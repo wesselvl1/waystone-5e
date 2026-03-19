@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-surface-950 text-slate-100 antialiased;
+  }
+
+  /* Thin scrollbars on mobile */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.surface.600') transparent;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-500 active:bg-primary-600;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-slate-300 hover:bg-surface-700 hover:text-white;
+  }
+
+  .btn-danger {
+    @apply btn bg-transparent text-danger-400 hover:bg-danger-500/10;
+  }
+
+  .card {
+    @apply rounded-xl bg-surface-800 border border-surface-700/50 p-4;
+  }
+
+  .input {
+    @apply w-full rounded-lg bg-surface-700 border border-surface-600 px-3 py-2 text-sm text-slate-100 placeholder-slate-500
+      focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors;
+  }
+
+  .label {
+    @apply block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1;
+  }
+
+  .stat-box {
+    @apply flex flex-col items-center justify-center rounded-xl bg-surface-800 border border-surface-700/50 p-3 gap-1;
+  }
+
+  .stat-value {
+    @apply text-2xl font-bold text-white;
+  }
+
+  .stat-label {
+    @apply text-[10px] uppercase tracking-widest text-slate-400;
+  }
+
+  .section-header {
+    @apply text-xs font-semibold uppercase tracking-widest text-slate-400 px-1 mb-2;
+  }
+
+  .proficiency-dot {
+    @apply w-3 h-3 rounded-full border border-slate-500 flex-shrink-0 transition-colors cursor-pointer;
+  }
+
+  .proficiency-dot.active {
+    @apply bg-primary-500 border-primary-500;
+  }
+
+  .proficiency-dot.expertise {
+    @apply bg-accent-400 border-accent-400;
+  }
+}
+
+@layer utilities {
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: opacity 0.15s ease;
+  }
+  .fade-enter-from,
+  .fade-leave-to {
+    opacity: 0;
+  }
+}

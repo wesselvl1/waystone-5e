@@ -1,0 +1,32 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Races and classes included \u2014 backgrounds, feats, and spells to follow.",
+  "author": "Wizards of the Coast",
+  "backgrounds": [
+    {
+      "id": "acolyte",
+      "name": "Acolyte",
+      "description": "You have spent your life in the service of a temple to a specific god or pantheon of gods. You act as an intermediary between the realm of the holy and the mortal world.",
+      "skillProficiencies": [
+        "insight",
+        "religion"
+      ],
+      "toolProficiencies": [],
+      "languages": 2,
+      "equipment": [
+        "Holy symbol",
+        "Prayer book or prayer wheel",
+        "5 sticks of incense",
+        "Vestments",
+        "Common clothes",
+        "Belt pouch containing 15 gp"
+      ],
+      "feature": {
+        "name": "Shelter of the Faithful",
+        "description": "As an acolyte, you command the respect of those who share your faith, and you can perform the religious ceremonies of your deity. You and your adventuring companions can expect to receive free healing and care at a temple, shrine, or other established presence of your faith, though you must provide any material components needed for spells. Those who share your religion will support you (but only you) at a modest lifestyle. You might also have ties to a specific temple dedicated to your chosen deity or pantheon, and you have a residence there. This could be the temple where you used to serve, if you remain on good terms with it, or a temple where you have found a new home."
+      }
+    }
+  ]
+}

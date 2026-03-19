@@ -1,0 +1,182 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Races and classes included \u2014 backgrounds, feats, and spells to follow.",
+  "author": "Wizards of the Coast",
+  "classes": [
+    {
+      "id": "barbarian",
+      "name": "Barbarian",
+      "hitDie": "d12",
+      "primaryAbility": ["str"],
+      "savingThrowProficiencies": ["str", "con"],
+      "armorProficiencies": ["light", "medium", "shields"],
+      "weaponProficiencies": ["simple", "martial"],
+      "toolProficiencies": [],
+      "skillChoices": {
+        "count": 2,
+        "from": [
+          "animalHandling",
+          "athletics",
+          "intimidation",
+          "nature",
+          "perception",
+          "survival"
+        ]
+      },
+      "levels": [
+        {
+          "level": 1,
+          "proficiencyBonus": 2,
+          "features": ["Rage", "Unarmored Defense"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 2,
+          "proficiencyBonus": 2,
+          "features": ["Reckless Attack", "Danger Sense"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 3,
+          "proficiencyBonus": 2,
+          "features": ["Primal Path"],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Primal Path"
+            }
+          ]
+        },
+        {
+          "level": 4,
+          "proficiencyBonus": 2,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 5,
+          "proficiencyBonus": 3,
+          "features": ["Extra Attack", "Fast Movement"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 6,
+          "proficiencyBonus": 3,
+          "features": ["Primal Path Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 7,
+          "proficiencyBonus": 3,
+          "features": ["Feral Instinct"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 8,
+          "proficiencyBonus": 3,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 9,
+          "proficiencyBonus": 4,
+          "features": ["Brutal Critical (1 die)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 10,
+          "proficiencyBonus": 4,
+          "features": ["Primal Path Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 11,
+          "proficiencyBonus": 4,
+          "features": ["Relentless Rage"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 12,
+          "proficiencyBonus": 4,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "proficiencyBonus": 5,
+          "features": ["Brutal Critical (2 dice)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 14,
+          "proficiencyBonus": 5,
+          "features": ["Primal Path Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 15,
+          "proficiencyBonus": 5,
+          "features": ["Persistent Rage"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 16,
+          "proficiencyBonus": 5,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "proficiencyBonus": 6,
+          "features": ["Brutal Critical (3 dice)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 18,
+          "proficiencyBonus": 6,
+          "features": ["Indomitable Might"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 19,
+          "proficiencyBonus": 6,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "proficiencyBonus": 6,
+          "features": ["Primal Champion"],
+          "levelUpEvents": []
+        }
+      ]
+    }
+  ]
+}
