@@ -19,7 +19,13 @@ export const validCharacter: Character = {
   deathSaves: { successes: 0, failures: 0 },
   conditions: [],
   savingThrowProficiencies: ['str', 'con'],
-  skillProficiencies: { athletics: 1, perception: 1 },
+  skillProficiencies: {
+    acrobatics: 0, animalHandling: 0, arcana: 0, athletics: 1,
+    deception: 0, history: 0, insight: 0, intimidation: 0,
+    investigation: 0, medicine: 0, nature: 0, perception: 1,
+    performance: 0, persuasion: 0, religion: 0, sleightOfHand: 0,
+    stealth: 0, survival: 0,
+  },
   otherProficiencies: ['light armor', 'medium armor', 'heavy armor'],
   attacks: [],
   spellSlots: {
