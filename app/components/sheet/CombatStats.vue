@@ -58,6 +58,27 @@ const hpColor = computed(() => {
 
 const hitDice = computed(() => props.character.hitDice)
 
+// ── Limited-use abilities ─────────────────────────────────────────────────────
+const limitedFeatures = computed(() =>
+  props.character.features.filter(f => f.usesMax !== undefined || f.recharge !== undefined),
+)
+
+function useCharge(id: string) {
+  const updated = props.character.features.map(f => {
+    if (f.id !== id || f.usesRemaining === undefined) return f
+    return { ...f, usesRemaining: Math.max(0, f.usesRemaining - 1) }
+  })
+  emit('update', { features: updated })
+}
+
+function restoreCharge(id: string) {
+  const updated = props.character.features.map(f => {
+    if (f.id !== id || f.usesMax === undefined || f.usesRemaining === undefined) return f
+    return { ...f, usesRemaining: Math.min(f.usesMax, f.usesRemaining + 1) }
+  })
+  emit('update', { features: updated })
+}
+
 function checkDeathSave(type: 'successes' | 'failures', idx: number) {
   const current = props.character.deathSaves[type]
   const newVal = current === idx + 1 ? idx : idx + 1
@@ -181,9 +202,47 @@ function applyHpChange() {
       </div>
     </div>
 
+    <!-- Limited-use abilities -->
+    <div v-if="limitedFeatures.length > 0" class="card space-y-0 divide-y divide-surface-700/50">
+      <p class="section-header">Abilities</p>
+      <div
+        v-for="feature in limitedFeatures"
+        :key="feature.id"
+        class="flex items-center gap-3 py-2 first:pt-1 last:pb-0"
+      >
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-white leading-tight">{{ feature.name }}</p>
+          <p v-if="feature.recharge" class="text-[10px] uppercase tracking-wider mt-0.5"
+            :class="{
+              'text-primary-400': feature.recharge === 'long',
+              'text-accent-400': feature.recharge === 'short',
+              'text-success-400': feature.recharge === 'dawn',
+            }"
+          >
+            {{ feature.recharge }} rest
+          </p>
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <template v-if="feature.usesMax !== undefined">
+            <button
+              class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-base leading-none transition-colors"
+              :disabled="(feature.usesRemaining ?? 0) <= 0"
+              @click="useCharge(feature.id)"
+            >−</button>
+            <span class="text-sm font-mono text-white tabular-nums w-10 text-center">{{ feature.usesRemaining }}/{{ feature.usesMax }}</span>
+            <button
+              class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-base leading-none transition-colors"
+              :disabled="(feature.usesRemaining ?? 0) >= (feature.usesMax ?? 0)"
+              @click="restoreCharge(feature.id)"
+            >+</button>
+          </template>
+          <span v-else class="text-lg text-slate-400">∞</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Death saves -->
-    <div v-if="character.hp.current <= 0" class="card">
-      <p class="section-header">Death Saves</p>
+    <div v-if="character.hp.current <= 0" class="card">      <p class="section-header">Death Saves</p>
       <div class="flex gap-4">
         <div class="flex-1">
           <p class="text-xs text-success-400 mb-1">Successes</p>

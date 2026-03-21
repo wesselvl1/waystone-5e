@@ -48,6 +48,12 @@ export interface UpdateHitDieEvent {
   totalDice: number
 }
 
+export interface UpdateFeatureUsesEvent {
+  type: 'UPDATE_FEATURE_USES'
+  featureName: string
+  usesMax: number | null   // null = unlimited (remove the cap)
+}
+
 // ─── Choice events (require player input) ─────────────────────────────────────
 
 export interface ChooseSpellEvent {
@@ -160,6 +166,7 @@ export type AutomaticLevelUpEvent =
   | AddFeatureEvent
   | GainProficiencyEvent
   | UpdateHitDieEvent
+  | UpdateFeatureUsesEvent
 
 export type ChoiceLevelUpEvent =
   | ChooseSpellEvent

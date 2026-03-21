@@ -67,7 +67,7 @@ describe('RulepackSchema', () => {
       ...minimalRulepack,
       classes: [{
         ...fighterRulepack.classes[0],
-        levels: [{ level: 21, proficiencyBonus: 7, features: [], levelUpEvents: [] }],
+        levels: [{ level: 21, features: [], levelUpEvents: [] }],
       }],
     })
     expect(result.success).toBe(false)

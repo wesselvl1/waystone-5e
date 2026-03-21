@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
+import { resolveLevelUpEvents } from '~/services/levelUpService'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
 
 const router = useRouter()
@@ -114,8 +115,8 @@ async function createCharacter() {
     abilityScoreOverrides: {},
 
     hp: {
-      max: Math.max(1, parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
-      current: Math.max(1, parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
+      max: Math.max(1, Number.parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
+      current: Math.max(1, Number.parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
       temp: 0,
     },
     armorClass: null,
@@ -140,13 +141,15 @@ async function createCharacter() {
 
     features: [
       ...(selectedRace.value?.traits.map(t => ({
-        id: `race-${t.name.toLowerCase().replace(/\s+/g, '-')}`,
+        id: `race-${t.name.toLowerCase().replaceAll(' ', '-')}`,
+
         name: t.name,
         source: selectedRace.value?.name ?? 'Race',
         description: t.description,
       })) ?? []),
       ...(selectedSubrace.value?.traits.map(t => ({
-        id: `subrace-${t.name.toLowerCase().replace(/\s+/g, '-')}`,
+        id: `subrace-${t.name.toLowerCase().replaceAll(' ', '-')}`,
+
         name: t.name,
         source: `${selectedRace.value?.name ?? 'Race'} (${selectedSubrace.value?.name})`,
         description: t.description,
@@ -162,8 +165,8 @@ async function createCharacter() {
       const match = item.match(/^(\d+)\s+(.+)$/)
       return {
         id: crypto.randomUUID(),
-        name: match ? match[2] : item,
-        quantity: match ? Number.parseInt(match[1]) : 1,
+        name: (match ? match[2] : item) ?? item,
+        quantity: match?.[1] ? Number.parseInt(match[1]) : 1,
       }
     }),
     currency: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
@@ -172,6 +175,20 @@ async function createCharacter() {
     createdAt: now,
     updatedAt: now,
     rulepackIds: rulepackStore.rulepacks.map(r => r.id),
+  }
+
+  // Apply level 1 class features
+  const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === draft.classId))
+  if (pack) {
+    const levelOneEvents = resolveLevelUpEvents(character, draft.classId, 1, pack)
+    for (const event of levelOneEvents) {
+      if (event.type === 'ADD_FEATURE') {
+        character.features.push({
+          ...event.feature,
+          usesRemaining: event.feature.usesMax,
+        })
+      }
+    }
   }
 
   await characterStore.save(character)
@@ -452,12 +469,12 @@ function abilityMod(score: number) {
       <template v-if="step === 6">
         <div class="space-y-3">
           <div>
-            <label class="label">Character Name</label>
-            <input v-model="draft.name" class="input" placeholder="Enter a name…" />
+            <label class="label" for="char-name">Character Name</label>
+            <input id="char-name" v-model="draft.name" class="input" placeholder="Enter a name…" />
           </div>
           <div>
-            <label class="label">Alignment (optional)</label>
-            <select v-model="draft.alignment" class="input">
+            <label class="label" for="char-alignment">Alignment (optional)</label>
+            <select id="char-alignment" v-model="draft.alignment" class="input">
               <option value="">—</option>
               <option v-for="a in ['Lawful Good', 'Neutral Good', 'Chaotic Good', 'Lawful Neutral', 'True Neutral', 'Chaotic Neutral', 'Lawful Evil', 'Neutral Evil', 'Chaotic Evil']" :key="a" :value="a">{{ a }}</option>
             </select>

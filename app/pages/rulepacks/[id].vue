@@ -242,7 +242,7 @@ function levelLabel(l: number): string {
                     <tbody class="divide-y divide-surface-700/20">
                       <tr v-for="lvl in cls.levels" :key="lvl.level" class="text-slate-300">
                         <td class="py-1 pr-3 text-slate-500 align-top">{{ lvl.level }}</td>
-                        <td class="py-1 pr-3 text-slate-500 align-top">+{{ lvl.proficiencyBonus }}</td>
+                        <td class="py-1 pr-3 text-slate-500 align-top">+{{ Math.floor((lvl.level - 1) / 4) + 2 }}</td>
                         <td class="py-1 text-slate-300 align-top leading-relaxed">{{ lvl.features.join(', ') || '—' }}</td>
                         <template v-if="cls.spellcastingAbility">
                           <td class="py-1 pl-2 text-right text-slate-500 align-top">{{ lvl.cantripsKnown ?? '—' }}</td>

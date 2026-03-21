@@ -71,19 +71,16 @@ export const fighterRulepack: Rulepack = {
       levels: [
         {
           level: 1,
-          proficiencyBonus: 2,
           features: ['Fighting Style', 'Second Wind'],
           levelUpEvents: [],
         },
         {
           level: 2,
-          proficiencyBonus: 2,
           features: ['Action Surge'],
           levelUpEvents: [],
         },
         {
           level: 4,
-          proficiencyBonus: 2,
           features: ['Ability Score Improvement'],
           levelUpEvents: [{ type: 'ABILITY_SCORE_IMPROVEMENT', points: 2 }],
         },

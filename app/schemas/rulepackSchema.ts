@@ -54,6 +54,7 @@ const ChooseOptionDefSchema = z.object({
 
 const LevelUpEventDefSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ADD_FEATURE'), featureId: z.string() }),
+  z.object({ type: z.literal('UPDATE_FEATURE_USES'), featureName: z.string(), usesMax: z.number().int().nullable() }),
   z.object({
     type: z.literal('UPDATE_SPELL_SLOTS'),
     slots: z.partialRecord(SpellSlotLevelSchema, z.number()),
@@ -79,7 +80,6 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
 
 const ClassLevelSchema = z.object({
   level: z.number().int().min(1).max(20),
-  proficiencyBonus: z.number().int().min(2).max(6),
   features: z.array(z.string()),
   spellSlots: z.partialRecord(SpellSlotLevelSchema, z.number()).optional(),
   cantripsKnown: z.number().int().optional(),
@@ -107,6 +107,13 @@ const SubclassDefinitionSchema = z.object({
   levels: z.array(SubclassLevelSchema),
 })
 
+const ClassFeatureDefinitionSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  usesMax: z.number().int().optional(),
+  recharge: z.enum(['short', 'long', 'dawn']).optional(),
+})
+
 const ClassDefinitionSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -124,6 +131,7 @@ const ClassDefinitionSchema = z.object({
   isFullCaster: z.boolean().optional(),
   isHalfCaster: z.boolean().optional(),
   levels: z.array(ClassLevelSchema),
+  featureDefinitions: z.array(ClassFeatureDefinitionSchema).optional(),
   subclasses: z.array(SubclassDefinitionSchema).optional(),
 })
 

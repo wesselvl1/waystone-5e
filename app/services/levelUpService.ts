@@ -10,6 +10,7 @@ import type {
   UpdateSpellSlotsEvent,
   UpdateWarlockSlotsEvent,
   UpdateHitDieEvent,
+  UpdateFeatureUsesEvent,
   ResolvedChoice,
 } from '~/types/events'
 
@@ -133,13 +134,16 @@ export function resolveLevelUpEvents(
     // Skip generic "Primal Path Feature" style placeholders when we have real subclass features
     if (hasSubclassFeatures && isSubclassPlaceholder(featureName)) continue
 
+    const featDef = classDef.featureDefinitions?.find(d => d.name === featureName)
     events.push({
       type: 'ADD_FEATURE',
       feature: {
         id: `${classId}-${featureName.toLowerCase().replace(/\s+/g, '-')}-${newLevel}`,
         name: featureName,
-        source: `${classDef.name} ${newLevel}`,
-        description: '',
+        source: classDef.name,
+        description: featDef?.description ?? '',
+        usesMax: featDef?.usesMax,
+        recharge: featDef?.recharge,
       },
     } satisfies AddFeatureEvent)
   }
@@ -196,6 +200,13 @@ export function resolveLevelUpEvents(
         break
       case 'CHOOSE_OPTION':
         events.push({ type: 'CHOOSE_OPTION', id: eventDef.id, label: eventDef.label, options: eventDef.options })
+        break
+      case 'UPDATE_FEATURE_USES':
+        events.push({
+          type: 'UPDATE_FEATURE_USES',
+          featureName: eventDef.featureName,
+          usesMax: eventDef.usesMax,
+        } satisfies UpdateFeatureUsesEvent)
         break
     }
   }
@@ -309,6 +320,20 @@ export function applyAutomaticEvents(
           total: event.totalDice,
           remaining: Math.min(updated.hitDice.remaining + 1, event.totalDice),
           die: event.die,
+        }
+        break
+      }
+      case 'UPDATE_FEATURE_USES': {
+        const feature = updated.features.find(f => f.name === event.featureName)
+        if (feature) {
+          if (event.usesMax === null) {
+            delete feature.usesMax
+            delete feature.usesRemaining
+          }
+          else {
+            feature.usesMax = event.usesMax
+            feature.usesRemaining = Math.min(feature.usesRemaining ?? event.usesMax, event.usesMax)
+          }
         }
         break
       }
@@ -427,6 +452,32 @@ export function applyResolvedChoices(
                 })
               }
             }
+          }
+        }
+        break
+      }
+      case 'RESOLVED_OPTION': {
+        // Find the option definition from the rulepack across all subclass level events
+        let optionName: string | undefined
+        let optionDescription: string | undefined
+        outer: for (const cls of rulepack.classes) {
+          for (const sub of cls.subclasses ?? []) {
+            for (const lvl of sub.levels) {
+              for (const evt of lvl.levelUpEvents ?? []) {
+                if (evt.type === 'CHOOSE_OPTION' && evt.id === choice.choiceId) {
+                  const opt = evt.options.find(o => o.id === choice.optionId)
+                  if (opt) { optionName = opt.name; optionDescription = opt.description; break outer }
+                }
+              }
+            }
+          }
+        }
+        if (optionName) {
+          // Update the feature whose id contains the choiceId (e.g. "totem-spirit" in the feature id)
+          const feat = updated.features.find(f => f.id.includes(choice.choiceId))
+          if (feat) {
+            feat.name = `${feat.name} (${optionName})`
+            feat.description = optionDescription ?? feat.description
           }
         }
         break

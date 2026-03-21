@@ -10,7 +10,14 @@ import srdFeats from '~/data/srd/feats.json'
 import srdSpells from '~/data/srd/spells.json'
 
 /** Additional fragment files to merge into the SRD rulepack, in load order. */
-const SRD_FRAGMENTS = [srdRacesData, srdSubracesData, srdSubclassesData, srdClasses, srdBackgrounds, srdFeats, srdSpells]
+const SRD_FRAGMENTS = [srdRacesData, srdSubracesData, srdClasses, srdSubclassesData, srdBackgrounds, srdFeats, srdSpells]
+
+/**
+ * Increment this when bundled SRD data changes in a way that requires re-seeding,
+ * without changing the official SRD version number.
+ */
+const SRD_SEED_REVISION = 2
+const SEED_REVISION_KEY = `waystone-srd-seed-revision-${srdRacesData.id}`
 
 export default defineNuxtPlugin(async () => {
   const rulepackStore = useRulepacksStore()
@@ -21,8 +28,9 @@ export default defineNuxtPlugin(async () => {
   // All fragments share the same id/version — use races.json to drive the version check
   const existing = rulepackStore.getById(srdRacesData.id)
 
-  // Re-seed if the bundled version is newer than what's stored
-  if (existing?.version === srdRacesData.version) return
+  const storedRevision = Number(localStorage.getItem(SEED_REVISION_KEY) ?? 0)
+  // Re-seed if the bundled version is newer or the internal seed revision has changed
+  if (existing?.version === srdRacesData.version && storedRevision >= SRD_SEED_REVISION) return
 
   // Merge all fragment files in order (first fragment creates the rulepack, rest merge in)
   for (const fragmentData of SRD_FRAGMENTS) {
@@ -34,5 +42,6 @@ export default defineNuxtPlugin(async () => {
     await rulepackStore.add(fragResult.data as RulepackFragment)
   }
 
+  localStorage.setItem(SEED_REVISION_KEY, String(SRD_SEED_REVISION))
   console.info('[Waystone] SRD 5.1 rulepack loaded.')
 })
