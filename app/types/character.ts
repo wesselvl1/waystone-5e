@@ -134,4 +134,6 @@ export interface Character {
   rulepackIds: string[]                 // Which rulepacks were used
   /** Accumulated flat HP bonus per level from feats like Tough. */
   hpBonusPerLevel?: number
+  /** Number of Bardic Inspiration dice already expended this rest. */
+  bardicInspirationUsed?: number
 }

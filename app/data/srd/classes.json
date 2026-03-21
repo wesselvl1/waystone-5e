@@ -249,6 +249,227 @@
           "description": "You embody the power of the wilds. Your Strength and Constitution scores each increase by 4. Your maximum for those scores is now 24."
         }
       ]
+    },
+    {
+      "id": "bard",
+      "name": "Bard",
+      "hitDie": "d8",
+      "primaryAbility": ["cha"],
+      "savingThrowProficiencies": ["dex", "cha"],
+      "armorProficiencies": ["light"],
+      "weaponProficiencies": ["simple", "martial"],
+      "toolProficiencies": ["music instrument 1", "music instrument 2", "music instrument 3"],
+      "skillChoices": {
+        "count": 3,
+        "from": [
+          "acrobatics",
+          "animalHandling",
+          "arcana",
+          "athletics",
+          "deception",
+          "history",
+          "insight",
+          "intimidation",
+          "investigation",
+          "medicine",
+          "nature",
+          "perception",
+          "performance",
+          "persuasion",
+          "religion",
+          "sleightOfHand",
+          "stealth",
+          "survival"
+        ]
+      },
+      "levels": [
+        {
+          "level": 1,
+          "features": ["Spellcasting", "Bardic Inspiration (d6)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 2,
+          "features": ["Jack of All Trades", "Song of Rest (d6)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 3,
+          "features": ["Bard College"],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Bard College"
+            },
+            {
+              "type": "CHOOSE_EXPERTISE",
+              "label": "Choose two skills for Expertise",
+              "options": [
+                "acrobatics",
+                "animalHandling",
+                "arcana",
+                "athletics",
+                "deception",
+                "history",
+                "insight",
+                "intimidation",
+                "investigation",
+                "medicine",
+                "nature",
+                "perception",
+                "performance",
+                "persuasion",
+                "religion",
+                "sleightOfHand",
+                "stealth",
+                "survival"
+              ],
+              "count": 2
+            }
+          ]
+        },
+        {
+          "level": 4,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 5,
+          "features": ["Font of Inspiration"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 6,
+          "features": ["Bard College Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 7,
+          "features": ["Countercharm"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 8,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 9,
+          "features": ["Song of Rest (d8)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 10,
+          "features": ["Bard College Feature"],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_EXPERTISE",
+              "label": "Choose two skills for Expertise",
+              "options": [
+                "acrobatics",
+                "animalHandling",
+                "arcana",
+                "athletics",
+                "deception",
+                "history",
+                "insight",
+                "intimidation",
+                "investigation",
+                "medicine",
+                "nature",
+                "perception",
+                "performance",
+                "persuasion",
+                "religion",
+                "sleightOfHand",
+                "stealth",
+                "survival"
+              ],
+              "count": 2
+            }
+          ]
+        },
+        {
+          "level": 11,
+          "features": ["Additional Magical Secrets"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 12,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "features": ["Song of Rest (d10)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 14,
+          "features": ["Bard College Feature"],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 15,
+          "features": ["Superior Inspiration"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 16,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "features": ["Song of Rest (d12)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 18,
+          "features": ["Bard College Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 19,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "features": ["Superior Inspiration"],
+          "levelUpEvents": []
+        }
+      ]
     }
   ]
 }

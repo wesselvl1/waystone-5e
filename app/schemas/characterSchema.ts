@@ -136,6 +136,7 @@ export const CharacterSchema = z.object({
   updatedAt: z.string(),
   rulepackIds: z.array(z.string()),
   hpBonusPerLevel: z.number().int().min(0).optional(),
+  bardicInspirationUsed: z.number().int().min(0).optional(),
 }).strip()
 
 export type CharacterInput = z.input<typeof CharacterSchema>

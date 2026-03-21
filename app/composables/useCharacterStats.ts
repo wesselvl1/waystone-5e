@@ -115,6 +115,24 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     return profBonus.value + abilityModifiers.value[c.spellcastingAbility]
   })
 
+  const bardicInspiration = computed(() => {
+    const c = characterRef.value
+    if (!c) return null
+    const bardEntry = c.classes.find(e => e.classId === 'bard')
+    if (!bardEntry) return null
+    const bardLevel = bardEntry.level
+    const chaMod = abilityModifiers.value.cha
+    const max = Math.max(1, chaMod)
+    const recharge = bardLevel >= 5 ? 'short' : 'long'
+    let die: string
+    if (bardLevel >= 15) die = 'd12'
+    else if (bardLevel >= 10) die = 'd10'
+    else if (bardLevel >= 5) die = 'd8'
+    else die = 'd6'
+    const used = c.bardicInspirationUsed ?? 0
+    return { max, used, recharge, die }
+  })
+
   return {
     scores,
     totalLevel,
@@ -127,5 +145,6 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     armorClass,
     spellSaveDC,
     spellAttackBonus,
+    bardicInspiration,
   }
 }
