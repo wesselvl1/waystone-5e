@@ -3,6 +3,7 @@ import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { exportCharacter } from '~/services/characterIO'
 import type { Character } from '~/types/character'
+import type { ClassDefinition } from '~/types/rulepack'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,9 +17,38 @@ onMounted(async () => {
   await Promise.all([characterStore.loadAll(), rulepackStore.loadAll()])
   const id = route.params.id as string
   character.value = (await characterStore.getById(id)) ?? null
-  if (!character.value) router.replace('/')
+  if (!character.value) { router.replace('/'); return }
+  character.value = repairFeatures(character.value)
   loading.value = false
 })
+
+/**
+ * Back-fills missing descriptions, usesMax, and recharge on class features
+ * by looking them up in the rulepack's featureDefinitions.
+ */
+function repairFeatures(char: Character): Character {
+  const allClasses = rulepackStore.rulepacks.flatMap(r => r.classes) as ClassDefinition[]
+  const repaired = char.features.map(f => {
+    if (f.description && f.usesMax !== undefined) return f
+    const classDef = allClasses.find(c => c.name === f.source)
+    if (!classDef?.featureDefinitions) return f
+    const def = classDef.featureDefinitions.find(d => d.name === f.name)
+    if (!def) return f
+    return {
+      ...f,
+      description: f.description || def.description,
+      usesMax: f.usesMax ?? def.usesMax,
+      usesRemaining: f.usesRemaining ?? def.usesMax,
+      recharge: f.recharge ?? def.recharge,
+    }
+  })
+  // Only persist if something actually changed
+  const changed = repaired.some((f, i) => f !== char.features[i])
+  if (!changed) return char
+  const patched = { ...char, features: repaired }
+  characterStore.save(patched)
+  return patched
+}
 
 const activeTab = ref<'combat' | 'spells' | 'features' | 'equipment' | 'notes'>('combat')
 
@@ -70,6 +100,58 @@ async function onUpdate(patch: Partial<Character>) {
 async function doExport() {
   if (character.value) exportCharacter(character.value)
 }
+
+// ── Three-dot menu ────────────────────────────────────────────────────────────
+const menuOpen = ref(false)
+
+function closeMenu() { menuOpen.value = false }
+
+async function doShortRest() {
+  closeMenu()
+  if (!character.value) return
+  const features = character.value.features.map(f => {
+    if (f.recharge === 'short' && f.usesMax !== undefined)
+      return { ...f, usesRemaining: f.usesMax }
+    return f
+  })
+  // Warlock pact magic slots recharge on a short rest
+  const warlockSlots = character.value.warlockSlots
+    ? { ...character.value.warlockSlots, used: 0 }
+    : undefined
+  await onUpdate({ features, ...(warlockSlots ? { warlockSlots } : {}) })
+}
+
+async function doLongRest() {
+  closeMenu()
+  if (!character.value) return
+  const features = character.value.features.map(f => {
+    if ((f.recharge === 'long' || f.recharge === 'short') && f.usesMax !== undefined)
+      return { ...f, usesRemaining: f.usesMax }
+    return f
+  })
+  const hitDice = {
+    ...character.value.hitDice,
+    remaining: Math.min(
+      character.value.hitDice.total,
+      character.value.hitDice.remaining + Math.max(1, Math.floor(character.value.hitDice.total / 2)),
+    ),
+  }
+  const hp = { ...character.value.hp, current: character.value.hp.max }
+  // Regular spell slots recharge on a long rest
+  const spellSlots = Object.fromEntries(
+    Object.entries(character.value.spellSlots).map(([lvl, slot]) => [lvl, { ...slot, used: 0 }]),
+  ) as Character['spellSlots']
+  // Warlock slots also recharge on a long rest
+  const warlockSlots = character.value.warlockSlots
+    ? { ...character.value.warlockSlots, used: 0 }
+    : undefined
+  await onUpdate({ features, hitDice, hp, spellSlots, ...(warlockSlots ? { warlockSlots } : {}) })
+}
+
+function doLevelUp() {
+  closeMenu()
+  if (character.value) router.push(`/characters/${character.value.id}/levelup`)
+}
 </script>
 
 <template>
@@ -84,16 +166,41 @@ async function doExport() {
           </svg>
         </NuxtLink>
         <span class="flex-1 text-sm font-semibold text-white truncate">{{ character?.name }}</span>
-        <NuxtLink v-if="character" :to="`/characters/${character.id}/levelup`" class="btn-ghost text-xs p-2" title="Level Up">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
-          </svg>
-        </NuxtLink>
-        <button class="btn-ghost text-xs p-2" title="Export JSON" @click="doExport">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-        </button>
+        <!-- Three-dot menu -->
+        <div v-if="character" class="relative">
+          <button class="btn-ghost p-2" @click="menuOpen = !menuOpen">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+            </svg>
+          </button>
+          <Transition name="fade">
+            <div
+              v-if="menuOpen"
+              class="absolute right-0 top-full mt-1 w-44 bg-surface-800 border border-surface-600 rounded-xl shadow-xl z-50 overflow-hidden py-1"
+              @click.stop
+            >
+              <button class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-surface-700 transition-colors text-left" @click="doShortRest">
+                <svg class="w-4 h-4 text-accent-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
+                Short Rest
+              </button>
+              <button class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-surface-700 transition-colors text-left" @click="doLongRest">
+                <svg class="w-4 h-4 text-primary-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3" /></svg>
+                Long Rest
+              </button>
+              <div class="border-t border-surface-700/60 my-1" />
+              <button class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-surface-700 transition-colors text-left" @click="doLevelUp">
+                <svg class="w-4 h-4 text-success-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
+                Level Up
+              </button>
+              <button class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-surface-700 transition-colors text-left" @click="doExport(); closeMenu()">
+                <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Export
+              </button>
+            </div>
+          </Transition>
+          <!-- backdrop to close on outside click -->
+          <div v-if="menuOpen" class="fixed inset-0 z-40" @click="closeMenu" />
+        </div>
       </header>
 
       <!-- Sheet header + tab bar (only when character is loaded) -->

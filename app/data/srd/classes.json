@@ -28,30 +28,31 @@
       "levels": [
         {
           "level": 1,
-          "proficiencyBonus": 2,
           "features": ["Rage", "Unarmored Defense"],
           "levelUpEvents": []
         },
         {
           "level": 2,
-          "proficiencyBonus": 2,
           "features": ["Reckless Attack", "Danger Sense"],
           "levelUpEvents": []
         },
         {
           "level": 3,
-          "proficiencyBonus": 2,
           "features": ["Primal Path"],
           "levelUpEvents": [
             {
               "type": "CHOOSE_SUBCLASS",
               "label": "Primal Path"
+            },
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": 3
             }
           ]
         },
         {
           "level": 4,
-          "proficiencyBonus": 2,
           "features": [],
           "levelUpEvents": [
             {
@@ -62,25 +63,27 @@
         },
         {
           "level": 5,
-          "proficiencyBonus": 3,
           "features": ["Extra Attack", "Fast Movement"],
           "levelUpEvents": []
         },
         {
           "level": 6,
-          "proficiencyBonus": 3,
           "features": ["Primal Path Feature"],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": 4
+            }
+          ]
         },
         {
           "level": 7,
-          "proficiencyBonus": 3,
           "features": ["Feral Instinct"],
           "levelUpEvents": []
         },
         {
           "level": 8,
-          "proficiencyBonus": 3,
           "features": [],
           "levelUpEvents": [
             {
@@ -91,54 +94,51 @@
         },
         {
           "level": 9,
-          "proficiencyBonus": 4,
           "features": ["Brutal Critical (1 die)"],
           "levelUpEvents": []
         },
         {
           "level": 10,
-          "proficiencyBonus": 4,
           "features": ["Primal Path Feature"],
           "levelUpEvents": []
         },
         {
           "level": 11,
-          "proficiencyBonus": 4,
           "features": ["Relentless Rage"],
           "levelUpEvents": []
         },
         {
           "level": 12,
-          "proficiencyBonus": 4,
           "features": [],
           "levelUpEvents": [
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": 5
             }
           ]
         },
         {
           "level": 13,
-          "proficiencyBonus": 5,
           "features": ["Brutal Critical (2 dice)"],
           "levelUpEvents": []
         },
         {
           "level": 14,
-          "proficiencyBonus": 5,
           "features": ["Primal Path Feature"],
           "levelUpEvents": []
         },
         {
           "level": 15,
-          "proficiencyBonus": 5,
           "features": ["Persistent Rage"],
           "levelUpEvents": []
         },
         {
           "level": 16,
-          "proficiencyBonus": 5,
           "features": [],
           "levelUpEvents": [
             {
@@ -149,19 +149,22 @@
         },
         {
           "level": 17,
-          "proficiencyBonus": 6,
           "features": ["Brutal Critical (3 dice)"],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": 6
+            }
+          ]
         },
         {
           "level": 18,
-          "proficiencyBonus": 6,
           "features": ["Indomitable Might"],
           "levelUpEvents": []
         },
         {
           "level": 19,
-          "proficiencyBonus": 6,
           "features": [],
           "levelUpEvents": [
             {
@@ -172,9 +175,78 @@
         },
         {
           "level": 20,
-          "proficiencyBonus": 6,
           "features": ["Primal Champion"],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": null
+            }
+          ]
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Rage",
+          "description": "On your turn, you can enter a rage as a bonus action. While raging, you gain advantage on Strength checks and Strength saving throws, a bonus to melee weapon damage rolls using Strength, and resistance to bludgeoning, piercing, and slashing damage. You can't cast or concentrate on spells while raging. Your rage lasts 1 minute and ends early if you're knocked unconscious, if you haven't attacked a hostile creature or taken damage since your last turn, or if you end it as a bonus action on your turn. Once you have raged the maximum number of times for your barbarian level, you must finish a long rest before you can rage again.",
+          "usesMax": 2,
+          "recharge": "long"
+        },
+        {
+          "name": "Unarmored Defense",
+          "description": "While you are not wearing any armor, your Armor Class equals 10 + your Dexterity modifier + your Constitution modifier. You can use a shield and still gain this benefit."
+        },
+        {
+          "name": "Reckless Attack",
+          "description": "When you make your first attack on your turn, you can decide to attack recklessly. Doing so gives you advantage on melee weapon attack rolls using Strength during this turn, but attack rolls against you have advantage until your next turn."
+        },
+        {
+          "name": "Danger Sense",
+          "description": "You have advantage on Dexterity saving throws against effects that you can see, such as traps and spells. To gain this benefit, you can't be blinded, deafened, or incapacitated."
+        },
+        {
+          "name": "Primal Path",
+          "description": "At 3rd level, you choose a path that shapes the nature of your rage. Your choice grants you features at 3rd level and again at 6th, 10th, and 14th levels."
+        },
+        {
+          "name": "Extra Attack",
+          "description": "You can attack twice, instead of once, whenever you take the Attack action on your turn."
+        },
+        {
+          "name": "Fast Movement",
+          "description": "Your speed increases by 10 feet while you aren't wearing heavy armor."
+        },
+        {
+          "name": "Feral Instinct",
+          "description": "Your instincts are so honed that you have advantage on initiative rolls. Additionally, if you are surprised at the beginning of combat and aren't incapacitated, you can act normally on your first turn, but only if you enter your rage before doing anything else on that turn."
+        },
+        {
+          "name": "Brutal Critical (1 die)",
+          "description": "You can roll one additional weapon damage die when determining the extra damage for a critical hit with a melee attack."
+        },
+        {
+          "name": "Brutal Critical (2 dice)",
+          "description": "You can roll two additional weapon damage dice when determining the extra damage for a critical hit with a melee attack."
+        },
+        {
+          "name": "Brutal Critical (3 dice)",
+          "description": "You can roll three additional weapon damage dice when determining the extra damage for a critical hit with a melee attack."
+        },
+        {
+          "name": "Relentless Rage",
+          "description": "If you drop to 0 hit points while you're raging and don't die outright, you can make a DC 10 Constitution saving throw. If you succeed, you drop to 1 hit point instead. Each time you use this feature after the first, the DC increases by 5. When you finish a short or long rest, the DC resets to 10."
+        },
+        {
+          "name": "Persistent Rage",
+          "description": "Your rage is so fierce that it ends early only if you fall unconscious or if you choose to end it."
+        },
+        {
+          "name": "Indomitable Might",
+          "description": "If your total for a Strength check is less than your Strength score, you can use that score in place of the total."
+        },
+        {
+          "name": "Primal Champion",
+          "description": "You embody the power of the wilds. Your Strength and Constitution scores each increase by 4. Your maximum for those scores is now 24."
         }
       ]
     }

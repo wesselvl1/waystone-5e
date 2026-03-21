@@ -18,6 +18,7 @@ import type {
   AbilityScoreImprovementEvent,
   ChooseSpellEvent,
   ChooseSubclassEvent,
+  ChooseOptionEvent,
   OfferOptionalFeaturesEvent,
 } from '~/types/events'
 
@@ -184,6 +185,17 @@ function confirmFeat() {
   nextChoice()
 }
 
+// Choose option (e.g. totem spirit)
+const selectedOptionId = ref('')
+
+function confirmOption() {
+  const choiceEvent = currentChoice.value as ChooseOptionEvent
+  if (!selectedOptionId.value) return
+  resolvedChoices.value.push({ type: 'RESOLVED_OPTION', choiceId: choiceEvent.id, optionId: selectedOptionId.value })
+  selectedOptionId.value = ''
+  nextChoice()
+}
+
 // Choose subclass
 const selectedSubclassId = ref('')
 
@@ -214,8 +226,26 @@ const availableSubclasses = computed(() => rulepackStore.getSubclassesForClass(t
 
 function confirmSubclass() {
   if (!selectedSubclassId.value) return
-  resolvedChoices.value.push({ type: 'RESOLVED_SUBCLASS', subclassId: selectedSubclassId.value, classId: targetClassId.value })
+  const subclassId = selectedSubclassId.value
+  resolvedChoices.value.push({ type: 'RESOLVED_SUBCLASS', subclassId, classId: targetClassId.value })
   selectedSubclassId.value = ''
+
+  // Inject subclass-level choice events for this level now that we know the subclass
+  const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === targetClassId.value))
+  const subclassDef = pack?.classes.flatMap(c => c.subclasses ?? []).find(s => s.id === subclassId)
+  const subclassLevelDef = subclassDef?.levels.find(l => l.level === targetLevel.value)
+  const injected: ChoiceLevelUpEvent[] = []
+  for (const eventDef of subclassLevelDef?.levelUpEvents ?? []) {
+    if (eventDef.type === 'CHOOSE_OPTION')
+      injected.push({ type: 'CHOOSE_OPTION', id: eventDef.id, label: eventDef.label, options: eventDef.options } satisfies ChooseOptionEvent)
+    else if (eventDef.type === 'CHOOSE_SPELL')
+      injected.push({ type: 'CHOOSE_SPELL', count: eventDef.count, cantrip: eventDef.cantrip ?? false, fromList: eventDef.fromList })
+    else if (eventDef.type === 'ABILITY_SCORE_IMPROVEMENT')
+      injected.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
+  }
+  if (injected.length > 0)
+    choiceEvents.value.splice(currentChoiceIdx.value + 1, 0, ...injected)
+
   nextChoice()
 }
 
@@ -516,6 +546,27 @@ const targetLevel = computed(() => {
               :disabled="!selectedSubclassId"
               @click="confirmSubclass"
             >Confirm</button>
+          </div>
+        </template>
+
+        <!-- Choose Option (e.g. Totem Spirit) -->
+        <template v-else-if="currentChoice.type === 'CHOOSE_OPTION'">
+          <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ChooseOptionEvent).label }}</h2>
+          <div class="space-y-2 mt-3">
+            <button
+              v-for="opt in (currentChoice as ChooseOptionEvent).options"
+              :key="opt.id"
+              class="card w-full text-left hover:border-primary-500/50 transition-colors"
+              :class="selectedOptionId === opt.id ? 'border-primary-500 bg-primary-900/20' : ''"
+              @click="selectedOptionId = opt.id"
+            >
+              <p class="font-semibold text-white">{{ opt.name }}</p>
+              <p class="text-xs text-slate-400 mt-1 leading-relaxed">{{ opt.description }}</p>
+            </button>
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
+            <button class="btn-primary flex-1 text-sm" :disabled="!selectedOptionId" @click="confirmOption">Confirm</button>
           </div>
         </template>
 

@@ -75,7 +75,6 @@ describe('resolveLevelUpEvents', () => {
         ...fighterRulepack.classes[0]!,
         levels: [{
           level: 3,
-          proficiencyBonus: 2,
           features: ['Martial Archetype'],
           levelUpEvents: [{ type: 'CHOOSE_SUBCLASS' as const, label: 'Martial Archetype' }],
         }],

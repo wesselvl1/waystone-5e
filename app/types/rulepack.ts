@@ -52,6 +52,7 @@ export interface ChooseOptionDef {
 
 export type LevelUpEventDef =
   | { type: 'ADD_FEATURE'; featureId: string }
+  | { type: 'UPDATE_FEATURE_USES'; featureName: string; usesMax: number | null }
   | { type: 'UPDATE_SPELL_SLOTS'; slots: Partial<Record<SpellSlotLevel, number>> }
   | { type: 'UPDATE_WARLOCK_SLOTS'; slotLevel: SpellSlotLevel; max: number }
   | { type: 'GAIN_PROFICIENCY'; proficiency: string }
@@ -64,7 +65,6 @@ export type LevelUpEventDef =
 
 export interface ClassLevel {
   level: number
-  proficiencyBonus: number
   features: string[]                   // Feature names gained at this level
   spellSlots?: Partial<Record<SpellSlotLevel, number>>
   cantripsKnown?: number
@@ -92,6 +92,13 @@ export interface SubclassDefinition {
   levels: SubclassLevel[]
 }
 
+export interface ClassFeatureDefinition {
+  name: string
+  description: string
+  usesMax?: number
+  recharge?: 'short' | 'long' | 'dawn'
+}
+
 export interface ClassDefinition {
   id: string
   name: string
@@ -107,6 +114,7 @@ export interface ClassDefinition {
   isHalfCaster?: boolean
   pactMagic?: boolean                  // Warlock-style pact magic (slots separate from regular slots)
   levels: ClassLevel[]                 // index 0 = level 1
+  featureDefinitions?: ClassFeatureDefinition[]
   subclasses?: SubclassDefinition[]
 }
 
