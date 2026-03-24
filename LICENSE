@@ -138,7 +138,7 @@ rights.
 
 ## Third-Party Content
 
-The file `app/data/srd-5.1.json` contains content from the
+The folder `app/data/srd` contains content from the
 Systems Reference Document 5.1 by Wizards of the Coast LLC,
 licensed under the Creative Commons Attribution 4.0
 International License (CC BY 4.0).
