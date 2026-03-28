@@ -62,9 +62,25 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('GAIN_PROFICIENCY'), proficiency: z.string() }),
   z.object({
     type: z.literal('CHOOSE_SPELL'),
+    addTo: z.string(),
     count: z.number().int().min(1),
     fromList: z.array(z.string()).optional(),
     cantrip: z.boolean().optional(),
+    classes: z.array(z.string()).optional(),
+    schools: z.array(z.string()).optional(),
+  }),
+  z.object({
+    type: z.literal('CHANGE_SPELL'),
+    addTo: z.string(),
+    amount: z.number().int().min(1),
+    classes: z.array(z.string()).optional(),
+    schools: z.array(z.string()).optional(),
+  }),
+  z.object({
+    type: z.literal('CHOOSE_EXPERTISE'),
+    label: z.string(),
+    options: z.array(SkillKeySchema),
+    count: z.number().int().min(1),
   }),
   z.object({ type: z.literal('CHOOSE_FEAT') }),
   z.object({ type: z.literal('ABILITY_SCORE_IMPROVEMENT'), points: z.number().int() }),
@@ -112,6 +128,7 @@ const ClassFeatureDefinitionSchema = z.object({
   description: z.string(),
   usesMax: z.number().int().optional(),
   recharge: z.enum(['short', 'long', 'dawn']).optional(),
+  replaces: z.string().optional(),
 })
 
 const ClassDefinitionSchema = z.object({

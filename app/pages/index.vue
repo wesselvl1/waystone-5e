@@ -49,7 +49,7 @@ function raceName(raceId: string) {
 </script>
 
 <template>
-  <div class="min-h-screen pb-4">
+  <div class="fixed inset-0 flex flex-col">
     <!-- Header -->
     <header class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-surface-900/95 backdrop-blur border-b border-surface-700/60">
       <h1 class="font-display text-lg font-semibold text-primary-400 tracking-wide">Waystone</h1>
@@ -67,7 +67,7 @@ function raceName(raceId: string) {
       </div>
     </header>
 
-    <main class="px-4 pt-4">
+    <main class="flex-1 overflow-y-auto overflow-x-hidden px-4 pt-4 pb-20">
       <!-- Empty state -->
       <div v-if="!characterStore.loading && characterStore.characters.length === 0" class="flex flex-col items-center justify-center pt-24 gap-4 text-center">
         <div class="w-16 h-16 rounded-full bg-surface-800 flex items-center justify-center">
@@ -87,7 +87,7 @@ function raceName(raceId: string) {
         <div
           v-for="character in characterStore.characters"
           :key="character.id"
-          class="card flex items-center gap-4 cursor-pointer hover:border-primary-500/40 transition-colors active:scale-[0.99]"
+          class="card flex items-center gap-4 overflow-hidden cursor-pointer hover:border-primary-500/40 transition-colors active:scale-[0.99]"
           @click="$router.push(`/characters/${character.id}`)"
         >
           <!-- Level badge -->
@@ -116,6 +116,10 @@ function raceName(raceId: string) {
           </div>
         </div>
       </div>
+
+      <footer class="mt-8 pb-4 text-center">
+        <NuxtLink to="/about" class="text-xs text-slate-500 hover:text-slate-300 transition-colors">About Waystone</NuxtLink>
+      </footer>
     </main>
   </div>
 </template>

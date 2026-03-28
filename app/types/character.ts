@@ -28,6 +28,11 @@ export interface AttackEntry {
   notes?: string
 }
 
+export interface ClassSpellcasting {
+  ability: AbilityKey               // Spellcasting ability used for DC and attack bonus
+  spells: SpellEntry[]              // Spells known/prepared for this class
+}
+
 export interface SpellEntry {
   id: string
   spellId: string               // References SpellDefinition.id in a rulepack
@@ -114,7 +119,9 @@ export interface Character {
 
   // Attacks & spells
   attacks: AttackEntry[]
+  /** @deprecated Use classSpellcasting[classId].ability for per-class DC tracking. */
   spellcastingAbility?: AbilityKey
+  classSpellcasting: Record<string, ClassSpellcasting>   // Keyed by classId
   spellSlots: SpellSlots
   warlockSlots?: WarlockSlots           // Pact magic slots — separate from regular slots
   spells: SpellEntry[]
