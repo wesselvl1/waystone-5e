@@ -31,6 +31,7 @@ export interface AddFeatureEvent {
     description: string
     usesMax?: number
     recharge?: 'short' | 'long' | 'dawn'
+    replaces?: string    // Name of an existing feature to remove when this one is added
   }
 }
 
@@ -58,10 +59,28 @@ export interface UpdateFeatureUsesEvent {
 
 export interface ChooseSpellEvent {
   type: 'CHOOSE_SPELL'
+  addTo: string         // classId of the class spell list to add chosen spells to
   count: number
   cantrip: boolean
   fromList?: string[]   // Spell ids if restricted; empty = any from class list
   replace?: boolean     // Whether player can also swap an existing spell
+  classes?: string[]    // Restrict to spells from these class lists
+  schools?: string[]    // Restrict to spells from these schools of magic
+}
+
+export interface ChangeSpellEvent {
+  type: 'CHANGE_SPELL'
+  addTo: string         // classId of the class spell list to swap spells in
+  amount: number        // Number of spells the player may swap out
+  classes?: string[]    // Restrict replacements to spells from these class lists
+  schools?: string[]    // Restrict replacements to spells from these schools of magic
+}
+
+export interface ChooseExpertiseEvent {
+  type: 'CHOOSE_EXPERTISE'
+  label: string
+  options: SkillKey[]
+  count: number
 }
 
 export interface ChooseFeatEvent {
@@ -170,6 +189,8 @@ export type AutomaticLevelUpEvent =
 
 export type ChoiceLevelUpEvent =
   | ChooseSpellEvent
+  | ChangeSpellEvent
+  | ChooseExpertiseEvent
   | ChooseFeatEvent
   | AbilityScoreImprovementEvent
   | ChooseSubclassEvent

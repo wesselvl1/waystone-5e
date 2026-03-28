@@ -39,7 +39,7 @@ export default defineNuxtPlugin(async () => {
       console.error('[Waystone] Failed to validate SRD fragment:', fragResult.error.issues)
       continue
     }
-    await rulepackStore.add(fragResult.data as RulepackFragment)
+    await rulepackStore.add(fragResult.data)
   }
 
   localStorage.setItem(SEED_REVISION_KEY, String(SRD_SEED_REVISION))

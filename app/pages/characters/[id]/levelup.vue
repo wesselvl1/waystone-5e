@@ -154,10 +154,11 @@ const availableSpells = computed(() => {
   const existing = new Set(character.value?.spells.map(s => s.spellId) ?? [])
   return allSpells.filter(s => {
     if (existing.has(s.id)) return false
-    if (choiceEvent.cantrip) return s.level === 0
+    if (choiceEvent.cantrip !== (s.level === 0)) return false
     if (choiceEvent.fromList?.length) return choiceEvent.fromList.includes(s.id)
-    const classSpells = rulepackStore.getClass(targetClassId.value)
-    return classSpells ? s.classes.includes(targetClassId.value) : true
+    if (choiceEvent.classes?.length) return s.classes.some(c => choiceEvent.classes!.includes(c))
+    if (choiceEvent.schools?.length) return choiceEvent.schools.includes(s.school)
+    return true
   })
 })
 
@@ -239,7 +240,7 @@ function confirmSubclass() {
     if (eventDef.type === 'CHOOSE_OPTION')
       injected.push({ type: 'CHOOSE_OPTION', id: eventDef.id, label: eventDef.label, options: eventDef.options } satisfies ChooseOptionEvent)
     else if (eventDef.type === 'CHOOSE_SPELL')
-      injected.push({ type: 'CHOOSE_SPELL', count: eventDef.count, cantrip: eventDef.cantrip ?? false, fromList: eventDef.fromList })
+      injected.push({ type: 'CHOOSE_SPELL', addTo: eventDef.addTo, count: eventDef.count, cantrip: eventDef.cantrip ?? false, fromList: eventDef.fromList })
     else if (eventDef.type === 'ABILITY_SCORE_IMPROVEMENT')
       injected.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
   }
@@ -298,6 +299,19 @@ const targetLevel = computed(() => {
   const entry = character.value.classes.find(c => c.classId === targetClassId.value)
   return (entry?.level ?? 0) + 1
 })
+
+// True when this level-up is the character's very first level (not multiclassing into a new class)
+const isFirstCharacterLevel = computed(() => {
+  if (!character.value) return false
+  if (targetLevel.value !== 1) return false
+  return character.value.classes
+    .filter(c => c.classId !== targetClassId.value)
+    .every(c => c.level === 0)
+})
+
+watch(isFirstCharacterLevel, (val) => {
+  if (val) hpChoice.value = 'max'
+}, { immediate: true })
 </script>
 
 <template>
@@ -614,8 +628,15 @@ const targetLevel = computed(() => {
           Level {{ targetLevel }} — Summary
         </h2>
 
-        <!-- HP gain -->
-        <div v-if="addHpEvent" class="card space-y-3">
+        <!-- HP gain: first character level always gets max, no choice needed -->
+        <div v-if="addHpEvent && isFirstCharacterLevel" class="card space-y-2">
+          <p class="section-header">Hit Points</p>
+          <p class="text-xs text-slate-400">You gain maximum hit points at 1st level.</p>
+          <p class="text-2xl font-bold text-white">+{{ Math.max(1, addHpEvent.max + addHpEvent.conBonus + addHpEvent.hpFlatBonus) }}</p>
+        </div>
+
+        <!-- HP gain: multiclass or higher levels — player chooses -->
+        <div v-if="addHpEvent && !isFirstCharacterLevel" class="card space-y-3">
           <p class="section-header">Hit Points</p>
           <div class="grid grid-cols-2 gap-2">
             <button

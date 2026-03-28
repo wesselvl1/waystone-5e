@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
-import { resolveLevelUpEvents } from '~/services/levelUpService'
+import { resolveLevelUpEvents, getChoiceEvents } from '~/services/levelUpService'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
 
 const router = useRouter()
@@ -100,6 +100,18 @@ async function createCharacter() {
     }
   }
 
+  // Check if level 1 has choice events (e.g. spell selection). If so, create the character at
+  // level 0 so the level-up wizard handles level 1 — including HP roll and spell choices.
+  const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === draft.classId))
+  const hasLevel1Choices = pack
+    ? getChoiceEvents(resolveLevelUpEvents(
+        { abilityScores: effectiveAbilities.value, hitDice: { total: 0, remaining: 0, die: cls?.hitDie ?? 'd8' }, classes: [{ classId: draft.classId, level: 0 }], spells: [] } as any,
+        draft.classId, 1, pack,
+      )).length > 0
+    : false
+
+  const startingLevel = hasLevel1Choices ? 0 : 1
+
   const character: Character = {
     id: crypto.randomUUID(),
     name: draft.name || 'Unnamed Adventurer',
@@ -107,22 +119,24 @@ async function createCharacter() {
     subrace: draft.subraceId || undefined,
     background: draft.backgroundId,
     alignment: draft.alignment,
-    classes: [{ classId: draft.classId, level: 1 }],
+    classes: [{ classId: draft.classId, level: startingLevel }],
     experiencePoints: 0,
     inspiration: false,
 
     abilityScores: { ...draft.abilities },
     abilityScoreOverrides: {},
 
-    hp: {
-      max: Math.max(1, Number.parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
-      current: Math.max(1, Number.parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
-      temp: 0,
-    },
+    hp: hasLevel1Choices
+      ? { max: 0, current: 0, temp: 0 }
+      : {
+          max: Math.max(1, Number.parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
+          current: Math.max(1, Number.parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
+          temp: 0,
+        },
     armorClass: null,
     speeds: selectedRace.value?.speeds ?? { walk: 30 },
     initiative: null,
-    hitDice: { total: 1, remaining: 1, die: cls?.hitDie ?? 'd8' },
+    hitDice: { total: startingLevel, remaining: startingLevel, die: cls?.hitDie ?? 'd8' },
     deathSaves: { successes: 0, failures: 0 },
     conditions: [],
 
@@ -135,6 +149,7 @@ async function createCharacter() {
     ],
 
     spellcastingAbility: cls?.spellcastingAbility,
+    classSpellcasting: {},
     spellSlots: {} as Character['spellSlots'],
     spells: [],
     attacks: [],
@@ -177,8 +192,14 @@ async function createCharacter() {
     rulepackIds: rulepackStore.rulepacks.map(r => r.id),
   }
 
-  // Apply level 1 class features
-  const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === draft.classId))
+  if (hasLevel1Choices) {
+    // The level-up wizard handles HP, features, and spell choices for level 1
+    await characterStore.save(character)
+    router.push(`/characters/${character.id}/levelup`)
+    return
+  }
+
+  // Apply level 1 class features for classes without level-1 choices
   if (pack) {
     const levelOneEvents = resolveLevelUpEvents(character, draft.classId, 1, pack)
     for (const event of levelOneEvents) {
@@ -409,10 +430,13 @@ function abilityMod(score: number) {
           </div>
         </div>
 
-        <div v-if="Object.keys(selectedRace?.abilityScoreBonuses ?? {}).length > 0" class="card">
+        <div v-if="Object.keys(selectedRace?.abilityScoreBonuses ?? {}).length > 0 || Object.keys(selectedSubrace?.abilityScoreBonuses ?? {}).length > 0" class="card">
           <p class="text-xs text-slate-400">
             <span class="text-accent-400 font-medium">Racial bonuses applied:</span>
-            {{ Object.entries(selectedRace!.abilityScoreBonuses).map(([k, v]) => `+${v} ${k.toUpperCase()}`).join(', ') }}
+            {{ [
+              ...Object.entries(selectedRace?.abilityScoreBonuses ?? {}),
+              ...Object.entries(selectedSubrace?.abilityScoreBonuses ?? {}),
+            ].map(([k, v]) => `+${v} ${k.toUpperCase()}`).join(', ') }}
           </p>
         </div>
       </template>
@@ -426,10 +450,13 @@ function abilityMod(score: number) {
             <button
               v-for="skill in availableSkills"
               :key="skill"
-              class="card text-sm text-left transition-colors hover:border-primary-500/50 py-2"
-              :class="draft.skillChoices.includes(skill)
-                ? 'border-primary-500 bg-primary-900/20 text-white'
-                : 'text-slate-400'"
+              class="card text-sm text-left py-2"
+              :class="selectedBackground?.skillProficiencies.includes(skill)
+                ? 'opacity-40 cursor-not-allowed text-slate-400'
+                : draft.skillChoices.includes(skill)
+                  ? 'border-primary-500 bg-primary-900/20 text-white transition-colors hover:border-primary-500/50'
+                  : 'text-slate-400 transition-colors hover:border-primary-500/50'"
+              :disabled="selectedBackground?.skillProficiencies.includes(skill)"
               @click="toggleSkill(skill)"
             >
               {{ skill.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()) }}

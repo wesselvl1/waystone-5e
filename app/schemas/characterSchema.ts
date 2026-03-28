@@ -34,6 +34,11 @@ const AttackEntrySchema = z.object({
   notes: z.string().optional(),
 })
 
+const ClassSpellcastingSchema = z.object({
+  ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+  spells: z.array(z.lazy(() => SpellEntrySchema)),
+})
+
 const SpellEntrySchema = z.object({
   id: z.string(),
   spellId: z.string(),
@@ -114,6 +119,7 @@ export const CharacterSchema = z.object({
 
   attacks: z.array(AttackEntrySchema),
   spellcastingAbility: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']).optional(),
+  classSpellcasting: z.record(z.string(), ClassSpellcastingSchema).default({}),
   spellSlots: SpellSlotsSchema,
   warlockSlots: WarlockSlotsSchema.optional(),
   spells: z.array(SpellEntrySchema),
@@ -136,6 +142,7 @@ export const CharacterSchema = z.object({
   updatedAt: z.string(),
   rulepackIds: z.array(z.string()),
   hpBonusPerLevel: z.number().int().min(0).optional(),
+  bardicInspirationUsed: z.number().int().min(0).optional(),
 }).strip()
 
 export type CharacterInput = z.input<typeof CharacterSchema>

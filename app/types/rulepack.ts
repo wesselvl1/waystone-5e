@@ -56,7 +56,9 @@ export type LevelUpEventDef =
   | { type: 'UPDATE_SPELL_SLOTS'; slots: Partial<Record<SpellSlotLevel, number>> }
   | { type: 'UPDATE_WARLOCK_SLOTS'; slotLevel: SpellSlotLevel; max: number }
   | { type: 'GAIN_PROFICIENCY'; proficiency: string }
-  | { type: 'CHOOSE_SPELL'; count: number; fromList?: string[]; cantrip?: boolean }
+  | { type: 'CHOOSE_SPELL'; addTo: string; count: number; fromList?: string[]; cantrip?: boolean; classes?: string[]; schools?: string[] }
+  | { type: 'CHANGE_SPELL'; addTo: string; amount: number; classes?: string[]; schools?: string[] }
+  | { type: 'CHOOSE_EXPERTISE'; label: string; options: SkillKey[]; count: number }
   | { type: 'CHOOSE_FEAT' }
   | { type: 'ABILITY_SCORE_IMPROVEMENT'; points: number }
   | { type: 'CHOOSE_SUBCLASS'; label: string }
@@ -97,6 +99,7 @@ export interface ClassFeatureDefinition {
   description: string
   usesMax?: number
   recharge?: 'short' | 'long' | 'dawn'
+  replaces?: string    // Name of the feature this one upgrades/replaces
 }
 
 export interface ClassDefinition {

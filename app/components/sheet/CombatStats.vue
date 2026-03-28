@@ -85,6 +85,19 @@ function checkDeathSave(type: 'successes' | 'failures', idx: number) {
   emit('update', { deathSaves: { ...props.character.deathSaves, [type]: newVal } })
 }
 
+// ── Bardic Inspiration ────────────────────────────────────────────────────────
+function useBardicInspiration() {
+  const bi = stats.bardicInspiration.value
+  if (!bi || bi.used >= bi.max) return
+  emit('update', { bardicInspirationUsed: bi.used + 1 })
+}
+
+function restoreBardicInspiration() {
+  const bi = stats.bardicInspiration.value
+  if (!bi || bi.used <= 0) return
+  emit('update', { bardicInspirationUsed: bi.used - 1 })
+}
+
 // ── Damage / Heal modal ───────────────────────────────────────────────────────
 const hpModalMode = ref<'damage' | 'heal' | null>(null)
 const hpModalAmount = ref(0)
@@ -198,6 +211,50 @@ function applyHpChange() {
           @click="emit('update', { hitDice: { ...character.hitDice, remaining: i <= hitDice.remaining ? hitDice.remaining - 1 : hitDice.remaining + 1 } })"
         >
           {{ hitDice.die.replace('d', '') }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Bardic Inspiration -->
+    <div v-if="stats.bardicInspiration.value" class="card">
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <p class="section-header mb-0">Bardic Inspiration</p>
+          <p class="text-[10px] uppercase tracking-wider mt-0.5"
+            :class="stats.bardicInspiration.value.recharge === 'short' ? 'text-accent-400' : 'text-primary-400'"
+          >
+            {{ stats.bardicInspiration.value.recharge }} rest &middot; {{ stats.bardicInspiration.value.die }}
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-base leading-none transition-colors"
+            :disabled="stats.bardicInspiration.value.used >= stats.bardicInspiration.value.max"
+            @click="useBardicInspiration"
+          >−</button>
+          <span class="text-sm font-mono text-white tabular-nums w-10 text-center">
+            {{ stats.bardicInspiration.value.max - stats.bardicInspiration.value.used }}/{{ stats.bardicInspiration.value.max }}
+          </span>
+          <button
+            class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-base leading-none transition-colors"
+            :disabled="stats.bardicInspiration.value.used <= 0"
+            @click="restoreBardicInspiration"
+          >+</button>
+        </div>
+      </div>
+      <div class="flex gap-1.5 flex-wrap">
+        <div
+          v-for="i in stats.bardicInspiration.value.max"
+          :key="i"
+          class="w-7 h-7 rounded-md border text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
+          :class="i <= (stats.bardicInspiration.value.max - stats.bardicInspiration.value.used)
+            ? 'bg-accent-600/30 border-accent-500/60 text-accent-300'
+            : 'bg-surface-700 border-surface-600 text-slate-600'"
+          @click="i <= (stats.bardicInspiration.value.max - stats.bardicInspiration.value.used)
+            ? useBardicInspiration()
+            : restoreBardicInspiration()"
+        >
+          {{ stats.bardicInspiration.value.die }}
         </div>
       </div>
     </div>

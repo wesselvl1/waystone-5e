@@ -144,6 +144,7 @@ export function resolveLevelUpEvents(
         description: featDef?.description ?? '',
         usesMax: featDef?.usesMax,
         recharge: featDef?.recharge,
+        replaces: featDef?.replaces,
       },
     } satisfies AddFeatureEvent)
   }
@@ -182,9 +183,12 @@ export function resolveLevelUpEvents(
       case 'CHOOSE_SPELL':
         events.push({
           type: 'CHOOSE_SPELL',
+          addTo: eventDef.addTo,
           count: eventDef.count,
           cantrip: eventDef.cantrip ?? false,
           fromList: eventDef.fromList,
+          classes: eventDef.classes,
+          schools: eventDef.schools,
         })
         break
       case 'CHOOSE_FEAT':
@@ -220,9 +224,12 @@ export function resolveLevelUpEvents(
       case 'CHOOSE_SPELL':
         events.push({
           type: 'CHOOSE_SPELL',
+          addTo: eventDef.addTo,
           count: eventDef.count,
           cantrip: eventDef.cantrip ?? false,
           fromList: eventDef.fromList,
+          classes: eventDef.classes,
+          schools: eventDef.schools,
         })
         break
       case 'GAIN_PROFICIENCY':
@@ -302,6 +309,8 @@ export function applyAutomaticEvents(
       case 'ADD_FEATURE': {
         const exists = updated.features.some(f => f.id === event.feature.id)
         if (!exists) {
+          if (event.feature.replaces)
+            updated.features = updated.features.filter(f => f.name !== event.feature.replaces)
           updated.features.push({
             ...event.feature,
             usesRemaining: event.feature.usesMax,

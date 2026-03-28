@@ -23,8 +23,17 @@ const totalLevel = computed(() => props.character.classes.reduce((s, c) => s + c
 const editingName = ref(false)
 const draftName = ref(props.character.name)
 
+watch(() => props.character.name, (newName) => {
+  if (!editingName.value) draftName.value = newName
+})
+
 function saveName() {
   if (draftName.value.trim()) emit('update', { name: draftName.value.trim() })
+  editingName.value = false
+}
+
+function cancelEdit() {
+  draftName.value = props.character.name
   editingName.value = false
 }
 </script>
@@ -40,16 +49,17 @@ function saveName() {
           autofocus
           @blur="saveName"
           @keydown.enter="saveName"
-          @keydown.esc="editingName = false"
+          @keydown.esc="cancelEdit"
         />
       </template>
       <template v-else>
-        <h2
-          class="flex-1 text-xl font-semibold text-white truncate cursor-pointer hover:text-primary-300 transition-colors"
+        <button
+          type="button"
+          class="flex-1 text-xl font-semibold text-white truncate text-left cursor-pointer hover:text-primary-300 transition-colors"
           @click="editingName = true"
         >
           {{ character.name }}
-        </h2>
+        </button>
       </template>
       <div
         class="px-2 py-0.5 rounded-full text-xs font-bold border"
