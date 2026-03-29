@@ -3877,7 +3877,7 @@
       "ritual": false,
       "description": "You create a sword-shaped plane of force that hovers within range. It lasts for the duration.\n\nWhen the sword appears, you make a melee spell attack against a target of your choice within 5 feet of the sword. On a hit, the target takes 3d10 force damage. Until the spell ends, you can use a bonus action on each of your turns to move the sword up to 20 feet to a spot you can see and repeat this attack against the same target or a different one.",
       "classes": ["bard", "wizard"],
-      "attackRoll": true
+      "attackRoll": "melee"
     },
     {
       "id": "conjure-celestial",
@@ -4023,7 +4023,7 @@
       "ritual": false,
       "description": "You and up to eight willing creatures who link hands in a circle are transported to a different plane of existence. You can specify a target destination in general terms, such as the City of Brass on the Elemental Plane of Fire or the palace of Dispater on the second level of the Nine Hells, and you appear in or near that destination.\n\nAlternatively, if you know the sigil sequence of a teleportation circle on another plane of existence, this spell can take you to that circle. If the teleportation circle is too small to hold all the creatures you transported, they appear in the closest unoccupied spaces next to the circle.\n\nYou can use this spell to banish an unwilling creature to another plane. Choose a creature within your reach and make a melee spell attack against it. On a hit, the creature must make a Charisma saving throw. If the creature fails this save, it is transported to a random location on the plane of existence you specify. A creature so transported must find its own way back to your current plane of existence.",
       "classes": ["cleric", "druid", "sorcerer", "warlock", "wizard"],
-      "attackRoll": true,
+      "attackRoll": "melee",
       "savingThrow": "cha"
     },
     {
