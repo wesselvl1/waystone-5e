@@ -1,0 +1,659 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1 \u2014 Ranger class. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).",
+  "author": "Wizards of the Coast",
+  "classes": [
+    {
+      "id": "ranger",
+      "name": "Ranger",
+      "hitDie": "d10",
+      "primaryAbility": [
+        "dex",
+        "wis"
+      ],
+      "spellcastingAbility": "wis",
+      "isHalfCaster": true,
+      "savingThrowProficiencies": [
+        "str",
+        "dex"
+      ],
+      "armorProficiencies": [
+        "light",
+        "medium",
+        "shields"
+      ],
+      "weaponProficiencies": [
+        "simple",
+        "martial"
+      ],
+      "toolProficiencies": [],
+      "skillChoices": {
+        "count": 3,
+        "from": [
+          "animalHandling",
+          "athletics",
+          "insight",
+          "investigation",
+          "nature",
+          "perception",
+          "stealth",
+          "survival"
+        ]
+      },
+      "levels": [
+        {
+          "level": 1,
+          "spellsKnown": 0,
+          "features": [
+            "Favored Enemy",
+            "Natural Explorer"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 2,
+          "spellSlots": {
+            "1": 2
+          },
+          "spellsKnown": 2,
+          "features": [
+            "Spellcasting",
+            "Fighting Style"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_OPTION",
+              "id": "fighting-style",
+              "label": "Choose a Fighting Style",
+              "options": [
+                {
+                  "id": "archery",
+                  "name": "Archery",
+                  "description": "You gain a +2 bonus to attack rolls you make with ranged weapons."
+                },
+                {
+                  "id": "defense",
+                  "name": "Defense",
+                  "description": "While you are wearing armor, you gain a +1 bonus to AC."
+                },
+                {
+                  "id": "dueling",
+                  "name": "Dueling",
+                  "description": "When you are wielding a melee weapon in one hand and no other weapons, you gain a +2 bonus to damage rolls with that weapon."
+                },
+                {
+                  "id": "two-weapon-fighting",
+                  "name": "Two-Weapon Fighting",
+                  "description": "When you engage in two-weapon fighting, you can add your ability modifier to the damage of the second attack."
+                }
+              ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 3,
+          "spellSlots": {
+            "1": 3
+          },
+          "spellsKnown": 3,
+          "features": [
+            "Ranger Archetype",
+            "Primeval Awareness"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Ranger Archetype"
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 4,
+          "spellSlots": {
+            "1": 3
+          },
+          "spellsKnown": 3,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 5,
+          "spellSlots": {
+            "1": 4,
+            "2": 2
+          },
+          "spellsKnown": 4,
+          "features": [
+            "Extra Attack"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 6,
+          "spellSlots": {
+            "1": 4,
+            "2": 2
+          },
+          "spellsKnown": 4,
+          "features": [
+            "Favored Enemy (2 types)",
+            "Natural Explorer (2 terrains)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 7,
+          "spellSlots": {
+            "1": 4,
+            "2": 3
+          },
+          "spellsKnown": 5,
+          "features": [
+            "Ranger Archetype Feature"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 8,
+          "spellSlots": {
+            "1": 4,
+            "2": 3
+          },
+          "spellsKnown": 5,
+          "features": [
+            "Land's Stride"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 9,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 2
+          },
+          "spellsKnown": 6,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 10,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 2
+          },
+          "spellsKnown": 6,
+          "features": [
+            "Natural Explorer (3 terrains)",
+            "Hide in Plain Sight"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 11,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3
+          },
+          "spellsKnown": 7,
+          "features": [
+            "Ranger Archetype Feature"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 12,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3
+          },
+          "spellsKnown": 7,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 1
+          },
+          "spellsKnown": 8,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 14,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 1
+          },
+          "spellsKnown": 8,
+          "features": [
+            "Favored Enemy (3 types)",
+            "Vanish"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 15,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 2
+          },
+          "spellsKnown": 9,
+          "features": [
+            "Ranger Archetype Feature"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 16,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 2
+          },
+          "spellsKnown": 9,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 1
+          },
+          "spellsKnown": 10,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 18,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 1
+          },
+          "spellsKnown": 10,
+          "features": [
+            "Feral Senses"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 19,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2
+          },
+          "spellsKnown": 11,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "ranger",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "ranger"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2
+          },
+          "spellsKnown": 11,
+          "features": [
+            "Foe Slayer"
+          ],
+          "levelUpEvents": []
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Spellcasting",
+          "description": "By the time you reach 2nd level, you have learned to use the magical essence of nature to cast spells, much as a druid does."
+        },
+        {
+          "name": "Favored Enemy",
+          "description": "Beginning at 1st level, you have significant experience studying, tracking, hunting, and even talking to a certain type of enemy.\n\nChoose a type of favored enemy: aberrations, beasts, celestials, constructs, dragons, elementals, fey, fiends, giants, monstrosities, oozes, plants, or undead. Alternatively, you can select two races of humanoid (such as gnolls and orcs) as favored enemies.\n\nYou have advantage on Wisdom (Survival) checks to track your favored enemies, as well as on Intelligence checks to recall information about them.\n\nWhen you gain this feature, you also learn one language of your choice that is spoken by your favored enemies, if they speak one at all.\n\nYou choose one additional favored enemy, as well as an associated language, at 6th and 14th level. As you gain levels, your choices should reflect the types of monsters you have encountered on your adventures."
+        },
+        {
+          "name": "Favored Enemy (2 types)",
+          "description": "Beginning at 1st level, you have significant experience studying, tracking, hunting, and even talking to a certain type of enemy.\n\nChoose a type of favored enemy: aberrations, beasts, celestials, constructs, dragons, elementals, fey, fiends, giants, monstrosities, oozes, plants, or undead. Alternatively, you can select two races of humanoid (such as gnolls and orcs) as favored enemies.\n\nYou have advantage on Wisdom (Survival) checks to track your favored enemies, as well as on Intelligence checks to recall information about them.\n\nWhen you gain this feature, you also learn one language of your choice that is spoken by your favored enemies, if they speak one at all.\n\nYou choose one additional favored enemy, as well as an associated language, at 6th and 14th level. As you gain levels, your choices should reflect the types of monsters you have encountered on your adventures.",
+          "replaces": "Favored Enemy"
+        },
+        {
+          "name": "Favored Enemy (3 types)",
+          "description": "Beginning at 1st level, you have significant experience studying, tracking, hunting, and even talking to a certain type of enemy.\n\nChoose a type of favored enemy: aberrations, beasts, celestials, constructs, dragons, elementals, fey, fiends, giants, monstrosities, oozes, plants, or undead. Alternatively, you can select two races of humanoid (such as gnolls and orcs) as favored enemies.\n\nYou have advantage on Wisdom (Survival) checks to track your favored enemies, as well as on Intelligence checks to recall information about them.\n\nWhen you gain this feature, you also learn one language of your choice that is spoken by your favored enemies, if they speak one at all.\n\nYou choose one additional favored enemy, as well as an associated language, at 6th and 14th level. As you gain levels, your choices should reflect the types of monsters you have encountered on your adventures.",
+          "replaces": "Favored Enemy (2 types)"
+        },
+        {
+          "name": "Natural Explorer",
+          "description": "You are particularly familiar with one type of natural environment and are adept at traveling and surviving in such regions. Choose one type of favored terrain: arctic, coast, desert, forest, grassland, mountain, or swamp. When you make an Intelligence or Wisdom check related to your favored terrain, your proficiency bonus is doubled if you are using a skill that you're proficient in.\n\nWhile traveling for an hour or more in your favored terrain, you gain the following benefits:\n\n- Difficult terrain doesn't slow your group's travel.\n\n- Your group can't become lost except by magical means.\n\n- Even when you are engaged in another activity while traveling (such as foraging, navigating, or tracking), you remain alert to danger.\n\n- If you are traveling alone, you can move stealthily at a normal pace.\n\n- When you forage, you find twice as much food as you normally would.\n\n- While tracking other creatures, you also learn their exact number, their sizes, and how long ago they passed through the area.\n\nYou choose additional favored terrain types at 6th and 10th level."
+        },
+        {
+          "name": "Natural Explorer (2 terrains)",
+          "description": "You are particularly familiar with one type of natural environment and are adept at traveling and surviving in such regions. Choose one type of favored terrain: arctic, coast, desert, forest, grassland, mountain, or swamp. When you make an Intelligence or Wisdom check related to your favored terrain, your proficiency bonus is doubled if you are using a skill that you're proficient in.\n\nWhile traveling for an hour or more in your favored terrain, you gain the following benefits:\n\n- Difficult terrain doesn't slow your group's travel.\n\n- Your group can't become lost except by magical means.\n\n- Even when you are engaged in another activity while traveling (such as foraging, navigating, or tracking), you remain alert to danger.\n\n- If you are traveling alone, you can move stealthily at a normal pace.\n\n- When you forage, you find twice as much food as you normally would.\n\n- While tracking other creatures, you also learn their exact number, their sizes, and how long ago they passed through the area.\n\nYou choose additional favored terrain types at 6th and 10th level.",
+          "replaces": "Natural Explorer"
+        },
+        {
+          "name": "Natural Explorer (3 terrains)",
+          "description": "You are particularly familiar with one type of natural environment and are adept at traveling and surviving in such regions. Choose one type of favored terrain: arctic, coast, desert, forest, grassland, mountain, or swamp. When you make an Intelligence or Wisdom check related to your favored terrain, your proficiency bonus is doubled if you are using a skill that you're proficient in.\n\nWhile traveling for an hour or more in your favored terrain, you gain the following benefits:\n\n- Difficult terrain doesn't slow your group's travel.\n\n- Your group can't become lost except by magical means.\n\n- Even when you are engaged in another activity while traveling (such as foraging, navigating, or tracking), you remain alert to danger.\n\n- If you are traveling alone, you can move stealthily at a normal pace.\n\n- When you forage, you find twice as much food as you normally would.\n\n- While tracking other creatures, you also learn their exact number, their sizes, and how long ago they passed through the area.\n\nYou choose additional favored terrain types at 6th and 10th level.",
+          "replaces": "Natural Explorer (2 terrains)"
+        },
+        {
+          "name": "Fighting Style",
+          "description": "At 2nd level, you adopt a particular style of fighting as your specialty. Choose one of the following options. You can't take a Fighting Style option more than once, even if you later get to choose again."
+        },
+        {
+          "name": "Ranger Archetype",
+          "description": "At 3rd level, you choose an archetype that you strive to emulate, such as the Hunter. Your choice grants you features at 3rd level and again at 7th, 11th, and 15th level."
+        },
+        {
+          "name": "Primeval Awareness",
+          "description": "Beginning at 3rd level, you can use your action and expend one ranger spell slot to focus your awareness on the region around you. For 1 minute per level of the spell slot you expend, you can sense whether the following types of creatures are present within 1 mile of you (or within up to 6 miles if you are in your favored terrain): aberrations, celestials, dragons, elementals, fey, fiends, and undead. This feature doesn't reveal the creatures' location or number."
+        },
+        {
+          "name": "Extra Attack",
+          "description": "Beginning at 5th level, you can attack twice, instead of once, whenever you take the Attack action on your turn."
+        },
+        {
+          "name": "Land's Stride",
+          "description": "Starting at 8th level, moving through nonmagical difficult terrain costs you no extra movement. You can also pass through nonmagical plants without being slowed by them and without taking damage from them if they have thorns, spines, or a similar hazard.\n\nIn addition, you have advantage on saving throws against plants that are magically created or manipulated to impede movement, such those created by the entangle spell."
+        },
+        {
+          "name": "Hide in Plain Sight",
+          "description": "Starting at 10th level, you can spend 1 minute creating camouflage for yourself. You must have access to fresh mud, dirt, plants, soot, and other naturally occurring materials with which to create your camouflage.\n\nOnce you are camouflaged in this way, you can try to hide by pressing yourself up against a solid surface, such as a tree or wall, that is at least as tall and wide as you are. You gain a +10 bonus to Dexterity (Stealth) checks as long as you remain there without moving or taking actions. Once you move or take an action or a reaction, you must camouflage yourself again to gain this benefit."
+        },
+        {
+          "name": "Vanish",
+          "description": "Starting at 14th level, you can use the Hide action as a bonus action on your turn. Also, you can't be tracked by nonmagical means, unless you choose to leave a trail."
+        },
+        {
+          "name": "Feral Senses",
+          "description": "At 18th level, you gain preternatural senses that help you fight creatures you can't see. When you attack a creature you can't see, your inability to see it doesn't impose disadvantage on your attack rolls against it.\n\nYou are also aware of the location of any invisible creature within 30 feet of you, provided that the creature isn't hidden from you and you aren't blinded or deafened."
+        },
+        {
+          "name": "Foe Slayer",
+          "description": "At 20th level, you become an unparalleled hunter of your enemies. Once on each of your turns, you can add your Wisdom modifier to the attack roll or the damage roll of an attack you make against one of your favored enemies. You can choose to use this feature before or after the roll, but before any effects of the roll are applied."
+        }
+      ],
+      "subclasses": [
+        {
+          "id": "hunter",
+          "name": "Hunter",
+          "description": "Emulating the Hunter archetype means accepting your place as a bulwark between civilisation and the terrors of the wilderness. As you walk the hunter's path, you learn specialised techniques for fighting the threats you face, from rampaging ogres to hordes of goblins.",
+          "levels": [
+            {
+              "level": 3,
+              "features": [
+                {
+                  "name": "Hunter's Prey",
+                  "description": "At 3rd level, you gain one of the following features of your choice.\n\nColossus Slayer\n\nGiant Killer\n\nHorde Breaker"
+                }
+              ],
+              "levelUpEvents": [
+                {
+                  "type": "CHOOSE_OPTION",
+                  "id": "hunters-prey",
+                  "label": "Choose a Hunter's Prey feature",
+                  "options": [
+                    {
+                      "id": "colossus-slayer",
+                      "name": "Colossus Slayer",
+                      "description": "Your tenacity can wear down the most potent foes. When you hit a creature with a weapon attack, the creature takes an extra 1d8 damage if it's below its hit point maximum. You can deal this extra damage only once per turn."
+                    },
+                    {
+                      "id": "giant-killer",
+                      "name": "Giant Killer",
+                      "description": "When a Large or larger creature within 5 feet of you hits or misses you with an attack, you can use your reaction to attack that creature immediately after its attack, provided that you can see the creature."
+                    },
+                    {
+                      "id": "horde-breaker",
+                      "name": "Horde Breaker",
+                      "description": "Once on each of your turns when you make a weapon attack, you can make another attack with the same weapon against a different creature that is within 5 feet of the original target and within range of your weapon."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 7,
+              "features": [
+                {
+                  "name": "Defensive Tactics",
+                  "description": "At 7th level, you gain one of the following features of your choice.\n\nEscape the Horde\n\nMultiattack Defense\n\nSteel Will"
+                }
+              ],
+              "levelUpEvents": [
+                {
+                  "type": "CHOOSE_OPTION",
+                  "id": "defensive-tactics",
+                  "label": "Choose a Defensive Tactics feature",
+                  "options": [
+                    {
+                      "id": "escape-the-horde",
+                      "name": "Escape the Horde",
+                      "description": "Opportunity attacks against you are made with disadvantage."
+                    },
+                    {
+                      "id": "multiattack-defense",
+                      "name": "Multiattack Defense",
+                      "description": "When a creature hits you with an attack, you gain a +4 bonus to AC against all subsequent attacks made by that creature for the rest of the turn."
+                    },
+                    {
+                      "id": "steel-will",
+                      "name": "Steel Will",
+                      "description": "You have advantage on saving throws against being frightened."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 11,
+              "features": [
+                {
+                  "name": "Multiattack",
+                  "description": "At 11th level, you gain one of the following features of your choice.\n\nVolley\n\nWhirlwind Attack"
+                }
+              ],
+              "levelUpEvents": [
+                {
+                  "type": "CHOOSE_OPTION",
+                  "id": "multiattack",
+                  "label": "Choose a Multiattack feature",
+                  "options": [
+                    {
+                      "id": "volley",
+                      "name": "Volley",
+                      "description": "You can use your action to make a ranged attack against any number of creatures within 10 feet of a point you can see within your weapon's range. You must have ammunition for each target, as normal, and you make a separate attack roll for each target."
+                    },
+                    {
+                      "id": "whirlwind-attack",
+                      "name": "Whirlwind Attack",
+                      "description": "You can use your action to make a melee attack against any number of creatures within 5 feet of you, with a separate attack roll for each target."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 15,
+              "features": [
+                {
+                  "name": "Superior Hunter's Defense",
+                  "description": "At 15th level, you gain one of the following features of your choice.\n\nEvasion\n\nStand Against the Tide\n\nUncanny Dodge"
+                }
+              ],
+              "levelUpEvents": [
+                {
+                  "type": "CHOOSE_OPTION",
+                  "id": "superior-hunters-defense",
+                  "label": "Choose a Superior Hunter's Defense feature",
+                  "options": [
+                    {
+                      "id": "evasion",
+                      "name": "Evasion",
+                      "description": "When you are subjected to an effect, such as a red dragon's fiery breath or a lightning bolt spell, that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail."
+                    },
+                    {
+                      "id": "stand-against-the-tide",
+                      "name": "Stand Against the Tide",
+                      "description": "When a hostile creature misses you with a melee attack, you can use your reaction to force that creature to repeat the same attack against another creature (other than itself) of your choice."
+                    },
+                    {
+                      "id": "uncanny-dodge",
+                      "name": "Uncanny Dodge",
+                      "description": "When an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
