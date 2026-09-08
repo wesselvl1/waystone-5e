@@ -313,7 +313,7 @@
           "spellSlots": { "1": 4, "2": 2 },
           "cantripsKnown": 2,
           "spellsKnown": 6,
-          "features": ["Bard College"],
+          "features": ["Expertise", "Bard College"],
           "levelUpEvents": [
             {
               "type": "CHOOSE_SUBCLASS",
@@ -377,7 +377,7 @@
           "spellSlots": { "1": 4, "2": 3, "3": 3 },
           "cantripsKnown": 3,
           "spellsKnown": 9,
-          "features": ["Bard College Feature"],
+          "features": ["Countercharm", "Bard College Feature"],
           "levelUpEvents": [
             { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
           ]
@@ -387,7 +387,7 @@
           "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 1 },
           "cantripsKnown": 3,
           "spellsKnown": 10,
-          "features": ["Countercharm"],
+          "features": [],
           "levelUpEvents": [
             { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
           ]
@@ -421,7 +421,7 @@
           "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2 },
           "cantripsKnown": 4,
           "spellsKnown": 14,
-          "features": ["Bard College Feature", "Bardic Inspiration (d10)"],
+          "features": ["Expertise", "Bardic Inspiration (d10)", "Magical Secrets"],
           "levelUpEvents": [
             {
               "type": "CHOOSE_EXPERTISE",
@@ -457,9 +457,9 @@
           "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1 },
           "cantripsKnown": 4,
           "spellsKnown": 15,
-          "features": ["Additional Magical Secrets"],
+          "features": [],
           "levelUpEvents": [
-            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 2, "cantrip": false }
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
           ]
         },
         {
@@ -490,7 +490,7 @@
           "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1 },
           "cantripsKnown": 4,
           "spellsKnown": 18,
-          "features": ["Bard College Feature"],
+          "features": ["Magical Secrets", "Bard College Feature"],
           "levelUpEvents": [
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
@@ -504,7 +504,7 @@
           "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1, "8": 1 },
           "cantripsKnown": 4,
           "spellsKnown": 19,
-          "features": ["Superior Inspiration", "Bardic Inspiration (d12)"],
+          "features": ["Bardic Inspiration (d12)"],
           "levelUpEvents": [
             { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
           ]
@@ -537,7 +537,7 @@
           "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 3, "6": 1, "7": 1, "8": 1, "9": 1 },
           "cantripsKnown": 4,
           "spellsKnown": 22,
-          "features": ["Bard College Feature"],
+          "features": ["Magical Secrets"],
           "levelUpEvents": [
             { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 2, "cantrip": false }
           ]
@@ -565,6 +565,38 @@
         }
       ],
       "featureDefinitions": [
+        {
+          "name": "Spellcasting",
+          "description": "You have learned to untangle and reshape the fabric of reality in harmony with your wishes and music. Your spells are part of your vast repertoire, magic that you can tune to different situations. Charisma is your spellcasting ability for your bard spells."
+        },
+        {
+          "name": "Jack of All Trades",
+          "description": "Starting at 2nd level, you can add half your proficiency bonus, rounded down, to any ability check you make that doesn't already include your proficiency bonus."
+        },
+        {
+          "name": "Bard College",
+          "description": "At 3rd level, you delve into the advanced techniques of a bard college of your choice, such as the College of Lore. Your choice grants you features at 3rd level and again at 6th and 14th level."
+        },
+        {
+          "name": "Expertise",
+          "description": "At 3rd level, choose two of your skill proficiencies. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies. At 10th level, you can choose another two skill proficiencies to gain this benefit."
+        },
+        {
+          "name": "Font of Inspiration",
+          "description": "Beginning when you reach 5th level, you regain all of your expended uses of Bardic Inspiration when you finish a short or long rest."
+        },
+        {
+          "name": "Countercharm",
+          "description": "At 6th level, you gain the ability to use musical notes or words of power to disrupt mind-influencing effects. As an action, you can start a performance that lasts until the end of your next turn. During that time, you and any friendly creatures within 30 feet of you have advantage on saving throws against being frightened or charmed. A creature must be able to hear you to gain this benefit. The performance ends early if you are incapacitated or silenced or if you voluntarily end it (no action required)."
+        },
+        {
+          "name": "Magical Secrets",
+          "description": "By 10th level, you have plundered magical knowledge from a wide spectrum of disciplines. Choose two spells from any class, including this one. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip.\n\nThe chosen spells count as bard spells for you and are included in the number in the Spells Known column of the Bard table.\n\nYou learn two additional spells from any class at 14th level and again at 18th level."
+        },
+        {
+          "name": "Superior Inspiration",
+          "description": "At 20th level, when you roll initiative and have no uses of Bardic Inspiration left, you regain one use."
+        },
         {
           "name": "Bardic Inspiration (d6)",
           "description": "You can inspire others through stirring words or music. As a bonus action, you can choose one creature other than yourself within 60 feet who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes the creature can add the die to one ability check, attack roll, or saving throw. The Bardic Inspiration die is expended when used.",
