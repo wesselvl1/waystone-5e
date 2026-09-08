@@ -26,7 +26,7 @@ logs
 # Data
 /data
 
-# Non-SRD rulepack data — NEVER commit. Only SRD 5.1 content may be persisted here.
-/app/data/phb/
-/app/data/nonsrd/
-*.nonsrd.json
+# Rulepack data: allow-list. Only app/data/srd/ may be committed — every other
+# folder under app/data is non-SRD dev data and must never enter git.
+/app/data/*
+!/app/data/srd/
