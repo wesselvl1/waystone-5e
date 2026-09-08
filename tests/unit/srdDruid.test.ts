@@ -49,7 +49,7 @@ describe('SRD druid', () => {
   it('ships Circle of the Land as its only subclass', () => {
     expect(druid.subclasses?.map(s => s.id)).toEqual(['circle-of-the-land'])
     const levels = druid.subclasses![0]!.levels.map(l => l.level)
-    expect(levels).toEqual([2, 3, 6, 10, 14])
+    expect(levels).toEqual([2, 3, 5, 6, 7, 9, 10, 14])
   })
 
   it('gives every subclass feature a description', () => {

@@ -484,53 +484,63 @@
               "features": [
                 {
                   "name": "Circle Spells",
-                  "description": "Your mystical connection to the land infuses you with the ability to cast certain spells. At 3rd, 5th, 7th, and 9th level you gain access to circle spells connected to the land where you became a druid.\n\nChoose that land--arctic, coast, desert, forest, grassland, mountain, or swamp--and consult the associated list of spells.\n\nOnce you gain access to a circle spell, you always have it prepared, and it doesn't count against the number of spells you can prepare each day. If you gain access to a spell that doesn't appear on the druid spell list, the spell is nonetheless a druid spell for you."
+                  "description": "At 3rd level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Hold Person, Spike Growth; coast \u2014 Mirror Image, Misty Step; desert \u2014 Blur, Silence; forest \u2014 Barkskin, Spider Climb; grassland \u2014 Invisibility, Pass without Trace; mountain \u2014 Spider Climb, Spike Growth; swamp \u2014 Acid Arrow, Darkness. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. These are not added to your spell list automatically \u2014 add them from the Spells tab."
                 }
               ],
               "levelUpEvents": [
                 {
                   "type": "CHOOSE_OPTION",
                   "id": "land-circle",
-                  "label": "Choose your land type",
+                  "label": "Choose the land where you became a druid",
                   "options": [
                     {
                       "id": "arctic",
                       "name": "Arctic",
-                      "description": "The Circle of the Land is made up of mystics and sages who safeguard ancient knowledge and rites through a vast oral tradition. These druids meet within sacred circles of trees or standing stones to whisper primal secrets in Druidic. The circle's wisest members preside as the chief priests of communities that hold to the Old Faith and serve as advisors to the rulers of those folk. As a member of this circle, your magic is influenced by the land where you were initiated into the circle's mysterious rites."
+                      "description": "Your circle spells are Hold Person and Spike Growth at 3rd level, Sleet Storm and Slow at 5th level, Freedom of Movement and Ice Storm at 7th level, Commune with Nature and Cone of Cold at 9th level. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day."
                     },
                     {
                       "id": "coast",
                       "name": "Coast",
-                      "description": "The Circle of the Land is made up of mystics and sages who safeguard ancient knowledge and rites through a vast oral tradition. These druids meet within sacred circles of trees or standing stones to whisper primal secrets in Druidic. The circle's wisest members preside as the chief priests of communities that hold to the Old Faith and serve as advisors to the rulers of those folk. As a member of this circle, your magic is influenced by the land where you were initiated into the circle's mysterious rites."
+                      "description": "Your circle spells are Mirror Image and Misty Step at 3rd level, Water Breathing and Water Walk at 5th level, Control Water and Freedom of Movement at 7th level, Conjure Elemental and Scrying at 9th level. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day."
                     },
                     {
                       "id": "desert",
                       "name": "Desert",
-                      "description": "The Circle of the Land is made up of mystics and sages who safeguard ancient knowledge and rites through a vast oral tradition. These druids meet within sacred circles of trees or standing stones to whisper primal secrets in Druidic. The circle's wisest members preside as the chief priests of communities that hold to the Old Faith and serve as advisors to the rulers of those folk. As a member of this circle, your magic is influenced by the land where you were initiated into the circle's mysterious rites."
+                      "description": "Your circle spells are Blur and Silence at 3rd level, Create Food and Water and Protection from Energy at 5th level, Blight and Hallucinatory Terrain at 7th level, Insect Plague and Wall of Stone at 9th level. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day."
                     },
                     {
                       "id": "forest",
                       "name": "Forest",
-                      "description": "The Circle of the Land is made up of mystics and sages who safeguard ancient knowledge and rites through a vast oral tradition. These druids meet within sacred circles of trees or standing stones to whisper primal secrets in Druidic. The circle's wisest members preside as the chief priests of communities that hold to the Old Faith and serve as advisors to the rulers of those folk. As a member of this circle, your magic is influenced by the land where you were initiated into the circle's mysterious rites."
+                      "description": "Your circle spells are Barkskin and Spider Climb at 3rd level, Call Lightning and Plant Growth at 5th level, Divination and Freedom of Movement at 7th level, Commune with Nature and Tree Stride at 9th level. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day."
                     },
                     {
                       "id": "grassland",
                       "name": "Grassland",
-                      "description": "The Circle of the Land is made up of mystics and sages who safeguard ancient knowledge and rites through a vast oral tradition. These druids meet within sacred circles of trees or standing stones to whisper primal secrets in Druidic. The circle's wisest members preside as the chief priests of communities that hold to the Old Faith and serve as advisors to the rulers of those folk. As a member of this circle, your magic is influenced by the land where you were initiated into the circle's mysterious rites."
+                      "description": "Your circle spells are Invisibility and Pass without Trace at 3rd level, Daylight and Haste at 5th level, Divination and Freedom of Movement at 7th level, Dream and Insect Plague at 9th level. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day."
                     },
                     {
                       "id": "mountain",
                       "name": "Mountain",
-                      "description": "The Circle of the Land is made up of mystics and sages who safeguard ancient knowledge and rites through a vast oral tradition. These druids meet within sacred circles of trees or standing stones to whisper primal secrets in Druidic. The circle's wisest members preside as the chief priests of communities that hold to the Old Faith and serve as advisors to the rulers of those folk. As a member of this circle, your magic is influenced by the land where you were initiated into the circle's mysterious rites."
+                      "description": "Your circle spells are Spider Climb and Spike Growth at 3rd level, Lightning Bolt and Meld into Stone at 5th level, Stone Shape and Stoneskin at 7th level, Passwall and Wall of Stone at 9th level. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day."
                     },
                     {
                       "id": "swamp",
                       "name": "Swamp",
-                      "description": "The Circle of the Land is made up of mystics and sages who safeguard ancient knowledge and rites through a vast oral tradition. These druids meet within sacred circles of trees or standing stones to whisper primal secrets in Druidic. The circle's wisest members preside as the chief priests of communities that hold to the Old Faith and serve as advisors to the rulers of those folk. As a member of this circle, your magic is influenced by the land where you were initiated into the circle's mysterious rites."
+                      "description": "Your circle spells are Acid Arrow and Darkness at 3rd level, Water Walk and Stinking Cloud at 5th level, Freedom of Movement and Locate Creature at 7th level, Insect Plague and Scrying at 9th level. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day."
                     }
                   ]
                 }
               ]
+            },
+            {
+              "level": 5,
+              "features": [
+                {
+                  "name": "Circle Spells",
+                  "description": "At 5th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Sleet Storm, Slow; coast \u2014 Water Breathing, Water Walk; desert \u2014 Create Food and Water, Protection from Energy; forest \u2014 Call Lightning, Plant Growth; grassland \u2014 Daylight, Haste; mountain \u2014 Lightning Bolt, Meld into Stone; swamp \u2014 Water Walk, Stinking Cloud. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. These are not added to your spell list automatically \u2014 add them from the Spells tab."
+                }
+              ],
+              "levelUpEvents": []
             },
             {
               "level": 6,
@@ -538,6 +548,26 @@
                 {
                   "name": "Land's Stride",
                   "description": "Starting at 6th level, moving through nonmagical difficult terrain costs you no extra movement. You can also pass through nonmagical plants without being slowed by them and without taking damage from them if they have thorns, spines, or a similar hazard.\n\nIn addition, you have advantage on saving throws against plants that are magically created or manipulated to impede movement, such those created by the entangle spell."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 7,
+              "features": [
+                {
+                  "name": "Circle Spells",
+                  "description": "At 7th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Freedom of Movement, Ice Storm; coast \u2014 Control Water, Freedom of Movement; desert \u2014 Blight, Hallucinatory Terrain; forest \u2014 Divination, Freedom of Movement; grassland \u2014 Divination, Freedom of Movement; mountain \u2014 Stone Shape, Stoneskin; swamp \u2014 Freedom of Movement, Locate Creature. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. These are not added to your spell list automatically \u2014 add them from the Spells tab."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 9,
+              "features": [
+                {
+                  "name": "Circle Spells",
+                  "description": "At 9th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Commune with Nature, Cone of Cold; coast \u2014 Conjure Elemental, Scrying; desert \u2014 Insect Plague, Wall of Stone; forest \u2014 Commune with Nature, Tree Stride; grassland \u2014 Dream, Insect Plague; mountain \u2014 Passwall, Wall of Stone; swamp \u2014 Insect Plague, Scrying. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. These are not added to your spell list automatically \u2014 add them from the Spells tab."
                 }
               ],
               "levelUpEvents": []
