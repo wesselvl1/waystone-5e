@@ -153,6 +153,8 @@ const ClassDefinitionSchema = z.object({
   spellcastingAbility: AbilityKeySchema.optional(),
   isFullCaster: z.boolean().optional(),
   isHalfCaster: z.boolean().optional(),
+  /** Warlock-style pact magic: slots are absolute and live in character.warlockSlots. */
+  pactMagic: z.boolean().optional(),
   levels: z.array(ClassLevelSchema),
   featureDefinitions: z.array(ClassFeatureDefinitionSchema).optional(),
   subclasses: z.array(SubclassDefinitionSchema).optional(),
