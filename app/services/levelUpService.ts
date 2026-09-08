@@ -11,6 +11,7 @@ import type {
   UpdateSpellSlotsEvent,
   UpdateWarlockSlotsEvent,
   UpdateHitDieEvent,
+  SetSpellcastingAbilityEvent,
   UpdateFeatureUsesEvent,
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
@@ -85,6 +86,16 @@ export function resolveLevelUpEvents(
     conBonus,
     hpFlatBonus: character.hpBonusPerLevel ?? 0,
   } satisfies AddHpEvent)
+
+  // Record this class's spellcasting ability against its own source, so a multiclass
+  // caster gets a DC per class rather than one taken from whichever class came first.
+  if (classDef.spellcastingAbility) {
+    events.push({
+      type: 'SET_SPELLCASTING_ABILITY',
+      sourceId: classId,
+      ability: classDef.spellcastingAbility,
+    } satisfies SetSpellcastingAbilityEvent)
+  }
 
   // Hit dice are pooled per class, since a fighter/wizard spends d10s and d6s separately
   events.push({
@@ -411,6 +422,20 @@ export function applyAutomaticEvents(
       case 'GAIN_PROFICIENCY': {
         if (!updated.otherProficiencies.includes(event.proficiency)) {
           updated.otherProficiencies.push(event.proficiency)
+        }
+        break
+      }
+      case 'SET_SPELLCASTING_ABILITY': {
+        // Recorded per source so a cleric/sorcerer has two DCs. The deprecated
+        // character.spellcastingAbility is left alone: feat prerequisites still read it.
+        // Absent on characters stored before per-source lists existed
+        const sources = updated.classSpellcasting ?? {}
+        const existing = sources[event.sourceId]
+        updated.classSpellcasting = {
+          ...sources,
+          [event.sourceId]: existing
+            ? { ...existing, ability: event.ability }
+            : { ability: event.ability, origin: 'class', spells: [] },
         }
         break
       }

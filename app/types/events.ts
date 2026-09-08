@@ -43,6 +43,17 @@ export interface GainProficiencyEvent {
   save?: AbilityKey
 }
 
+/**
+ * Records which ability a spellcasting source uses. Emitted per class on every level-up,
+ * so a multiclass caster ends up with an entry each rather than sharing one ability.
+ */
+export interface SetSpellcastingAbilityEvent {
+  type: 'SET_SPELLCASTING_ABILITY'
+  /** classId today; a race or background source later. */
+  sourceId: string
+  ability: AbilityKey
+}
+
 export interface UpdateHitDieEvent {
   type: 'UPDATE_HIT_DIE'
   /** Which class's pool gains a die. */
@@ -208,6 +219,7 @@ export type AutomaticLevelUpEvent =
   | UpdateFeatureUsesEvent
   | GrantSpellsEvent
   | SetWildShapeLimitsEvent
+  | SetSpellcastingAbilityEvent
 
 export type ChoiceLevelUpEvent =
   | ChooseSpellEvent

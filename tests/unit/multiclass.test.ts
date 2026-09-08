@@ -15,6 +15,8 @@ import {
   maxSpellLevelForClass,
   spellSlotMax,
   clampSpellSlots,
+  spellSaveDCFor,
+  spellAttackBonusFor,
 } from '~/services/spellcasting'
 import {
   resolveLevelUpEvents,
@@ -290,6 +292,56 @@ describe('max learnable spell level', () => {
     // Paladin gains 1st-level spells at 2, not at 1
     expect(maxSpellLevelForClass('paladin', [{ classId: 'paladin', level: 1 }], rulepack)).toBe(0)
     expect(maxSpellLevelForClass('paladin', [{ classId: 'paladin', level: 2 }], rulepack)).toBe(1)
+  })
+})
+
+describe('per-source spellcasting ability', () => {
+  it('records each caster class against its own source', () => {
+    // The sheet used to read one character-wide spellcastingAbility, set from whichever
+    // class came first. A druid/cleric looked right only because both use Wisdom; adding
+    // a sorcerer would have shown a Wisdom DC for Charisma spells.
+    const char: Character = {
+      ...validCharacter,
+      classes: [{ classId: 'cleric', level: 1 }],
+      classSpellcasting: {},
+    } as Character
+
+    const events = resolveLevelUpEvents(char, 'sorcerer', 1, rulepack)
+    const applied = applyAutomaticEvents(char, getAutomaticEvents(events), 'average')
+    expect(applied.classSpellcasting.sorcerer?.ability).toBe('cha')
+  })
+
+  it('gives a cleric and a sorcerer different save DCs', () => {
+    // WIS 16 (+3) and CHA 10 (+0) at proficiency +2: DC 13 versus DC 10
+    const wisMod = 3
+    const chaMod = 0
+    const prof = 2
+    expect(spellSaveDCFor('wis', wisMod, prof)).toBe(13)
+    expect(spellSaveDCFor('cha', chaMod, prof)).toBe(10)
+    expect(spellAttackBonusFor(wisMod, prof)).toBe(5)
+    expect(spellAttackBonusFor(chaMod, prof)).toBe(2)
+  })
+
+  it('emits nothing for a class that cannot cast', () => {
+    const char: Character = {
+      ...validCharacter,
+      classes: [{ classId: 'cleric', level: 1 }],
+    } as Character
+    const events = resolveLevelUpEvents(char, 'fighter', 1, rulepack)
+    expect(events.some(e => e.type === 'SET_SPELLCASTING_ABILITY')).toBe(false)
+  })
+
+  it('does not disturb the deprecated character-wide field', () => {
+    // Feat prerequisites still check character.spellcastingAbility
+    const char: Character = {
+      ...validCharacter,
+      classes: [{ classId: 'cleric', level: 1 }],
+      spellcastingAbility: 'wis',
+      classSpellcasting: {},
+    } as Character
+    const events = resolveLevelUpEvents(char, 'sorcerer', 1, rulepack)
+    const applied = applyAutomaticEvents(char, getAutomaticEvents(events), 'average')
+    expect(applied.spellcastingAbility).toBe('wis')
   })
 })
 
