@@ -67,6 +67,31 @@ describe('SRD bard table', () => {
     expect(collegeLevels).toEqual([3, 6, 14])
   })
 
+  it('ships College of Lore as its only subclass', () => {
+    expect(bard.subclasses?.map(s => s.id)).toEqual(['college-of-lore'])
+    expect(bard.subclasses![0]!.levels.map(l => l.level)).toEqual([3, 6, 14])
+  })
+
+  it('grants Additional Magical Secrets at college level 6, outside Spells Known', () => {
+    // The SRD says these two spells do not count against the number of spells you know,
+    // so the choice is unrestricted by class and lives on the subclass, not the class table.
+    const lvl6 = bard.subclasses![0]!.levels.find(l => l.level === 6)!
+    const choice = lvl6.levelUpEvents!.find(e => e.type === 'CHOOSE_SPELL')!
+    expect(choice.type).toBe('CHOOSE_SPELL')
+    if (choice.type === 'CHOOSE_SPELL') {
+      expect(choice.count).toBe(2)
+      expect(choice.cantrip).toBeFalsy()
+      expect(choice.classes).toBeUndefined()
+    }
+  })
+
+  it('gives every subclass feature a description', () => {
+    for (const lvl of bard.subclasses![0]!.levels) {
+      for (const f of lvl.features) {
+        expect(f.description.length, f.name).toBeGreaterThan(20)
+      }
+    }
+  })
   it('defines every feature it grants, except the subclass placeholder', () => {
     const defined = (bard.featureDefinitions ?? []).map(f => f.name)
     const used = [...new Set(bard.levels.flatMap(l => l.features))]
