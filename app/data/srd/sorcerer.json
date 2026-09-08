@@ -110,6 +110,11 @@
           ],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 3
+            },
+            {
               "type": "CHOOSE_OPTION",
               "id": "metamagic-1",
               "label": "Choose a Metamagic option",
@@ -225,6 +230,11 @@
           "features": [],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 4
+            },
+            {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
             },
@@ -260,6 +270,11 @@
           "features": [],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 5
+            },
+            {
               "type": "CHOOSE_SPELL",
               "addTo": "sorcerer",
               "count": 1,
@@ -284,6 +299,11 @@
           ],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 6
+            },
+            {
               "type": "CHOOSE_SPELL",
               "addTo": "sorcerer",
               "count": 1,
@@ -307,6 +327,11 @@
           "features": [],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 7
+            },
+            {
               "type": "CHOOSE_SPELL",
               "addTo": "sorcerer",
               "count": 1,
@@ -329,6 +354,11 @@
           "spellsKnown": 9,
           "features": [],
           "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 8
+            },
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
@@ -358,6 +388,11 @@
           "features": [],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 9
+            },
+            {
               "type": "CHOOSE_SPELL",
               "addTo": "sorcerer",
               "count": 1,
@@ -383,6 +418,11 @@
             "Metamagic"
           ],
           "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 10
+            },
             {
               "type": "CHOOSE_OPTION",
               "id": "metamagic-3",
@@ -465,6 +505,11 @@
           "features": [],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 11
+            },
+            {
               "type": "CHOOSE_SPELL",
               "addTo": "sorcerer",
               "count": 1,
@@ -490,6 +535,11 @@
           "features": [],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 12
+            },
+            {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
             }
@@ -510,6 +560,11 @@
           "spellsKnown": 13,
           "features": [],
           "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 13
+            },
             {
               "type": "CHOOSE_SPELL",
               "addTo": "sorcerer",
@@ -537,7 +592,13 @@
           "features": [
             "Sorcerous Origin Feature"
           ],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 14
+            }
+          ]
         },
         {
           "level": 15,
@@ -555,6 +616,11 @@
           "spellsKnown": 14,
           "features": [],
           "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 15
+            },
             {
               "type": "CHOOSE_SPELL",
               "addTo": "sorcerer",
@@ -583,6 +649,11 @@
           "features": [],
           "levelUpEvents": [
             {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 16
+            },
+            {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
             }
@@ -607,6 +678,11 @@
             "Metamagic"
           ],
           "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 17
+            },
             {
               "type": "CHOOSE_OPTION",
               "id": "metamagic-4",
@@ -683,7 +759,13 @@
           "features": [
             "Sorcerous Origin Feature"
           ],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 18
+            }
+          ]
         },
         {
           "level": 19,
@@ -702,6 +784,11 @@
           "spellsKnown": 15,
           "features": [],
           "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 19
+            },
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
@@ -726,7 +813,13 @@
           "features": [
             "Sorcerous Restoration"
           ],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 20
+            }
+          ]
         }
       ],
       "featureDefinitions": [
@@ -740,7 +833,9 @@
         },
         {
           "name": "Font of Magic",
-          "description": "At 2nd level, you tap into a deep wellspring of magic within yourself. This wellspring is represented by sorcery points, which allow you to create a variety of magical effects.\n\nSorcery Points\n\nYou have 2 sorcery points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer table. You can never have more sorcery points than shown on the table for your level. You regain all spent sorcery points when you finish a long rest.\n\nYou can transform unexpended sorcery points into one spell slot as a bonus action on your turn. The Creating Spell Slots table shows the cost of creating a spell slot of a given level. You can create spell slots no higher in level than 5th.\n\nAny spell slot you create with this feature vanishes when you finish a long rest.\n\nAs a bonus action on your turn, you can expend one spell slot and gain a number of sorcery points equal to the slot's level..\n\nYour sorcery point maximum equals your sorcerer level."
+          "description": "At 2nd level, you tap into a deep wellspring of magic within yourself. This wellspring is represented by sorcery points, which allow you to create a variety of magical effects.\n\nSorcery Points\n\nYou have 2 sorcery points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer table. You can never have more sorcery points than shown on the table for your level. You regain all spent sorcery points when you finish a long rest.\n\nYou can transform unexpended sorcery points into one spell slot as a bonus action on your turn. The Creating Spell Slots table shows the cost of creating a spell slot of a given level. You can create spell slots no higher in level than 5th.\n\nAny spell slot you create with this feature vanishes when you finish a long rest.\n\nAs a bonus action on your turn, you can expend one spell slot and gain a number of sorcery points equal to the slot's level..\n\nYour sorcery point maximum equals your sorcerer level.",
+          "usesMax": 2,
+          "recharge": "long"
         },
         {
           "name": "Metamagic",

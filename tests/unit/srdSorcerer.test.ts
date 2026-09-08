@@ -64,6 +64,25 @@ describe('SRD sorcerer', () => {
     }
   })
 
+  it('tracks sorcery points as a pool equal to the sorcerer level', () => {
+    const fom = sorcerer.featureDefinitions!.find(f => f.name === 'Font of Magic')!
+    expect(fom.usesMax).toBe(2)
+    expect(fom.recharge).toBe('long')
+
+    // Same mechanism as barbarian Rage and monk Ki: UPDATE_FEATURE_USES per level.
+    const pool = new Map<number, number>([[2, 2]])
+    for (const lvl of sorcerer.levels) {
+      for (const e of lvl.levelUpEvents) {
+        if (e.type === 'UPDATE_FEATURE_USES' && e.featureName === 'Font of Magic') {
+          pool.set(lvl.level, e.usesMax as number)
+        }
+      }
+    }
+    for (let n = 2; n <= 20; n++) {
+      expect(pool.get(n), `sorcery points at level ${n}`).toBe(n)
+    }
+    expect(pool.has(1)).toBe(false)
+  })
   it('defines every feature it grants, apart from subclass placeholders', () => {
     const defined = (sorcerer.featureDefinitions ?? []).map(f => f.name)
     const used = [...new Set(sorcerer.levels.flatMap(l => l.features))]
