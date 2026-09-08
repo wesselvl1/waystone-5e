@@ -44,6 +44,9 @@ function applyFragment(existing: Rulepack, fragment: RulepackFragment): Rulepack
 
   return {
     ...existing,
+    // Adopt the fragment's version — otherwise the stored pack keeps its old version
+    // forever and the SRD loader's version check re-seeds on every startup.
+    version: fragment.version,
     races,
     classes,
     backgrounds: mergeById(existing.backgrounds, fragment.backgrounds ?? []),

@@ -68,7 +68,7 @@ pnpm preview
 
 Waystone uses a rulepack system to keep game rules separate from character data. A rulepack is a JSON file that defines races, classes, backgrounds, feats, and spells.
 
-The **SRD 5.1** rulepack is bundled at `app/data/srd-5.1.json` and loaded automatically on startup. Additional rulepacks can be added through the **Rulepacks** page in the app — either by uploading a local `.json` file or by providing a URL.
+The **SRD 5.1** rulepack is bundled as a set of fragment files in `app/data/srd/` (`races.json`, `subraces.json`, `classes.json`, `subclasses.json`, `backgrounds.json`, `feats.json`, `spells.json`) which are merged and loaded automatically on startup. Additional rulepacks can be added through the **Rulepacks** page in the app — either by uploading a local `.json` file or by providing a URL.
 
 Rulepack files are validated with Zod against the schema in `app/schemas/rulepackSchema.ts`.
 
@@ -78,7 +78,7 @@ Rulepack files are validated with Zod against the schema in `app/schemas/rulepac
 app/
   components/sheet/   # Character sheet tab components
   composables/        # useCharacterStats — derived stat calculations
-  data/               # Bundled SRD 5.1 rulepack JSON
+  data/srd/           # Bundled SRD 5.1 rulepack JSON fragments
   db/                 # Dexie database definition
   pages/              # File-based routing (index, characters, rulepacks)
   plugins/            # SRD auto-loader (client-side)
@@ -86,5 +86,5 @@ app/
   services/           # characterIO (export/import), levelUpService, rulepackImport
   stores/             # Pinia stores (characters, rulepacks)
   types/              # TypeScript types (Character, Rulepack, LevelUpEvent)
-scripts/              # Utility scripts for populating spell data
+tests/                # Vitest unit tests + shared fixtures
 ```
