@@ -1,0 +1,464 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1 \u2014 Wizard class. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).",
+  "author": "Wizards of the Coast",
+  "classes": [
+    {
+      "id": "wizard",
+      "name": "Wizard",
+      "hitDie": "d6",
+      "primaryAbility": [
+        "int"
+      ],
+      "spellcastingAbility": "int",
+      "isFullCaster": true,
+      "savingThrowProficiencies": [
+        "int",
+        "wis"
+      ],
+      "armorProficiencies": [],
+      "weaponProficiencies": [
+        "dagger",
+        "dart",
+        "sling",
+        "quarterstaff",
+        "light crossbow"
+      ],
+      "toolProficiencies": [],
+      "skillChoices": {
+        "count": 2,
+        "from": [
+          "arcana",
+          "history",
+          "insight",
+          "investigation",
+          "medicine",
+          "religion"
+        ]
+      },
+      "levels": [
+        {
+          "level": 1,
+          "spellSlots": {
+            "1": 2
+          },
+          "cantripsKnown": 3,
+          "features": [
+            "Spellcasting",
+            "Arcane Recovery"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 3,
+              "cantrip": true,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 2,
+          "spellSlots": {
+            "1": 3
+          },
+          "cantripsKnown": 3,
+          "features": [
+            "Arcane Tradition"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Arcane Tradition"
+            }
+          ]
+        },
+        {
+          "level": 3,
+          "spellSlots": {
+            "1": 4,
+            "2": 2
+          },
+          "cantripsKnown": 3,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 4,
+          "spellSlots": {
+            "1": 4,
+            "2": 3
+          },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 1,
+              "cantrip": true,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 5,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 2
+          },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 6,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3
+          },
+          "cantripsKnown": 4,
+          "features": [
+            "Arcane Tradition Feature"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 7,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 1
+          },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 8,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 2
+          },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 9,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 1
+          },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 10,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Arcane Tradition Feature"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 1,
+              "cantrip": true,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 11,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 12,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 14,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Arcane Tradition Feature"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 15,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 16,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 18,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 1,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Spell Mastery"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 19,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 2,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 2,
+            "7": 2,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Signature Spells"
+          ],
+          "levelUpEvents": []
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Spellcasting",
+          "description": "As a student of arcane magic, you have a spellbook containing spells that show the first glimmerings of your true power.\n\nYou prepare a number of wizard spells from your spellbook equal to your Intelligence modifier + your wizard level. Intelligence is your spellcasting ability, and you can use an arcane focus as a spellcasting focus."
+        },
+        {
+          "name": "Arcane Recovery",
+          "description": "You have learned to regain some of your magical energy by studying your spellbook. Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your wizard level (rounded up), and none of the slots can be 6th level or higher.\n\nFor example, if you're a 4th-level wizard, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level spell slot or two 1st-level spell slots.",
+          "usesMax": 1,
+          "recharge": "long"
+        },
+        {
+          "name": "Arcane Tradition",
+          "description": "When you reach 2nd level, you choose an arcane tradition, shaping your practice of magic through one of eight schools, such as Evocation.\n\nYour choice grants you features at 2nd level and again at 6th, 10th, and 14th level."
+        },
+        {
+          "name": "Spell Mastery",
+          "description": "At 18th level, you have achieved such mastery over certain spells that you can cast them at will. Choose a 1st-level wizard spell and a 2nd-level wizard spell that are in your spellbook. You can cast those spells at their lowest level without expending a spell slot when you have them prepared. If you want to cast either spell at a higher level, you must expend a spell slot as normal.\n\nBy spending 8 hours in study, you can exchange one or both of the spells you chose for different spells of the same levels."
+        },
+        {
+          "name": "Signature Spells",
+          "description": "When you reach 20th level, you gain mastery over two powerful spells and can cast them with little effort. Choose two 3rd-level wizard spells in your spellbook as your signature spells. You always have these spells prepared, they don't count against the number of spells you have prepared, and you can cast each of them once at 3rd level without expending a spell slot. When you do so, you can't do so again until you finish a short or long rest.\n\nIf you want to cast either spell at a higher level, you must expend a spell slot as normal."
+        }
+      ],
+      "subclasses": [
+        {
+          "id": "school-of-evocation",
+          "name": "School of Evocation",
+          "description": "You focus your study on magic that creates powerful elemental effects such as bitter cold, searing flame, rolling thunder, crackling lightning and burning acid. Some evokers find employment in military forces, serving as artillery to blast enemy armies from afar.",
+          "levels": [
+            {
+              "level": 2,
+              "features": [
+                {
+                  "name": "Evocation Savant",
+                  "description": "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved."
+                },
+                {
+                  "name": "Sculpt Spells",
+                  "description": "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 6,
+              "features": [
+                {
+                  "name": "Potent Cantrip",
+                  "description": "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 10,
+              "features": [
+                {
+                  "name": "Empowered Evocation",
+                  "description": "Beginning at 10th level, you can add your Intelligence modifier to one damage roll of any wizard evocation spell you cast."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 14,
+              "features": [
+                {
+                  "name": "Overchannel",
+                  "description": "Starting at 14th level, you can increase the power of your simpler spells. When you cast a wizard spell of 1st through 5th level that deals damage, you can deal maximum damage with that spell.\n\nThe first time you do so, you suffer no adverse effect. If you use this feature again before you finish a long rest, you take 2d12 necrotic damage for each level of the spell, immediately after you cast it. Each time you use this feature again before finishing a long rest, the necrotic damage per spell level increases by 1d12. This damage ignores resistance and immunity."
+                }
+              ],
+              "levelUpEvents": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
