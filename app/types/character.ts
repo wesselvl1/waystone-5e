@@ -28,6 +28,36 @@ export interface AttackEntry {
   notes?: string
 }
 
+/**
+ * Limits on which creatures a character may assume as a form, set by a feature such as
+ * Wild Shape. Stored on the character so the sheet can filter without re-deriving them
+ * from class levels, and so a subclass that widens them (Circle of the Moon) needs no
+ * code change — it just emits a later SET_WILD_SHAPE_LIMITS.
+ *
+ * `types` is string[] rather than CreatureType because character.ts must not import from
+ * rulepack.ts — rulepack.ts already imports from here, and the cycle would be worse than
+ * the lost narrowing. The sheet widens it back into a CreatureFilter.
+ */
+export interface CreatureFormLimits {
+  maxCR: number
+  allowSwim: boolean
+  allowFly: boolean
+  types?: string[]
+}
+
+/** The form a character is currently in. Form hit points are tracked separately from
+ * the character's own, and are discarded when the form ends. */
+export interface ActiveCreatureForm {
+  creatureId: string
+  /** Denormalized so the sheet still renders if the pack providing the statblock is gone. */
+  name: string
+  hp: { max: number; current: number }
+}
+
+export interface WildShapeState {
+  limits: CreatureFormLimits
+  active?: ActiveCreatureForm
+}
 export interface ClassSpellcasting {
   ability: AbilityKey               // Spellcasting ability used for DC and attack bonus
   spells: SpellEntry[]              // Spells known/prepared for this class
@@ -126,6 +156,8 @@ export interface Character {
   warlockSlots?: WarlockSlots           // Pact magic slots — separate from regular slots
   spells: SpellEntry[]
   concentrating?: string                // Spell name if concentrating
+  /** Present once a feature grants creature forms (Wild Shape). */
+  wildShape?: WildShapeState
 
   // Features & equipment
   features: Feature[]

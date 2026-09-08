@@ -124,6 +124,19 @@ export const CharacterSchema = z.object({
   warlockSlots: WarlockSlotsSchema.optional(),
   spells: z.array(SpellEntrySchema),
   concentrating: z.string().optional(),
+  wildShape: z.object({
+    limits: z.object({
+      maxCR: z.number().min(0),
+      allowSwim: z.boolean(),
+      allowFly: z.boolean(),
+      types: z.array(z.string()).optional(),
+    }),
+    active: z.object({
+      creatureId: z.string(),
+      name: z.string(),
+      hp: z.object({ max: z.number().int(), current: z.number().int() }),
+    }).optional(),
+  }).optional(),
 
   features: z.array(FeatureSchema),
   equipment: z.array(EquipmentEntrySchema),

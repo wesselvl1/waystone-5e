@@ -52,54 +52,6 @@ const ChooseOptionDefSchema = z.object({
   description: z.string(),
 })
 
-const LevelUpEventDefSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('ADD_FEATURE'), featureId: z.string() }),
-  z.object({ type: z.literal('UPDATE_FEATURE_USES'), featureName: z.string(), usesMax: z.number().int().nullable() }),
-  z.object({
-    type: z.literal('UPDATE_SPELL_SLOTS'),
-    slots: z.partialRecord(SpellSlotLevelSchema, z.number()),
-  }),
-  z.object({ type: z.literal('GAIN_PROFICIENCY'), proficiency: z.string() }),
-  z.object({
-    type: z.literal('CHOOSE_SPELL'),
-    addTo: z.string(),
-    count: z.number().int().min(1),
-    fromList: z.array(z.string()).optional(),
-    cantrip: z.boolean().optional(),
-    classes: z.array(z.string()).optional(),
-    schools: z.array(z.string()).optional(),
-  }),
-  z.object({
-    type: z.literal('CHANGE_SPELL'),
-    addTo: z.string(),
-    amount: z.number().int().min(1),
-    classes: z.array(z.string()).optional(),
-    schools: z.array(z.string()).optional(),
-  }),
-  z.object({
-    type: z.literal('CHOOSE_EXPERTISE'),
-    label: z.string(),
-    options: z.array(SkillKeySchema),
-    count: z.number().int().min(1),
-  }),
-  z.object({
-    type: z.literal('GRANT_SPELLS'),
-    addTo: z.string(),
-    spellIds: z.array(z.string()).min(1),
-    alwaysPrepared: z.boolean().optional(),
-  }),
-  z.object({ type: z.literal('CHOOSE_FEAT') }),
-  z.object({ type: z.literal('ABILITY_SCORE_IMPROVEMENT'), points: z.number().int() }),
-  z.object({ type: z.literal('CHOOSE_SUBCLASS'), label: z.string() }),
-  z.object({ type: z.literal('UPDATE_HIT_DIE'), die: z.string() }),
-  z.object({
-    type: z.literal('CHOOSE_OPTION'),
-    id: z.string(),
-    label: z.string(),
-    options: z.array(ChooseOptionDefSchema).min(1),
-  }),
-])
-
 const CreatureTypeSchema = z.enum([
   'aberration', 'beast', 'celestial', 'construct', 'dragon', 'elemental',
   'fey', 'fiend', 'giant', 'humanoid', 'monstrosity', 'ooze', 'plant',
@@ -151,6 +103,61 @@ const CreatureDefinitionSchema = z.object({
   traits: z.array(RaceTraitSchema).optional(),
   actions: z.array(CreatureActionSchema).optional(),
 })
+const LevelUpEventDefSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('ADD_FEATURE'), featureId: z.string() }),
+  z.object({ type: z.literal('UPDATE_FEATURE_USES'), featureName: z.string(), usesMax: z.number().int().nullable() }),
+  z.object({
+    type: z.literal('UPDATE_SPELL_SLOTS'),
+    slots: z.partialRecord(SpellSlotLevelSchema, z.number()),
+  }),
+  z.object({ type: z.literal('GAIN_PROFICIENCY'), proficiency: z.string() }),
+  z.object({
+    type: z.literal('CHOOSE_SPELL'),
+    addTo: z.string(),
+    count: z.number().int().min(1),
+    fromList: z.array(z.string()).optional(),
+    cantrip: z.boolean().optional(),
+    classes: z.array(z.string()).optional(),
+    schools: z.array(z.string()).optional(),
+  }),
+  z.object({
+    type: z.literal('CHANGE_SPELL'),
+    addTo: z.string(),
+    amount: z.number().int().min(1),
+    classes: z.array(z.string()).optional(),
+    schools: z.array(z.string()).optional(),
+  }),
+  z.object({
+    type: z.literal('CHOOSE_EXPERTISE'),
+    label: z.string(),
+    options: z.array(SkillKeySchema),
+    count: z.number().int().min(1),
+  }),
+  z.object({
+    type: z.literal('GRANT_SPELLS'),
+    addTo: z.string(),
+    spellIds: z.array(z.string()).min(1),
+    alwaysPrepared: z.boolean().optional(),
+  }),
+  z.object({
+    type: z.literal('SET_WILD_SHAPE_LIMITS'),
+    maxCR: z.number().min(0),
+    allowSwim: z.boolean().optional(),
+    allowFly: z.boolean().optional(),
+    types: z.array(CreatureTypeSchema).optional(),
+  }),
+  z.object({ type: z.literal('CHOOSE_FEAT') }),
+  z.object({ type: z.literal('ABILITY_SCORE_IMPROVEMENT'), points: z.number().int() }),
+  z.object({ type: z.literal('CHOOSE_SUBCLASS'), label: z.string() }),
+  z.object({ type: z.literal('UPDATE_HIT_DIE'), die: z.string() }),
+  z.object({
+    type: z.literal('CHOOSE_OPTION'),
+    id: z.string(),
+    label: z.string(),
+    options: z.array(ChooseOptionDefSchema).min(1),
+  }),
+])
+
 const ClassLevelSchema = z.object({
   level: z.number().int().min(1).max(20),
   features: z.array(z.string()),
