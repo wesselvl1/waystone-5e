@@ -1,4 +1,4 @@
-import type { AbilityKey, SkillKey, SpellSlotLevel } from './character'
+import type { AbilityKey, AbilityScores, SkillKey, SpellSlotLevel } from './character'
 
 export interface RaceTrait {
   name: string
@@ -122,6 +122,76 @@ export interface ClassDefinition {
   subclasses?: SubclassDefinition[]
 }
 
+/**
+ * A creature statblock. Deliberately generic rather than beast-specific: Wild Shape,
+ * Find Familiar, Conjure Animals and Conjure Elemental all need the same shape, and
+ * differ only in the filter applied (see CreatureFilter).
+ */
+export type CreatureType =
+  | 'aberration' | 'beast' | 'celestial' | 'construct' | 'dragon' | 'elemental'
+  | 'fey' | 'fiend' | 'giant' | 'humanoid' | 'monstrosity' | 'ooze' | 'plant'
+  | 'swarm' | 'undead'
+
+export type CreatureSize = 'tiny' | 'small' | 'medium' | 'large' | 'huge' | 'gargantuan'
+
+export interface CreatureSpeeds {
+  walk?: number
+  climb?: number
+  swim?: number
+  fly?: number
+  burrow?: number
+}
+
+export interface CreatureAction {
+  name: string
+  description: string
+  attackBonus?: number
+  /** Damage expression, e.g. "2d4+2". */
+  damage?: string
+  damageType?: string
+}
+
+export interface CreatureDefinition {
+  id: string
+  name: string
+  type: CreatureType
+  size: CreatureSize
+  /** Fractional for low-CR creatures: 0, 0.125, 0.25, 0.5, then whole numbers. */
+  challengeRating: number
+  armorClass: number
+  hitPoints: number
+  /** e.g. "2d8" — lets the player reroll form hit points if they prefer. */
+  hitDice: string
+  speeds: CreatureSpeeds
+  abilityScores: AbilityScores
+  /** Skill bonuses as printed on the statblock, not proficiency levels. */
+  skillBonuses?: Partial<Record<SkillKey, number>>
+  passivePerception?: number
+  senses?: string[]
+  languages?: string[]
+  damageResistances?: string[]
+  damageImmunities?: string[]
+  damageVulnerabilities?: string[]
+  conditionImmunities?: string[]
+  traits?: RaceTrait[]
+  actions?: CreatureAction[]
+}
+
+/**
+ * Constrains which creatures a feature may select. Wild Shape sets maxCR plus the
+ * swim/fly gates; Moon Druid raises maxCR and opens the gates earlier, which is why
+ * none of this is hardcoded. Find Familiar and the conjure spells reuse the same shape.
+ */
+export interface CreatureFilter {
+  types?: CreatureType[]
+  maxCR?: number
+  minCR?: number
+  sizes?: CreatureSize[]
+  allowSwim?: boolean
+  allowFly?: boolean
+  /** Restrict to these creature ids exactly, ignoring the other fields. */
+  ids?: string[]
+}
 export interface Background {
   id: string
   name: string
@@ -200,6 +270,7 @@ export interface Rulepack {
   backgrounds: Background[]
   feats: FeatDefinition[]
   spells: SpellDefinition[]
+  creatures: CreatureDefinition[]
   optionalFeatures: OptionalClassFeature[]
 }
 
@@ -229,6 +300,7 @@ export interface RulepackFragment {
   backgrounds?: Background[]
   feats?: FeatDefinition[]
   spells?: SpellDefinition[]
+  creatures?: CreatureDefinition[]
   /** Subclasses to attach to existing classes identified by classId. */
   subclasses?: SubclassPatchEntry[]
   /** Subraces to attach to existing races identified by raceId. */

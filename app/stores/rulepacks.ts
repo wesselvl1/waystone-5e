@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { db } from '~/db'
-import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SpellDefinition, FeatDefinition, OptionalClassFeature } from '~/types/rulepack'
+import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
 
 /** Merge two arrays by id — incoming items overwrite existing ones with the same id. */
@@ -52,6 +52,7 @@ function applyFragment(existing: Rulepack, fragment: RulepackFragment): Rulepack
     backgrounds: mergeById(existing.backgrounds, fragment.backgrounds ?? []),
     feats: mergeById(existing.feats, fragment.feats ?? []),
     spells: mergeById(existing.spells, fragment.spells ?? []),
+    creatures: mergeById(existing.creatures ?? [], fragment.creatures ?? []),
     optionalFeatures: mergeById(existing.optionalFeatures, fragment.optionalFeatures ?? []),
   }
 }
@@ -93,6 +94,7 @@ function fragmentToRulepack(fragment: RulepackFragment): Rulepack {
     backgrounds: fragment.backgrounds ?? [],
     feats: fragment.feats ?? [],
     spells: fragment.spells ?? [],
+    creatures: fragment.creatures ?? [],
     optionalFeatures: fragment.optionalFeatures ?? [],
   }
 }
@@ -181,6 +183,47 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     return rulepacks.value.flatMap(p => p.feats)
   }
 
+  /**
+   * Every creature statblock across all loaded packs. Later packs win on id, so a user
+   * pack can override an SRD statblock without the SRD pack being edited — the same way
+   * custom packs already extend or override classes and spells.
+   */
+  function getAllCreatures(): CreatureDefinition[] {
+    const byId = new Map<string, CreatureDefinition>()
+    for (const pack of rulepacks.value) {
+      for (const creature of pack.creatures ?? []) byId.set(creature.id, creature)
+    }
+    return [...byId.values()]
+  }
+
+  function getCreature(creatureId: string): CreatureDefinition | undefined {
+    return getAllCreatures().find(c => c.id === creatureId)
+  }
+
+  /**
+   * Creatures a feature may select, given its filter. An explicit id list short-circuits
+   * everything else (Find Familiar names its forms); otherwise the type, CR and movement
+   * gates apply. allowSwim/allowFly default to permitting the speed, so a filter that
+   * does not mention them is unrestricted — only Wild Shape's early levels set them false.
+   */
+  function getCreaturesMatching(filter: CreatureFilter): CreatureDefinition[] {
+    const all = getAllCreatures()
+    if (filter.ids) {
+      const wanted = new Set(filter.ids)
+      return all.filter(c => wanted.has(c.id))
+    }
+    return all.filter((c) => {
+      if (filter.types && !filter.types.includes(c.type)) return false
+      if (filter.sizes && !filter.sizes.includes(c.size)) return false
+      if (filter.maxCR !== undefined && c.challengeRating > filter.maxCR) return false
+      if (filter.minCR !== undefined && c.challengeRating < filter.minCR) return false
+      if (filter.allowSwim === false && (c.speeds.swim ?? 0) > 0) return false
+      if (filter.allowFly === false && (c.speeds.fly ?? 0) > 0) return false
+      return true
+    })
+  }
+
+
   function getAllBackgrounds() {
     return rulepacks.value.flatMap(p => p.backgrounds)
   }
@@ -233,6 +276,9 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     getAllClasses,
     getAllSpells,
     getAllFeats,
+    getAllCreatures,
+    getCreature,
+    getCreaturesMatching,
     getAllBackgrounds,
     getSubclassesForClass,
     getSubclass,

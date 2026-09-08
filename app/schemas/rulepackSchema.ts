@@ -100,6 +100,57 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
   }),
 ])
 
+const CreatureTypeSchema = z.enum([
+  'aberration', 'beast', 'celestial', 'construct', 'dragon', 'elemental',
+  'fey', 'fiend', 'giant', 'humanoid', 'monstrosity', 'ooze', 'plant',
+  'swarm', 'undead',
+])
+
+const CreatureSizeSchema = z.enum(['tiny', 'small', 'medium', 'large', 'huge', 'gargantuan'])
+
+const CreatureActionSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  attackBonus: z.number().int().optional(),
+  damage: z.string().optional(),
+  damageType: z.string().optional(),
+})
+
+const CreatureDefinitionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: CreatureTypeSchema,
+  size: CreatureSizeSchema,
+  challengeRating: z.number().min(0),
+  armorClass: z.number().int().min(0),
+  hitPoints: z.number().int().min(1),
+  hitDice: z.string(),
+  speeds: z.object({
+    walk: z.number().int().optional(),
+    climb: z.number().int().optional(),
+    swim: z.number().int().optional(),
+    fly: z.number().int().optional(),
+    burrow: z.number().int().optional(),
+  }),
+  abilityScores: z.object({
+    str: z.number().int(),
+    dex: z.number().int(),
+    con: z.number().int(),
+    int: z.number().int(),
+    wis: z.number().int(),
+    cha: z.number().int(),
+  }),
+  skillBonuses: z.partialRecord(SkillKeySchema, z.number().int()).optional(),
+  passivePerception: z.number().int().optional(),
+  senses: z.array(z.string()).optional(),
+  languages: z.array(z.string()).optional(),
+  damageResistances: z.array(z.string()).optional(),
+  damageImmunities: z.array(z.string()).optional(),
+  damageVulnerabilities: z.array(z.string()).optional(),
+  conditionImmunities: z.array(z.string()).optional(),
+  traits: z.array(RaceTraitSchema).optional(),
+  actions: z.array(CreatureActionSchema).optional(),
+})
 const ClassLevelSchema = z.object({
   level: z.number().int().min(1).max(20),
   features: z.array(z.string()),
@@ -240,6 +291,8 @@ export const RulepackSchema = z.object({
   backgrounds: z.array(BackgroundSchema).optional().default([]),
   feats: z.array(FeatDefinitionSchema).optional().default([]),
   spells: z.array(SpellDefinitionSchema).optional().default([]),
+  /** Creature statblocks: beasts for Wild Shape now, summons and familiars later. */
+  creatures: z.array(CreatureDefinitionSchema).optional().default([]),
   /** Top-level subclass patches: each entry carries a classId specifying which class to attach to. */
   subclasses: z.array(SubclassPatchEntrySchema).optional().default([]),
   /** Top-level subrace patches: each entry carries a raceId specifying which race to attach to. */
