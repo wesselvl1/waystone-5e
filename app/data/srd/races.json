@@ -1,0 +1,45 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Races and classes included \u2014 backgrounds, feats, and spells to follow.",
+  "author": "Wizards of the Coast",
+  "races": [
+    {
+      "id": "dwarf",
+      "name": "Dwarf",
+      "size": "medium",
+      "speeds": { "walk": 25 },
+      "abilityScoreBonuses": {
+        "con": 2
+      },
+      "traits": [
+        {
+          "name": "Darkvision",
+          "description": "Accustomed to life underground, you have superior vision in dark and dim conditions. You can see in dim light within 60 feet of you as if it were bright light, and in darkness as if it were dim light. You can't discern color in darkness, only shades of gray."
+        },
+        {
+          "name": "Dwarven Resilience",
+          "description": "You have advantage on saving throws against poison, and you have resistance against poison damage."
+        },
+        {
+          "name": "Dwarven Combat Training",
+          "description": "You have proficiency with the battleaxe, handaxe, light hammer, and warhammer."
+        },
+        {
+          "name": "Tool Proficiency",
+          "description": "You gain proficiency with the artisan's tools of your choice: smith's tools, brewer's supplies, or mason's tools."
+        },
+        {
+          "name": "Stonecunning",
+          "description": "Whenever you make an Intelligence (History) check related to the origin of stonework, you are considered proficient in the History skill and add double your proficiency bonus to the check, instead of your normal proficiency bonus."
+        },
+        {
+          "name": "Steady Footing",
+          "description": "Your speed is not reduced by wearing heavy armor."
+        }
+      ],
+      "languages": ["Common", "Dwarvish"]
+    }
+  ]
+}

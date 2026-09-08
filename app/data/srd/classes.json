@@ -1,0 +1,862 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Races and classes included \u2014 backgrounds, feats, and spells to follow.",
+  "author": "Wizards of the Coast",
+  "classes": [
+    {
+      "id": "barbarian",
+      "name": "Barbarian",
+      "hitDie": "d12",
+      "primaryAbility": ["str"],
+      "savingThrowProficiencies": ["str", "con"],
+      "armorProficiencies": ["light", "medium", "shields"],
+      "weaponProficiencies": ["simple", "martial"],
+      "toolProficiencies": [],
+      "skillChoices": {
+        "count": 2,
+        "from": [
+          "animalHandling",
+          "athletics",
+          "intimidation",
+          "nature",
+          "perception",
+          "survival"
+        ]
+      },
+      "levels": [
+        {
+          "level": 1,
+          "features": ["Rage", "Unarmored Defense"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 2,
+          "features": ["Reckless Attack", "Danger Sense"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 3,
+          "features": ["Primal Path"],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Primal Path"
+            },
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": 3
+            }
+          ]
+        },
+        {
+          "level": 4,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 5,
+          "features": ["Extra Attack", "Fast Movement"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 6,
+          "features": ["Primal Path Feature"],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": 4
+            }
+          ]
+        },
+        {
+          "level": 7,
+          "features": ["Feral Instinct"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 8,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 9,
+          "features": ["Brutal Critical (1 die)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 10,
+          "features": ["Primal Path Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 11,
+          "features": ["Relentless Rage"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 12,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": 5
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "features": ["Brutal Critical (2 dice)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 14,
+          "features": ["Primal Path Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 15,
+          "features": ["Persistent Rage"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 16,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "features": ["Brutal Critical (3 dice)"],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": 6
+            }
+          ]
+        },
+        {
+          "level": 18,
+          "features": ["Indomitable Might"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 19,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "features": ["Primal Champion"],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Rage",
+              "usesMax": null
+            }
+          ]
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Rage",
+          "description": "On your turn, you can enter a rage as a bonus action. While raging, you gain advantage on Strength checks and Strength saving throws, a bonus to melee weapon damage rolls using Strength, and resistance to bludgeoning, piercing, and slashing damage. You can't cast or concentrate on spells while raging. Your rage lasts 1 minute and ends early if you're knocked unconscious, if you haven't attacked a hostile creature or taken damage since your last turn, or if you end it as a bonus action on your turn. Once you have raged the maximum number of times for your barbarian level, you must finish a long rest before you can rage again.",
+          "usesMax": 2,
+          "recharge": "long"
+        },
+        {
+          "name": "Unarmored Defense",
+          "description": "While you are not wearing any armor, your Armor Class equals 10 + your Dexterity modifier + your Constitution modifier. You can use a shield and still gain this benefit."
+        },
+        {
+          "name": "Reckless Attack",
+          "description": "When you make your first attack on your turn, you can decide to attack recklessly. Doing so gives you advantage on melee weapon attack rolls using Strength during this turn, but attack rolls against you have advantage until your next turn."
+        },
+        {
+          "name": "Danger Sense",
+          "description": "You have advantage on Dexterity saving throws against effects that you can see, such as traps and spells. To gain this benefit, you can't be blinded, deafened, or incapacitated."
+        },
+        {
+          "name": "Primal Path",
+          "description": "At 3rd level, you choose a path that shapes the nature of your rage. Your choice grants you features at 3rd level and again at 6th, 10th, and 14th levels."
+        },
+        {
+          "name": "Extra Attack",
+          "description": "You can attack twice, instead of once, whenever you take the Attack action on your turn."
+        },
+        {
+          "name": "Fast Movement",
+          "description": "Your speed increases by 10 feet while you aren't wearing heavy armor."
+        },
+        {
+          "name": "Feral Instinct",
+          "description": "Your instincts are so honed that you have advantage on initiative rolls. Additionally, if you are surprised at the beginning of combat and aren't incapacitated, you can act normally on your first turn, but only if you enter your rage before doing anything else on that turn."
+        },
+        {
+          "name": "Brutal Critical (1 die)",
+          "description": "You can roll one additional weapon damage die when determining the extra damage for a critical hit with a melee attack."
+        },
+        {
+          "name": "Brutal Critical (2 dice)",
+          "description": "You can roll two additional weapon damage dice when determining the extra damage for a critical hit with a melee attack.",
+          "replaces": "Brutal Critical (1 die)"
+        },
+        {
+          "name": "Brutal Critical (3 dice)",
+          "description": "You can roll three additional weapon damage dice when determining the extra damage for a critical hit with a melee attack.",
+          "replaces": "Brutal Critical (2 dice)"
+        },
+        {
+          "name": "Relentless Rage",
+          "description": "If you drop to 0 hit points while you're raging and don't die outright, you can make a DC 10 Constitution saving throw. If you succeed, you drop to 1 hit point instead. Each time you use this feature after the first, the DC increases by 5. When you finish a short or long rest, the DC resets to 10."
+        },
+        {
+          "name": "Persistent Rage",
+          "description": "Your rage is so fierce that it ends early only if you fall unconscious or if you choose to end it."
+        },
+        {
+          "name": "Indomitable Might",
+          "description": "If your total for a Strength check is less than your Strength score, you can use that score in place of the total."
+        },
+        {
+          "name": "Primal Champion",
+          "description": "You embody the power of the wilds. Your Strength and Constitution scores each increase by 4. Your maximum for those scores is now 24."
+        }
+      ]
+    },
+    {
+      "id": "bard",
+      "name": "Bard",
+      "hitDie": "d8",
+      "primaryAbility": ["cha"],
+      "spellcastingAbility": "cha",
+      "isFullCaster": true,
+      "savingThrowProficiencies": ["dex", "cha"],
+      "armorProficiencies": ["light"],
+      "weaponProficiencies": ["simple", "martial"],
+      "toolProficiencies": ["music instrument 1", "music instrument 2", "music instrument 3"],
+      "skillChoices": {
+        "count": 3,
+        "from": [
+          "acrobatics",
+          "animalHandling",
+          "arcana",
+          "athletics",
+          "deception",
+          "history",
+          "insight",
+          "intimidation",
+          "investigation",
+          "medicine",
+          "nature",
+          "perception",
+          "performance",
+          "persuasion",
+          "religion",
+          "sleightOfHand",
+          "stealth",
+          "survival"
+        ]
+      },
+      "levels": [
+        {
+          "level": 1,
+          "spellSlots": { "1": 2 },
+          "cantripsKnown": 2,
+          "spellsKnown": 4,
+          "features": ["Spellcasting", "Bardic Inspiration (d6)"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 2, "cantrip": true, "classes": ["bard"] },
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 4, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 2,
+          "spellSlots": { "1": 3 },
+          "cantripsKnown": 2,
+          "spellsKnown": 5,
+          "features": ["Jack of All Trades", "Song of Rest (d6)"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 3,
+          "spellSlots": { "1": 4, "2": 2 },
+          "cantripsKnown": 2,
+          "spellsKnown": 6,
+          "features": ["Bard College"],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Bard College"
+            },
+            {
+              "type": "CHOOSE_EXPERTISE",
+              "label": "Choose two skills for Expertise",
+              "options": [
+                "acrobatics",
+                "animalHandling",
+                "arcana",
+                "athletics",
+                "deception",
+                "history",
+                "insight",
+                "intimidation",
+                "investigation",
+                "medicine",
+                "nature",
+                "perception",
+                "performance",
+                "persuasion",
+                "religion",
+                "sleightOfHand",
+                "stealth",
+                "survival"
+              ],
+              "count": 2
+            },
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 4,
+          "spellSlots": { "1": 4, "2": 3 },
+          "cantripsKnown": 3,
+          "spellsKnown": 7,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] },
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": true, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 5,
+          "spellSlots": { "1": 4, "2": 3, "3": 2 },
+          "cantripsKnown": 3,
+          "spellsKnown": 8,
+          "features": ["Font of Inspiration", "Bardic Inspiration (d8)"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 6,
+          "spellSlots": { "1": 4, "2": 3, "3": 3 },
+          "cantripsKnown": 3,
+          "spellsKnown": 9,
+          "features": ["Bard College Feature"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 7,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 1 },
+          "cantripsKnown": 3,
+          "spellsKnown": 10,
+          "features": ["Countercharm"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 8,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 2 },
+          "cantripsKnown": 3,
+          "spellsKnown": 11,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 9,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 1 },
+          "cantripsKnown": 3,
+          "spellsKnown": 12,
+          "features": ["Song of Rest (d8)"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 10,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2 },
+          "cantripsKnown": 4,
+          "spellsKnown": 14,
+          "features": ["Bard College Feature", "Bardic Inspiration (d10)"],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_EXPERTISE",
+              "label": "Choose two skills for Expertise",
+              "options": [
+                "acrobatics",
+                "animalHandling",
+                "arcana",
+                "athletics",
+                "deception",
+                "history",
+                "insight",
+                "intimidation",
+                "investigation",
+                "medicine",
+                "nature",
+                "perception",
+                "performance",
+                "persuasion",
+                "religion",
+                "sleightOfHand",
+                "stealth",
+                "survival"
+              ],
+              "count": 2
+            },
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 2, "cantrip": false },
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": true, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 11,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 15,
+          "features": ["Additional Magical Secrets"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 2, "cantrip": false }
+          ]
+        },
+        {
+          "level": 12,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 15,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 16,
+          "features": ["Song of Rest (d10)"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 14,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 18,
+          "features": ["Bard College Feature"],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 2, "cantrip": false }
+          ]
+        },
+        {
+          "level": 15,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1, "8": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 19,
+          "features": ["Superior Inspiration", "Bardic Inspiration (d12)"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 16,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1, "8": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 19,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1, "8": 1, "9": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 20,
+          "features": ["Song of Rest (d12)"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 1, "cantrip": false, "classes": ["bard"] }
+          ]
+        },
+        {
+          "level": 18,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 3, "6": 1, "7": 1, "8": 1, "9": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 22,
+          "features": ["Bard College Feature"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "bard", "count": 2, "cantrip": false }
+          ]
+        },
+        {
+          "level": 19,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 3, "6": 2, "7": 1, "8": 1, "9": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 22,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 3, "6": 2, "7": 2, "8": 1, "9": 1 },
+          "cantripsKnown": 4,
+          "spellsKnown": 22,
+          "features": ["Superior Inspiration"],
+          "levelUpEvents": []
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Bardic Inspiration (d6)",
+          "description": "You can inspire others through stirring words or music. As a bonus action, you can choose one creature other than yourself within 60 feet who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes the creature can add the die to one ability check, attack roll, or saving throw. The Bardic Inspiration die is expended when used.",
+          "usesMax": 3,
+          "recharge": "long"
+        },
+        {
+          "name": "Bardic Inspiration (d8)",
+          "description": "Your Bardic Inspiration die becomes a d8.",
+          "usesMax": 3,
+          "recharge": "long",
+          "replaces": "Bardic Inspiration (d6)"
+        },
+        {
+          "name": "Bardic Inspiration (d10)",
+          "description": "Your Bardic Inspiration die becomes a d10.",
+          "usesMax": 3,
+          "recharge": "long",
+          "replaces": "Bardic Inspiration (d8)"
+        },
+        {
+          "name": "Bardic Inspiration (d12)",
+          "description": "Your Bardic Inspiration die becomes a d12.",
+          "usesMax": 3,
+          "recharge": "long",
+          "replaces": "Bardic Inspiration (d10)"
+        },
+        {
+          "name": "Song of Rest (d6)",
+          "description": "You can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance spend Hit Dice to regain hit points at the end of a short rest, each of those creatures can regain an extra 1d6 hit points."
+        },
+        {
+          "name": "Song of Rest (d8)",
+          "description": "Your Song of Rest die becomes a d8.",
+          "replaces": "Song of Rest (d6)"
+        },
+        {
+          "name": "Song of Rest (d10)",
+          "description": "Your Song of Rest die becomes a d10.",
+          "replaces": "Song of Rest (d8)"
+        },
+        {
+          "name": "Song of Rest (d12)",
+          "description": "Your Song of Rest die becomes a d12.",
+          "replaces": "Song of Rest (d10)"
+        }
+      ]
+    },
+    {
+      "id": "cleric",
+      "name": "Cleric",
+      "hitDie": "d8",
+      "primaryAbility": ["wis"],
+      "spellcastingAbility": "wis",
+      "isFullCaster": true,
+      "savingThrowProficiencies": ["wis", "cha"],
+      "armorProficiencies": ["light", "medium", "shields"],
+      "weaponProficiencies": ["simple"],
+      "toolProficiencies": [],
+      "skillChoices": {
+        "count": 2,
+        "from": ["history", "insight", "medicine", "persuasion", "religion"]
+      },
+      "levels": [
+        {
+          "level": 1,
+          "spellSlots": { "1": 2 },
+          "cantripsKnown": 3,
+          "features": ["Spellcasting", "Divine Domain"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "cleric", "count": 3, "cantrip": true, "classes": ["cleric"] },
+            { "type": "CHOOSE_SUBCLASS", "label": "Divine Domain" }
+          ]
+        },
+        {
+          "level": 2,
+          "spellSlots": { "1": 3 },
+          "cantripsKnown": 3,
+          "features": ["Channel Divinity (1/rest)", "Channel Divinity: Turn Undead", "Divine Domain Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 3,
+          "spellSlots": { "1": 4, "2": 2 },
+          "cantripsKnown": 3,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 4,
+          "spellSlots": { "1": 4, "2": 3 },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": [
+            { "type": "ABILITY_SCORE_IMPROVEMENT", "points": 2 },
+            { "type": "CHOOSE_SPELL", "addTo": "cleric", "count": 1, "cantrip": true, "classes": ["cleric"] }
+          ]
+        },
+        {
+          "level": 5,
+          "spellSlots": { "1": 4, "2": 3, "3": 2 },
+          "cantripsKnown": 4,
+          "features": ["Destroy Undead (CR 1/2)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 6,
+          "spellSlots": { "1": 4, "2": 3, "3": 3 },
+          "cantripsKnown": 4,
+          "features": ["Channel Divinity (2/rest)", "Divine Domain Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 7,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 1 },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 8,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 2 },
+          "cantripsKnown": 4,
+          "features": ["Destroy Undead (CR 1)", "Divine Domain Feature"],
+          "levelUpEvents": [
+            { "type": "ABILITY_SCORE_IMPROVEMENT", "points": 2 }
+          ]
+        },
+        {
+          "level": 9,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 1 },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 10,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2 },
+          "cantripsKnown": 5,
+          "features": ["Divine Intervention"],
+          "levelUpEvents": [
+            { "type": "CHOOSE_SPELL", "addTo": "cleric", "count": 1, "cantrip": true, "classes": ["cleric"] }
+          ]
+        },
+        {
+          "level": 11,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1 },
+          "cantripsKnown": 5,
+          "features": ["Destroy Undead (CR 2)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 12,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1 },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            { "type": "ABILITY_SCORE_IMPROVEMENT", "points": 2 }
+          ]
+        },
+        {
+          "level": 13,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1 },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 14,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1 },
+          "cantripsKnown": 5,
+          "features": ["Destroy Undead (CR 3)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 15,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1, "8": 1 },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 16,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1, "8": 1 },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            { "type": "ABILITY_SCORE_IMPROVEMENT", "points": 2 }
+          ]
+        },
+        {
+          "level": 17,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 2, "6": 1, "7": 1, "8": 1, "9": 1 },
+          "cantripsKnown": 5,
+          "features": ["Destroy Undead (CR 4)", "Divine Domain Feature"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 18,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 3, "6": 1, "7": 1, "8": 1, "9": 1 },
+          "cantripsKnown": 5,
+          "features": ["Channel Divinity (3/rest)"],
+          "levelUpEvents": []
+        },
+        {
+          "level": 19,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 3, "6": 2, "7": 1, "8": 1, "9": 1 },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            { "type": "ABILITY_SCORE_IMPROVEMENT", "points": 2 }
+          ]
+        },
+        {
+          "level": 20,
+          "spellSlots": { "1": 4, "2": 3, "3": 3, "4": 3, "5": 3, "6": 2, "7": 2, "8": 1, "9": 1 },
+          "cantripsKnown": 5,
+          "features": ["Divine Intervention Improvement"],
+          "levelUpEvents": []
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Spellcasting",
+          "description": "As a conduit for divine power, you can cast cleric spells. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum of one spell), choosing from the cleric spell list. The spells must be of a level for which you have spell slots. You can change your list of prepared spells when you finish a long rest. Wisdom is your spellcasting ability for your cleric spells, and you can use a holy symbol as a spellcasting focus."
+        },
+        {
+          "name": "Divine Domain",
+          "description": "Choose one domain related to your deity. Only the Life domain is detailed in the SRD. Your domain grants you domain spells and other features when you choose it at 1st level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels."
+        },
+        {
+          "name": "Channel Divinity (1/rest)",
+          "description": "You gain the ability to channel divine energy directly from your deity, using that energy to fuel magical effects. You start with two such effects: Turn Undead and an effect determined by your domain. When you use your Channel Divinity, you choose which effect to create. You must then finish a short or long rest to use your Channel Divinity again. Some Channel Divinity effects require saving throws; when you use such an effect from this class, the DC equals your cleric spell save DC.",
+          "usesMax": 1,
+          "recharge": "short"
+        },
+        {
+          "name": "Channel Divinity: Turn Undead",
+          "description": "As an action, you present your holy symbol and speak a prayer censuring the undead. Each undead that can see or hear you within 30 feet of you must make a Wisdom saving throw. If the creature fails its saving throw, it is turned for 1 minute or until it takes any damage.\n\nA turned creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If there's nowhere to move, the creature can use the Dodge action."
+        },
+        {
+          "name": "Channel Divinity (2/rest)",
+          "description": "You can use your Channel Divinity twice between rests. When you finish a short or long rest, you regain your expended uses.",
+          "usesMax": 2,
+          "recharge": "short",
+          "replaces": "Channel Divinity (1/rest)"
+        },
+        {
+          "name": "Channel Divinity (3/rest)",
+          "description": "You can use your Channel Divinity three times between rests. When you finish a short or long rest, you regain your expended uses.",
+          "usesMax": 3,
+          "recharge": "short",
+          "replaces": "Channel Divinity (2/rest)"
+        },
+        {
+          "name": "Destroy Undead (CR 1/2)",
+          "description": "When an undead fails its saving throw against your Turn Undead feature, the creature is instantly destroyed if its challenge rating is 1/2 or lower."
+        },
+        {
+          "name": "Destroy Undead (CR 1)",
+          "description": "Your Turn Undead now instantly destroys undead of challenge rating 1 or lower.",
+          "replaces": "Destroy Undead (CR 1/2)"
+        },
+        {
+          "name": "Destroy Undead (CR 2)",
+          "description": "Your Turn Undead now instantly destroys undead of challenge rating 2 or lower.",
+          "replaces": "Destroy Undead (CR 1)"
+        },
+        {
+          "name": "Destroy Undead (CR 3)",
+          "description": "Your Turn Undead now instantly destroys undead of challenge rating 3 or lower.",
+          "replaces": "Destroy Undead (CR 2)"
+        },
+        {
+          "name": "Destroy Undead (CR 4)",
+          "description": "Your Turn Undead now instantly destroys undead of challenge rating 4 or lower.",
+          "replaces": "Destroy Undead (CR 3)"
+        },
+        {
+          "name": "Divine Intervention",
+          "description": "You can call on your deity to intervene on your behalf when your need is great. Imploring your deity's aid requires you to use your action. Describe the assistance you seek, and roll percentile dice. If you roll a number equal to or lower than your cleric level, your deity intervenes. The GM chooses the nature of the intervention; the effect of any cleric spell or cleric domain spell would be appropriate. If your deity intervenes, you can't use this feature again for 7 days. Otherwise, you can use it again after you finish a long rest.",
+          "usesMax": 1,
+          "recharge": "long"
+        },
+        {
+          "name": "Divine Intervention Improvement",
+          "description": "Your call for intervention succeeds automatically, no roll required.",
+          "usesMax": 1,
+          "recharge": "long",
+          "replaces": "Divine Intervention"
+        }
+      ]
+    }
+  ]
+}

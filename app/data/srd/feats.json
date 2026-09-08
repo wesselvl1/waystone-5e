@@ -1,0 +1,16 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Races and classes included \u2014 backgrounds, feats, and spells to follow.",
+  "author": "Wizards of the Coast",
+  "feats": [
+    {
+      "id": "grappler",
+      "name": "Grappler",
+      "description": "You've developed the skills necessary to hold your own in close-quarters grappling. You have advantage on attack rolls against a creature you are grappling. You can use your action to try to pin a creature grappled by you. To do so, make another grapple check. If you succeed, you and the creature are both restrained until the grapple ends.",
+      "prerequisite": "Strength 13 or higher",
+      "prerequisiteCheck": { "minAbilityScore": { "str": 13 } }
+    }
+  ]
+}
