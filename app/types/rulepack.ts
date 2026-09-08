@@ -59,6 +59,7 @@ export type LevelUpEventDef =
   | { type: 'CHOOSE_SPELL'; addTo: string; count: number; fromList?: string[]; cantrip?: boolean; classes?: string[]; schools?: string[] }
   | { type: 'CHANGE_SPELL'; addTo: string; amount: number; classes?: string[]; schools?: string[] }
   | { type: 'GRANT_SPELLS'; addTo: string; spellIds: string[]; alwaysPrepared?: boolean }
+  | { type: 'SET_WILD_SHAPE_LIMITS'; maxCR: number; allowSwim?: boolean; allowFly?: boolean; types?: CreatureType[] }
   | { type: 'CHOOSE_EXPERTISE'; label: string; options: SkillKey[]; count: number }
   | { type: 'CHOOSE_FEAT' }
   | { type: 'ABILITY_SCORE_IMPROVEMENT'; points: number }

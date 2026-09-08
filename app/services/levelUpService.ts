@@ -12,6 +12,7 @@ import type {
   UpdateHitDieEvent,
   UpdateFeatureUsesEvent,
   GrantSpellsEvent,
+  SetWildShapeLimitsEvent,
   ResolvedChoice,
 } from '~/types/events'
 
@@ -207,6 +208,17 @@ export function resolveLevelUpEvents(
         }
         break
       }
+      case 'SET_WILD_SHAPE_LIMITS':
+        events.push({
+          type: 'SET_WILD_SHAPE_LIMITS',
+          maxCR: eventDef.maxCR,
+          // Unset means unrestricted, so a subclass that widens the limits can simply
+          // omit the gates rather than having to re-state them as true.
+          allowSwim: eventDef.allowSwim ?? true,
+          allowFly: eventDef.allowFly ?? true,
+          types: eventDef.types,
+        } satisfies SetWildShapeLimitsEvent)
+        break
       case 'CHOOSE_FEAT':
         events.push({ type: 'CHOOSE_FEAT' })
         break
@@ -269,6 +281,17 @@ export function resolveLevelUpEvents(
           proficiency: eventDef.proficiency,
           category: 'skill',
         } satisfies GainProficiencyEvent)
+        break
+      case 'SET_WILD_SHAPE_LIMITS':
+        events.push({
+          type: 'SET_WILD_SHAPE_LIMITS',
+          maxCR: eventDef.maxCR,
+          // Unset means unrestricted, so a subclass that widens the limits can simply
+          // omit the gates rather than having to re-state them as true.
+          allowSwim: eventDef.allowSwim ?? true,
+          allowFly: eventDef.allowFly ?? true,
+          types: eventDef.types,
+        } satisfies SetWildShapeLimitsEvent)
         break
       case 'ABILITY_SCORE_IMPROVEMENT':
         events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
@@ -369,6 +392,21 @@ export function applyAutomaticEvents(
             alwaysPrepared: event.alwaysPrepared || undefined,
             classId: event.addTo,
           })
+        }
+        break
+      }
+      case 'SET_WILD_SHAPE_LIMITS': {
+        // Absolute, not a delta: a later level (or a subclass) replaces the limits.
+        // An active form is preserved even if it would no longer qualify — dropping a
+        // player out of a form mid-session because a limit narrowed would be worse.
+        updated.wildShape = {
+          ...updated.wildShape,
+          limits: {
+            maxCR: event.maxCR,
+            allowSwim: event.allowSwim,
+            allowFly: event.allowFly,
+            ...(event.types ? { types: event.types } : {}),
+          },
         }
         break
       }

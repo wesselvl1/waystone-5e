@@ -86,6 +86,15 @@
           ],
           "levelUpEvents": [
             {
+              "type": "SET_WILD_SHAPE_LIMITS",
+              "types": [
+                "beast"
+              ],
+              "maxCR": 0.25,
+              "allowSwim": false,
+              "allowFly": false
+            },
+            {
               "type": "CHOOSE_SUBCLASS",
               "label": "Druid Circle"
             }
@@ -112,6 +121,15 @@
             "Wild Shape (CR 1/2)"
           ],
           "levelUpEvents": [
+            {
+              "type": "SET_WILD_SHAPE_LIMITS",
+              "types": [
+                "beast"
+              ],
+              "maxCR": 0.5,
+              "allowSwim": true,
+              "allowFly": false
+            },
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
@@ -176,6 +194,15 @@
             "Wild Shape (CR 1)"
           ],
           "levelUpEvents": [
+            {
+              "type": "SET_WILD_SHAPE_LIMITS",
+              "types": [
+                "beast"
+              ],
+              "maxCR": 1,
+              "allowSwim": true,
+              "allowFly": true
+            },
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2

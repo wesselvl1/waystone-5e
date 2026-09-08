@@ -57,6 +57,17 @@ export interface GrantSpellsEvent {
   alwaysPrepared: boolean   // Domain spells are always prepared and don't count against the prepared limit
 }
 
+/** Sets or widens the creature forms a character may assume. Absolute, not a delta:
+ * a later level replaces the limits rather than adding to them, which is what lets a
+ * subclass override the class progression. */
+export interface SetWildShapeLimitsEvent {
+  type: 'SET_WILD_SHAPE_LIMITS'
+  maxCR: number
+  allowSwim: boolean
+  allowFly: boolean
+  types?: string[]
+}
+
 export interface UpdateFeatureUsesEvent {
   type: 'UPDATE_FEATURE_USES'
   featureName: string
@@ -195,6 +206,7 @@ export type AutomaticLevelUpEvent =
   | UpdateHitDieEvent
   | UpdateFeatureUsesEvent
   | GrantSpellsEvent
+  | SetWildShapeLimitsEvent
 
 export type ChoiceLevelUpEvent =
   | ChooseSpellEvent
