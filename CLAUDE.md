@@ -24,8 +24,13 @@ pnpm test -t "applies an ASI"
 Typecheck (no npm script exists for this):
 
 ```bash
-pnpm exec vue-tsc --noEmit -p tsconfig.json
+pnpm exec vue-tsc -b --force
 ```
+
+**Build mode (`-b`) is required.** `tsconfig.json` has `"files": []` plus `"references"`, so
+`vue-tsc --noEmit -p tsconfig.json` type-checks *nothing* and exits 0 — it silently passes
+even with dozens of real errors, including template errors in `.vue` files. Note `tests/`
+is not covered by either form, since the `.nuxt` project configs only include `app/`.
 
 `@antfu/eslint-config` and `eslint` are installed but there is **no `eslint.config.*` file and no `lint` script** — `pnpm exec eslint .` fails. Don't tell the user to run lint; match surrounding style manually.
 

@@ -1,3 +1,4 @@
+import { migrateCharacterShape } from '~/services/characterMigration'
 import { defineStore } from 'pinia'
 import { db } from '~/db'
 import type { Character } from '~/types/character'
@@ -8,12 +9,18 @@ export const useCharactersStore = defineStore('characters', () => {
 
   async function loadAll() {
     loading.value = true
-    characters.value = await db.characters.orderBy('updatedAt').reverse().toArray()
+    const stored = await db.characters.orderBy('updatedAt').reverse().toArray()
+    // Characters are read raw from Dexie, so shape migrations have to happen here as
+    // well as in CharacterSchema — the schema only guards the import boundary.
+    characters.value = stored.map(c => migrateCharacterShape(c))
     loading.value = false
   }
 
   async function getById(id: string): Promise<Character | undefined> {
-    return db.characters.get(id)
+    // Also migrates: this reads straight from Dexie rather than the loaded array, so
+    // skipping it here hands callers the stored shape even after loadAll() migrated.
+    const stored = await db.characters.get(id)
+    return stored ? migrateCharacterShape(stored) : undefined
   }
 
   async function save(character: Character): Promise<void> {

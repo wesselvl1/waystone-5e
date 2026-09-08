@@ -154,8 +154,26 @@ export function resolveLevelUpEvents(
   }
 
   // Process levelUpEvents from the rulepack definition
-  for (const eventDef of levelData.levelUpEvents) {
-    switch (eventDef.type) {
+  // Taking a class as an additional class grants the SRD's reduced proficiency set, never
+  // saving throws. Level 1 of the *first* class is handled at character creation instead,
+  // so this only fires when the character already has levels elsewhere.
+  const enteringAsMulticlass = newLevel === 1
+    && character.classes.some(c => c.classId !== classId && c.level > 0)
+  if (enteringAsMulticlass && classDef.multiclassing) {
+    for (const proficiency of multiclassProficiencies(classDef)) {
+      events.push({
+        type: 'GAIN_PROFICIENCY',
+        proficiency,
+        category: 'armor',
+      } satisfies GainProficiencyEvent)
+    }
+    const skills = classDef.multiclassing.skillChoices
+    if (skills && skills.count > 0) {
+      events.push({ type: 'CHOOSE_SKILL', count: skills.count, from: skills.from })
+    }
+  }
+
+  for (const eventDef of levelData.levelUpEvents) {    switch (eventDef.type) {
       case 'ADD_FEATURE':
         // Already handled above via feature names; skip duplicate
         break
@@ -571,8 +589,16 @@ export function applyResolvedChoices(
         }
         break
       }
-      case 'RESOLVED_OPTION': {
-        // Find the option definition from the rulepack across all subclass level events
+      case 'RESOLVED_SKILL': {
+        for (const skill of choice.skills) {
+          // Never downgrade: a skill already at expertise (2) stays there.
+          if ((updated.skillProficiencies[skill] ?? 0) === 0) {
+            updated.skillProficiencies[skill] = 1
+          }
+        }
+        break
+      }
+      case 'RESOLVED_OPTION': {        // Find the option definition from the rulepack across all subclass level events
         let optionName: string | undefined
         let optionDescription: string | undefined
         outer: for (const cls of rulepack.classes) {

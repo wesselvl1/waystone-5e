@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
+import { multiclassOptions, describeMulticlassPrerequisites, effectiveScores } from '~/services/multiclass'
+import { maxSpellLevelForClass, clampSpellSlots } from '~/services/spellcasting'
 import {
   resolveLevelUpEvents,
   applyAutomaticEvents,
@@ -9,7 +11,7 @@ import {
   getAutomaticEvents,
   checkFeatPrerequisite,
 } from '~/services/levelUpService'
-import type { Character, AbilityKey } from '~/types/character'
+import type { Character, AbilityKey, SkillKey } from '~/types/character'
 import type { FeatDefinition } from '~/types/rulepack'
 import type {
   LevelUpEvent,
@@ -20,6 +22,7 @@ import type {
   ChooseSubclassEvent,
   ChooseOptionEvent,
   OfferOptionalFeaturesEvent,
+  ChooseSkillEvent,
 } from '~/types/events'
 
 const route = useRoute()
@@ -53,13 +56,60 @@ const saving = ref(false)
 
 function initWizard() {
   if (!character.value) return
-  // If only one class, skip class selection
-  if (character.value.classes.length === 1) {
+  // The class step is always shown, even with a single class: skipping it was the reason
+  // there was no way to multiclass. A character still mid-creation (level 0) has nothing
+  // to choose between, so that case advances straight through.
+  const started = character.value.classes.filter(c => c.level > 0)
+  if (started.length === 0 && character.value.classes.length === 1) {
     targetClassId.value = character.value.classes[0]!.classId
     resolveEvents()
     wizardStep.value = choiceEvents.value.length > 0 ? 'choices' : 'summary'
   }
 }
+
+/** All loaded packs as one, since a class may come from any of them. */
+function mergedPack() {
+  return {
+    id: 'merged',
+    name: 'merged',
+    version: '0',
+    races: [],
+    classes: rulepackStore.rulepacks.flatMap(p => p.classes),
+    backgrounds: [],
+    feats: [],
+    spells: [],
+    creatures: [],
+    optionalFeatures: [],
+  }
+}
+
+// ── Multiclassing ─────────────────────────────────────────────────────────────
+
+const showMulticlass = ref(false)
+
+/** Classes the character does not have yet, each with its prerequisite state. */
+const multiclassChoices = computed(() => {
+  if (!character.value) return []
+  const pack = mergedPack()
+  return multiclassOptions(character.value, pack)
+})
+
+function prerequisiteText(classId: string): string {
+  const def = rulepackStore.getClass(classId)
+  return def ? describeMulticlassPrerequisites(def) : ''
+}
+
+/** Take the first level in a class the character does not have. */
+function selectNewClass(classId: string) {
+  if (!character.value) return
+  // Recorded at level 0 so resolveEvents computes level 1 for it; the level itself is
+  // applied on confirm like any other, so abandoning the wizard leaves nothing behind.
+  pendingNewClassId.value = classId
+  selectClass(classId)
+}
+
+const pendingNewClassId = ref<string | null>(null)
+
 
 function resolveEvents() {
   if (!character.value) return
@@ -147,6 +197,15 @@ function toggleSpell(spellId: string) {
   }
 }
 
+/** Highest spell level the targeted class can learn at the level being gained. */
+const maxLearnableSpellLevel = computed(() => {
+  if (!character.value) return 0
+  const classes = character.value.classes.map(c =>
+    c.classId === targetClassId.value ? { ...c, level: targetLevel.value } : c)
+  const pack = mergedPack()
+  return maxSpellLevelForClass(targetClassId.value, classes, pack)
+})
+
 const availableSpells = computed(() => {
   const choiceEvent = currentChoice.value as ChooseSpellEvent | null
   if (!choiceEvent) return []
@@ -155,6 +214,9 @@ const availableSpells = computed(() => {
   return allSpells.filter(s => {
     if (existing.has(s.id)) return false
     if (choiceEvent.cantrip !== (s.level === 0)) return false
+    // Cap by the *class's* own level, not the character's slots: a cleric 1 / wizard 1
+    // has a 2nd-level slot but may only take 1st-level spells from either list.
+    if (!choiceEvent.cantrip && s.level > maxLearnableSpellLevel.value) return false
     if (choiceEvent.fromList?.length) return choiceEvent.fromList.includes(s.id)
     if (choiceEvent.classes?.length) return s.classes.some(c => choiceEvent.classes!.includes(c))
     if (choiceEvent.schools?.length) return choiceEvent.schools.includes(s.school)
@@ -188,6 +250,36 @@ function confirmFeat() {
 
 // Choose option (e.g. totem spirit)
 const selectedOptionId = ref('')
+
+// CHOOSE_SKILL had no UI, so emitting one would have stalled the wizard. A multiclassing
+// bard, ranger or rogue gains one skill, so the picker is needed for those.
+const selectedSkills = ref<SkillKey[]>([])
+
+const SKILL_LABELS: Record<string, string> = {
+  acrobatics: 'Acrobatics', animalHandling: 'Animal Handling', arcana: 'Arcana',
+  athletics: 'Athletics', deception: 'Deception', history: 'History', insight: 'Insight',
+  intimidation: 'Intimidation', investigation: 'Investigation', medicine: 'Medicine',
+  nature: 'Nature', perception: 'Perception', performance: 'Performance',
+  persuasion: 'Persuasion', religion: 'Religion', sleightOfHand: 'Sleight of Hand',
+  stealth: 'Stealth', survival: 'Survival',
+}
+
+function toggleSkill(skill: SkillKey, count: number) {
+  const picked = selectedSkills.value
+  if (picked.includes(skill)) selectedSkills.value = picked.filter(s => s !== skill)
+  else if (picked.length < count) selectedSkills.value = [...picked, skill]
+}
+
+/** Skills the character already has, which cannot be picked again. */
+function alreadyProficient(skill: SkillKey): boolean {
+  return (character.value?.skillProficiencies[skill] ?? 0) > 0
+}
+
+function confirmSkills() {
+  resolvedChoices.value.push({ type: 'RESOLVED_SKILL', skills: [...selectedSkills.value] })
+  selectedSkills.value = []
+  nextChoice()
+}
 
 function confirmOption() {
   const choiceEvent = currentChoice.value as ChooseOptionEvent
@@ -285,16 +377,22 @@ async function applyLevelUp() {
   // Apply automatic events (toRaw strips the Vue Proxy so structuredClone can clone it)
   let updated = applyAutomaticEvents(toRaw(character.value), automaticEvents.value, hpChoice.value, hpChoice.value === 'manual' ? manualHp.value : undefined)
 
-  // Bump class level
+  // Bump the class level, or add the class when this is a first level in it. Without the
+  // append a multiclass level-up silently did nothing: map() only touches existing entries.
+  const alreadyHas = updated.classes.some(c => c.classId === targetClassId.value)
   updated = {
     ...updated,
-    classes: updated.classes.map(c =>
-      c.classId === targetClassId.value ? { ...c, level: c.level + 1 } : c,
-    ),
+    classes: alreadyHas
+      ? updated.classes.map(c =>
+          c.classId === targetClassId.value ? { ...c, level: c.level + 1 } : c)
+      : [...updated.classes, { classId: targetClassId.value, level: 1 }],
   }
 
   // Apply resolved choices
   updated = applyResolvedChoices(updated, resolvedChoices.value, pack)
+
+  // Slots are derived from the classes, so the base may have moved; keep `used` in range.
+  updated = { ...updated, spellSlots: clampSpellSlots(updated, mergedPack()) }
 
   await characterStore.save(updated)
   router.push(`/characters/${updated.id}`)
@@ -345,7 +443,7 @@ watch(isFirstCharacterLevel, (val) => {
         <p class="section-header">Which class levels up?</p>
         <div class="space-y-2">
           <button
-            v-for="cls in character.classes"
+            v-for="cls in character.classes.filter(c => c.level > 0)"
             :key="cls.classId"
             class="card w-full text-left hover:border-primary-500/50 transition-colors"
             @click="selectClass(cls.classId)"
@@ -353,6 +451,46 @@ watch(isFirstCharacterLevel, (val) => {
             <p class="font-semibold text-white">{{ rulepackStore.getClass(cls.classId)?.name ?? cls.classId }}</p>
             <p class="text-sm text-slate-400">Level {{ cls.level }} → {{ cls.level + 1 }}</p>
           </button>
+        </div>
+
+        <!-- Multiclassing: behind a toggle, since levelling an existing class is the common case -->
+        <div v-if="multiclassChoices.length > 0" class="mt-4">
+          <button
+            class="text-sm text-primary-400 hover:text-primary-300"
+            @click="showMulticlass = !showMulticlass"
+          >
+            {{ showMulticlass ? '−' : '+' }} Take a level in a new class
+          </button>
+
+          <div v-if="showMulticlass" class="space-y-2 mt-2">
+            <p class="text-xs text-slate-500">
+              Multiclassing grants a reduced set of proficiencies and never saving throws.
+            </p>
+            <button
+              v-for="opt in multiclassChoices"
+              :key="opt.classDef.id"
+              class="card w-full text-left transition-colors"
+              :class="opt.eligibility.eligible
+                ? 'hover:border-primary-500/50'
+                : 'border-accent-500/40 hover:border-accent-500/70'"
+              @click="selectNewClass(opt.classDef.id)"
+            >
+              <div class="flex items-baseline justify-between gap-2">
+                <p class="font-semibold text-white">{{ opt.classDef.name }}</p>
+                <span class="text-xs text-slate-500">Level 0 → 1</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Requires {{ prerequisiteText(opt.classDef.id) }}
+              </p>
+              <!-- Warn rather than block: variant rules and DM rulings are common -->
+              <p v-if="!opt.eligibility.eligible" class="text-xs text-accent-400 mt-1">
+                ⚠ Prerequisite not met —
+                <span v-for="(u, i) in opt.eligibility.unmet" :key="u.ability">
+                  <template v-if="i > 0"> / </template>{{ u.ability.toUpperCase() }} {{ u.actual }} of {{ u.minimum }}
+                </span>. You can still proceed.
+              </p>
+            </button>
+          </div>
         </div>
       </template>
 
@@ -591,6 +729,39 @@ watch(isFirstCharacterLevel, (val) => {
           <div class="flex gap-2 mt-2">
             <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
             <button class="btn-primary flex-1 text-sm" :disabled="!selectedOptionId" @click="confirmOption">Confirm</button>
+          </div>
+        </template>
+
+        <!-- Skill choice (multiclass proficiency) -->
+        <template v-else-if="currentChoice.type === 'CHOOSE_SKILL'">
+          <h2 class="font-semibold text-white text-lg">
+            Choose {{ (currentChoice as ChooseSkillEvent).count }}
+            {{ (currentChoice as ChooseSkillEvent).count === 1 ? 'Skill' : 'Skills' }}
+          </h2>
+          <p class="text-xs text-slate-500 mt-1">
+            {{ selectedSkills.length }}/{{ (currentChoice as ChooseSkillEvent).count }} selected
+          </p>
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <button
+              v-for="skill in (currentChoice as ChooseSkillEvent).from"
+              :key="skill"
+              class="card text-left text-sm transition-colors disabled:opacity-40"
+              :class="selectedSkills.includes(skill) ? 'border-primary-500 bg-primary-900/20' : ''"
+              :disabled="alreadyProficient(skill)"
+              :title="alreadyProficient(skill) ? 'Already proficient' : ''"
+              @click="toggleSkill(skill, (currentChoice as ChooseSkillEvent).count)"
+            >
+              <span class="text-white">{{ SKILL_LABELS[skill] ?? skill }}</span>
+              <span v-if="alreadyProficient(skill)" class="block text-[10px] text-slate-500">already proficient</span>
+            </button>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
+            <button
+              class="btn-primary flex-1 text-sm"
+              :disabled="selectedSkills.length !== (currentChoice as ChooseSkillEvent).count"
+              @click="confirmSkills"
+            >Confirm</button>
           </div>
         </template>
 

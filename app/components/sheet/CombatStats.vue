@@ -235,7 +235,8 @@ function applyHpChange() {
       <div v-for="pool in hitDice" :key="pool.classId">
         <div class="flex items-center justify-between">
           <p class="text-xs text-slate-400">
-            <span v-if="hitDice.length > 1">{{ className(pool.classId) }} </span>{{ pool.die }}
+            <span v-if="hitDice.length > 1" class="text-slate-300">{{ className(pool.classId) }}</span>
+            <span :class="hitDice.length > 1 ? 'ml-1.5' : ''">{{ pool.die }}</span>
           </p>
           <span class="text-xs text-slate-500">{{ pool.remaining }}/{{ pool.total }}</span>
         </div>

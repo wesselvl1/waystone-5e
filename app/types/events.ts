@@ -222,10 +222,16 @@ export type ChoiceLevelUpEvent =
 
 export type LevelUpEvent = AutomaticLevelUpEvent | ChoiceLevelUpEvent
 
-export type ResolvedChoice =
-  | ResolvedChoiceSpell
+/** Skills picked for a CHOOSE_SKILL, e.g. the single skill a multiclass bard gains. */
+export interface ResolvedSkill {
+  type: 'RESOLVED_SKILL'
+  skills: SkillKey[]
+}
+
+export type ResolvedChoice =  | ResolvedChoiceSpell
   | ResolvedChoiceFeat
   | ResolvedASI
   | ResolvedSubclass
   | ResolvedOption
   | ResolvedOptionalFeatures
+  | ResolvedSkill
