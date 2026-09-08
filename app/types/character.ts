@@ -49,12 +49,24 @@ export interface WarlockSlots {
   used: number
 }
 
+export type FeatureUsesBonusSource = 'magic' | 'feat' | 'misc'
+
+export type FeatureUsesBonuses = Partial<Record<FeatureUsesBonusSource, number>>
+
 export interface Feature {
   id: string
   name: string
   source: string                // e.g. "Fighter 1", "Human", "Acolyte"
   description: string
+  /** Class-derived base, overwritten by UPDATE_FEATURE_USES on level-up. */
   usesMax?: number
+  /**
+   * Manual adjustments on top of usesMax, kept apart by source so the sheet can show
+   * where extra uses come from and a feat can set its own entry without disturbing a
+   * magic item's. Never touched by levelling, so they do not need re-applying.
+   * Read through featureUsesMax() rather than summing ad hoc. Values may be negative.
+   */
+  usesBonuses?: FeatureUsesBonuses
   usesRemaining?: number
   recharge?: 'short' | 'long' | 'dawn'
 }
