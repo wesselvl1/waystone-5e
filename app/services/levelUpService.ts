@@ -395,7 +395,12 @@ export function applyAutomaticEvents(
           }
           else {
             feature.usesMax = event.usesMax
-            feature.usesRemaining = Math.min(feature.usesRemaining ?? event.usesMax, event.usesMax)
+            // Clamp against base + manual bonus, not the base alone, or a magic-item
+            // bonus would be silently trimmed off on every level-up.
+            const bonusTotal = Object.values(feature.usesBonuses ?? {})
+              .reduce<number>((sum, n) => sum + (n ?? 0), 0)
+            const effectiveMax = Math.max(0, event.usesMax + bonusTotal)
+            feature.usesRemaining = Math.min(feature.usesRemaining ?? effectiveMax, effectiveMax)
           }
         }
         break

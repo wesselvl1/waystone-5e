@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Character } from '~/types/character'
+import type { Character, FeatureUsesBonusSource } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
 
 const props = defineProps<{ character: Character }>()
@@ -74,7 +74,24 @@ function useCharge(id: string) {
 function restoreCharge(id: string) {
   const updated = props.character.features.map(f => {
     if (f.id !== id || f.usesMax === undefined || f.usesRemaining === undefined) return f
-    return { ...f, usesRemaining: Math.min(f.usesMax, f.usesRemaining + 1) }
+    return { ...f, usesRemaining: Math.min(featureUsesMax(f) ?? f.usesMax, f.usesRemaining + 1) }
+  })
+  emit('update', { features: updated })
+}
+
+// ── Manual bonus (magic items, curses) ───────────────────────────────────────
+
+/** Which feature's bonus editor is open, by id. */
+const editingBonus = ref<string | null>(null)
+
+function toggleBonusEditor(id: string) {
+  editingBonus.value = editingBonus.value === id ? null : id
+}
+
+function adjustBonus(id: string, source: FeatureUsesBonusSource, delta: number) {
+  const updated = props.character.features.map((f) => {
+    if (f.id !== id) return f
+    return setFeatureUsesBonus(f, source, (f.usesBonuses?.[source] ?? 0) + delta)
   })
   emit('update', { features: updated })
 }
@@ -286,14 +303,56 @@ function applyHpChange() {
               :disabled="(feature.usesRemaining ?? 0) <= 0"
               @click="useCharge(feature.id)"
             >−</button>
-            <span class="text-sm font-mono text-white tabular-nums w-10 text-center">{{ feature.usesRemaining }}/{{ feature.usesMax }}</span>
+            <button
+              class="text-sm font-mono text-white tabular-nums w-14 text-center"
+              :title="featureUsesBonusTotal(feature) !== 0 ? `${feature.usesMax} base, ${featureUsesBonusTotal(feature) > 0 ? '+' : ''}${featureUsesBonusTotal(feature)} bonus` : 'Add a bonus'"
+              @click="toggleBonusEditor(feature.id)"
+            >
+              {{ feature.usesRemaining }}/{{ featureUsesMax(feature) }}
+              <span v-if="featureUsesBonusTotal(feature) !== 0" class="text-accent-400 text-[10px] align-super">
+                {{ featureUsesBonusTotal(feature) > 0 ? '+' : '' }}{{ featureUsesBonusTotal(feature) }}
+              </span>
+            </button>
             <button
               class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-base leading-none transition-colors"
-              :disabled="(feature.usesRemaining ?? 0) >= (feature.usesMax ?? 0)"
+              :disabled="(feature.usesRemaining ?? 0) >= (featureUsesMax(feature) ?? 0)"
               @click="restoreCharge(feature.id)"
             >+</button>
           </template>
           <span v-else class="text-lg text-slate-400">∞</span>
+        </div>
+      </div>
+
+      <!-- Manual bonus: survives level-ups, so a magic item is entered once -->
+      <div
+        v-if="editingBonus === feature.id && feature.usesMax !== undefined"
+        class="flex items-center gap-2 mt-2 pt-2 border-t border-surface-700"
+      >
+        <div class="w-full space-y-1.5">
+          <div
+            v-for="src in FEATURE_USES_BONUS_SOURCES"
+            :key="src.key"
+            class="flex items-center gap-2"
+          >
+            <span class="stat-label flex-1" :title="src.hint">{{ src.label }}</span>
+            <button
+              class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 flex items-center justify-center text-base leading-none"
+              @click="adjustBonus(feature.id, src.key, -1)"
+            >−</button>
+            <span
+              class="text-sm font-mono tabular-nums w-10 text-center"
+              :class="(feature.usesBonuses?.[src.key] ?? 0) === 0 ? 'text-slate-500' : 'text-accent-400'"
+            >
+              {{ (feature.usesBonuses?.[src.key] ?? 0) > 0 ? '+' : '' }}{{ feature.usesBonuses?.[src.key] ?? 0 }}
+            </span>
+            <button
+              class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 flex items-center justify-center text-base leading-none"
+              @click="adjustBonus(feature.id, src.key, 1)"
+            >+</button>
+          </div>
+          <p class="text-[10px] text-slate-500 pt-0.5">
+            Base {{ feature.usesMax }} · total {{ featureUsesMax(feature) }}. Bonuses persist through level-ups.
+          </p>
         </div>
       </div>
     </div>

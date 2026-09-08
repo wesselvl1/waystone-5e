@@ -111,7 +111,7 @@ async function doShortRest() {
   if (!character.value) return
   const features = character.value.features.map(f => {
     if (f.recharge === 'short' && f.usesMax !== undefined)
-      return { ...f, usesRemaining: f.usesMax }
+      return { ...f, usesRemaining: featureUsesMax(f) }
     return f
   })
   // Warlock pact magic slots recharge on a short rest
@@ -126,7 +126,7 @@ async function doLongRest() {
   if (!character.value) return
   const features = character.value.features.map(f => {
     if ((f.recharge === 'long' || f.recharge === 'short') && f.usesMax !== undefined)
-      return { ...f, usesRemaining: f.usesMax }
+      return { ...f, usesRemaining: featureUsesMax(f) }
     return f
   })
   const hitDice = {

@@ -55,6 +55,11 @@ const FeatureSchema = z.object({
   source: z.string(),
   description: z.string(),
   usesMax: z.number().optional(),
+  usesBonuses: z.object({
+    magic: z.number().int().optional(),
+    feat: z.number().int().optional(),
+    misc: z.number().int().optional(),
+  }).optional(),
   usesRemaining: z.number().optional(),
   recharge: z.enum(['short', 'long', 'dawn']).optional(),
 })
