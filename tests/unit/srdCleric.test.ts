@@ -9,22 +9,18 @@ import type { Rulepack } from '~/types/rulepack'
 import type { Character } from '~/types/character'
 import { validCharacter } from '../fixtures'
 
-import classes from '~/data/srd/classes.json'
-import subclasses from '~/data/srd/subclasses.json'
+import clericFragment from '~/data/srd/cleric.json'
 import spells from '~/data/srd/spells.json'
 
-/** Merge the three SRD fragments the way the srd-loader plugin does. */
+/**
+ * Merge the cleric fragment with the spell list the way the srd-loader plugin does.
+ * The fragment carries its subclasses nested, so no patch distribution is needed.
+ */
 function srdPack(): Rulepack {
-  const cls = RulepackSchema.parse(classes)
-  const sub = RulepackSchema.parse(subclasses)
+  const cls = RulepackSchema.parse(clericFragment)
   const spl = RulepackSchema.parse(spells)
   const merged = structuredClone(cls) as unknown as Rulepack
   merged.spells = spl.spells as Rulepack['spells']
-  for (const patch of sub.subclasses ?? []) {
-    const target = merged.classes.find(c => c.id === patch.classId)
-    if (!target) continue
-    target.subclasses = [...(target.subclasses ?? []), patch]
-  }
   return merged
 }
 
@@ -54,13 +50,6 @@ describe('SRD cleric data', () => {
     expect(c.levels.every(l => l.spellSlots && Object.keys(l.spellSlots).length > 0)).toBe(true)
     expect(c.levels[0]!.spellSlots).toEqual({ 1: 2 })
     expect(c.levels[19]!.spellSlots).toEqual({ 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 })
-  })
-
-  it('bard also has a slot table now', () => {
-    const b = pack.classes.find(x => x.id === 'bard')!
-    expect(b.spellcastingAbility).toBe('cha')
-    expect(b.levels[0]!.spellSlots).toEqual({ 1: 2 })
-    expect(b.levels[19]!.spellSlots).toEqual({ 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 })
   })
 
   it('grants two 1st-level slots when a cleric reaches level 1', () => {

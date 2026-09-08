@@ -2,19 +2,17 @@ import { useRulepacksStore } from '~/stores/rulepacks'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
 
 /**
- * Fragment load order. A fragment that patches a class or race (subclasses.json,
- * subraces.json) only merges if the fragment defining its target has already been
- * added, so order is explicit rather than left to the glob's alphabetical keys.
- * Files not listed here load last, alphabetically, and warn in dev.
+ * Fragments that must merge before others, in this order. A patch fragment — one with a
+ * top-level `subclasses` or `subraces` array — is silently dropped if the fragment
+ * defining its target class or race has not merged yet.
+ *
+ * Class fragments (barbarian.json, bard.json, ...) carry their own subclasses nested
+ * inside the class, so they are self-contained and order-independent. They load after
+ * this list, alphabetically.
  */
 const SRD_FRAGMENT_ORDER = [
   'races',
   'subraces',
-  'classes',
-  'subclasses',
-  'backgrounds',
-  'feats',
-  'spells',
 ]
 
 /** SRD content ships in every build, so this glob is eager — equivalent to static imports. */
@@ -45,7 +43,7 @@ const nonSrdFragments = import.meta.glob<{ default: unknown }>([
  * Increment this when bundled SRD data changes in a way that requires re-seeding,
  * without changing the official SRD version number.
  */
-const SRD_SEED_REVISION = 3
+const SRD_SEED_REVISION = 4
 
 function fragmentName(path: string): string {
   return path.split('/').pop()!.replace(/\.json$/, '')
@@ -68,11 +66,17 @@ export default defineNuxtPlugin(async () => {
   const srdPaths = inLoadOrder(Object.keys(srdFragments))
 
   if (import.meta.dev) {
-    const unknown = srdPaths.filter(p => !SRD_FRAGMENT_ORDER.includes(fragmentName(p)))
-    if (unknown.length > 0) {
+    // A patch fragment loading outside SRD_FRAGMENT_ORDER may merge before its target exists
+    const unorderedPatches = srdPaths.filter((p) => {
+      if (SRD_FRAGMENT_ORDER.includes(fragmentName(p))) return false
+      const data = srdFragments[p]!.default as Record<string, unknown>
+      return Array.isArray(data?.subclasses) || Array.isArray(data?.subraces)
+    })
+    if (unorderedPatches.length > 0) {
       console.warn(
-        `[Waystone] SRD fragment(s) not in SRD_FRAGMENT_ORDER, loading last: ${unknown.join(', ')}. `
-        + 'Add them to the order list if they patch a class or race.',
+        `[Waystone] Patch fragment(s) outside SRD_FRAGMENT_ORDER: ${unorderedPatches.join(', ')}. `
+        + 'These carry top-level subclasses/subraces arrays and may merge before their '
+        + 'target class or race exists. Add them to the order list.',
       )
     }
   }

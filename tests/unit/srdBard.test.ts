@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
-import classes from '~/data/srd/classes.json'
+import classes from '~/data/srd/bard.json'
 
 const bard = RulepackSchema.parse(classes).classes.find(c => c.id === 'bard')!
 
@@ -9,6 +9,16 @@ const SPELLS_KNOWN = [4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 15, 16, 18, 19, 19, 
 const CANTRIPS_KNOWN = [2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
 
 describe('SRD bard table', () => {
+  it('is a charisma full caster with a complete slot table', () => {
+    expect(bard.spellcastingAbility).toBe('cha')
+    expect(bard.isFullCaster).toBe(true)
+    expect(bard.hitDie).toBe('d8')
+    expect(bard.levels).toHaveLength(20)
+    expect(bard.levels[0]!.spellSlots).toEqual({ 1: 2 })
+    expect(bard.levels[19]!.spellSlots).toEqual({ 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 })
+    expect(bard.levels.every(l => l.spellSlots && Object.keys(l.spellSlots).length > 0)).toBe(true)
+  })
+
   it('CHOOSE_SPELL counts accumulate to the Spells Known column', () => {
     let total = 0
     bard.levels.forEach((lvl, i) => {
