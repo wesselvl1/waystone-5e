@@ -15,7 +15,7 @@ export const validCharacter: Character = {
   armorClass: 16,
   speeds: { walk: 30 },
   initiative: null,
-  hitDice: { total: 1, remaining: 1, die: 'd10' },
+  hitDice: [{ classId: 'fighter', die: 'd10', total: 1, remaining: 1 }],
   deathSaves: { successes: 0, failures: 0 },
   conditions: [],
   savingThrowProficiencies: ['str', 'con'],

@@ -45,6 +45,33 @@
           "stealth"
         ]
       },
+      "multiclassing": {
+        "prerequisites": {
+          "dex": 13
+        },
+        "armorProficiencies": [
+          "light"
+        ],
+        "toolProficiencies": [
+          "thieves' tools"
+        ],
+        "skillChoices": {
+          "count": 1,
+          "from": [
+            "acrobatics",
+            "athletics",
+            "deception",
+            "insight",
+            "intimidation",
+            "investigation",
+            "perception",
+            "performance",
+            "persuasion",
+            "sleightOfHand",
+            "stealth"
+          ]
+        }
+      },
       "levels": [
         {
           "level": 1,

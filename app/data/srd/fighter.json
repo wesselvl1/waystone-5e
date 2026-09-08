@@ -41,6 +41,30 @@
           "survival"
         ]
       },
+      "multiclassing": {
+        "prerequisiteOptions": {
+          "choose": 1,
+          "from": [
+            {
+              "ability": "str",
+              "minimum": 13
+            },
+            {
+              "ability": "dex",
+              "minimum": 13
+            }
+          ]
+        },
+        "armorProficiencies": [
+          "light",
+          "medium",
+          "shields"
+        ],
+        "weaponProficiencies": [
+          "simple",
+          "martial"
+        ]
+      },
       "levels": [
         {
           "level": 1,

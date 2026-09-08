@@ -45,8 +45,9 @@ export interface GainProficiencyEvent {
 
 export interface UpdateHitDieEvent {
   type: 'UPDATE_HIT_DIE'
+  /** Which class's pool gains a die. */
+  classId: string
   die: string
-  totalDice: number
 }
 
 /** Spells granted outright by a class or subclass (e.g. cleric domain spells). No player choice. */

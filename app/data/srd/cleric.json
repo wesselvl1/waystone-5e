@@ -37,6 +37,16 @@
           "religion"
         ]
       },
+      "multiclassing": {
+        "prerequisites": {
+          "wis": 13
+        },
+        "armorProficiencies": [
+          "light",
+          "medium",
+          "shields"
+        ]
+      },
       "levels": [
         {
           "level": 1,

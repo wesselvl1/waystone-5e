@@ -42,6 +42,34 @@
           "survival"
         ]
       },
+      "multiclassing": {
+        "prerequisites": {
+          "dex": 13,
+          "wis": 13
+        },
+        "armorProficiencies": [
+          "light",
+          "medium",
+          "shields"
+        ],
+        "weaponProficiencies": [
+          "simple",
+          "martial"
+        ],
+        "skillChoices": {
+          "count": 1,
+          "from": [
+            "animalHandling",
+            "athletics",
+            "insight",
+            "investigation",
+            "nature",
+            "perception",
+            "stealth",
+            "survival"
+          ]
+        }
+      },
       "levels": [
         {
           "level": 1,

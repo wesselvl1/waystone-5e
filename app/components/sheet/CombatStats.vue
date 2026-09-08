@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { Character, FeatureUsesBonusSource } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
+import { useRulepacksStore } from '~/stores/rulepacks'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
 
 const characterRef = computed(() => props.character)
 const stats = useCharacterStats(characterRef)
+const rulepackStore = useRulepacksStore()
 
 const editingHP = ref<'current' | 'max' | 'temp' | null>(null)
 const draftHP = ref(0)
@@ -57,6 +59,20 @@ const hpColor = computed(() => {
 })
 
 const hitDice = computed(() => props.character.hitDice)
+
+/** Spend or restore one die in a specific class's pool. */
+function toggleHitDie(classId: string, index: number) {
+  const pools = props.character.hitDice.map((p) => {
+    if (p.classId !== classId) return p
+    const remaining = index <= p.remaining ? p.remaining - 1 : p.remaining + 1
+    return { ...p, remaining: Math.max(0, Math.min(p.total, remaining)) }
+  })
+  emit('update', { hitDice: pools })
+}
+
+function className(classId: string): string {
+  return rulepackStore.getClass(classId)?.name ?? classId
+}
 
 // ── Limited-use abilities ─────────────────────────────────────────────────────
 const limitedFeatures = computed(() =>
@@ -213,21 +229,26 @@ function applyHpChange() {
       </div>
     </div>
 
-    <!-- Hit Dice -->
-    <div class="card">
-      <div class="flex items-center justify-between">
-        <p class="section-header mb-0">Hit Dice ({{ hitDice.die }})</p>
-        <span class="text-xs text-slate-500">{{ hitDice.remaining }}/{{ hitDice.total }}</span>
-      </div>
-      <div class="flex gap-1.5 flex-wrap mt-2">
-        <div
-          v-for="i in hitDice.total"
-          :key="i"
-          class="w-7 h-7 rounded-md border text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
-          :class="i <= hitDice.remaining ? 'bg-primary-600/30 border-primary-500/60 text-primary-300' : 'bg-surface-700 border-surface-600 text-slate-600'"
-          @click="emit('update', { hitDice: { ...character.hitDice, remaining: i <= hitDice.remaining ? hitDice.remaining - 1 : hitDice.remaining + 1 } })"
-        >
-          {{ hitDice.die.replace('d', '') }}
+    <!-- Hit Dice: one pool per class, since a fighter/wizard spends d10s and d6s apart -->
+    <div v-if="hitDice.length > 0" class="card space-y-2">
+      <p class="section-header mb-0">Hit Dice</p>
+      <div v-for="pool in hitDice" :key="pool.classId">
+        <div class="flex items-center justify-between">
+          <p class="text-xs text-slate-400">
+            <span v-if="hitDice.length > 1">{{ className(pool.classId) }} </span>{{ pool.die }}
+          </p>
+          <span class="text-xs text-slate-500">{{ pool.remaining }}/{{ pool.total }}</span>
+        </div>
+        <div class="flex gap-1.5 flex-wrap mt-1">
+          <div
+            v-for="i in pool.total"
+            :key="i"
+            class="w-7 h-7 rounded-md border text-xs font-bold flex items-center justify-center cursor-pointer transition-colors"
+            :class="i <= pool.remaining ? 'bg-primary-600/30 border-primary-500/60 text-primary-300' : 'bg-surface-700 border-surface-600 text-slate-600'"
+            @click="toggleHitDie(pool.classId, i)"
+          >
+            {{ pool.die.replace('d', '') }}
+          </div>
         </div>
       </div>
     </div>

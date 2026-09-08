@@ -36,6 +36,16 @@
           "stealth"
         ]
       },
+      "multiclassing": {
+        "prerequisites": {
+          "dex": 13,
+          "wis": 13
+        },
+        "weaponProficiencies": [
+          "simple",
+          "shortsword"
+        ]
+      },
       "levels": [
         {
           "level": 1,

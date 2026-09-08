@@ -47,7 +47,8 @@ describe('resolveLevelUpEvents', () => {
     const hitDieEvent = events.find(e => e.type === 'UPDATE_HIT_DIE')!
     expect(hitDieEvent.type).toBe('UPDATE_HIT_DIE')
     if (hitDieEvent.type === 'UPDATE_HIT_DIE') {
-      expect(hitDieEvent.totalDice).toBe(validCharacter.hitDice.total + 1)
+      expect(hitDieEvent.classId).toBe('fighter')
+      expect(hitDieEvent.die).toBe('d10')
     }
   })
 
@@ -147,7 +148,8 @@ describe('applyAutomaticEvents', () => {
     const events = resolveLevelUpEvents(validCharacter, 'fighter', 2, fighterRulepack)
     const automatic = getAutomaticEvents(events)
     const updated = applyAutomaticEvents(validCharacter, automatic, 'average')
-    expect(updated.hitDice.total).toBe(validCharacter.hitDice.total + 1)
+    const pool = updated.hitDice.find(p => p.classId === 'fighter')!
+    expect(pool.total).toBe(validCharacter.hitDice[0]!.total + 1)
   })
 
   it('does not mutate the original character', () => {

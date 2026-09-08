@@ -2,6 +2,7 @@
 import type { Character, SpellEntry, SpellSlotLevel, AbilityKey } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useRulepacksStore } from '~/stores/rulepacks'
+import { spellSlotMax } from '~/services/spellcasting'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -61,23 +62,43 @@ const spellsByLevel = computed(() => {
 })
 
 // Whether any regular (non-warlock) spell slots exist
-const hasRegularSlots = computed(() =>
-  SLOT_LEVELS.some(lvl => (props.character.spellSlots[lvl]?.max ?? 0) > 0),
-)
+/**
+ * Slots are derived from the character's classes against the multiclass caster-level
+ * table rather than stored, so a new class level changes them without a migration.
+ * The merged pack is used because a class may come from any loaded rulepack.
+ */
+const mergedPack = computed(() => ({
+  id: 'merged',
+  name: 'merged',
+  version: '0',
+  races: [],
+  classes: rulepackStore.rulepacks.flatMap(p => p.classes),
+  backgrounds: [],
+  feats: [],
+  spells: [],
+  creatures: [],
+  optionalFeatures: [],
+}))
+
+function slotMax(lvl: SpellSlotLevel): number {
+  return spellSlotMax(lvl, props.character, mergedPack.value)
+}
+
+const hasRegularSlots = computed(() => SLOT_LEVELS.some(lvl => slotMax(lvl) > 0))
 
 // ── Regular slot actions ──────────────────────────────────────────────────────
 
 function useSlot(lvl: SpellSlotLevel) {
   const slots = { ...props.character.spellSlots }
-  const current = slots[lvl] ?? { max: 0, used: 0 }
-  if (current.used >= current.max) return
+  const current = slots[lvl] ?? { used: 0 }
+  if (current.used >= slotMax(lvl)) return
   slots[lvl] = { ...current, used: current.used + 1 }
   emit('update', { spellSlots: slots })
 }
 
 function restoreSlot(lvl: SpellSlotLevel) {
   const slots = { ...props.character.spellSlots }
-  const current = slots[lvl] ?? { max: 0, used: 0 }
+  const current = slots[lvl] ?? { used: 0 }
   if (current.used === 0) return
   slots[lvl] = { ...current, used: current.used - 1 }
   emit('update', { spellSlots: slots })
@@ -179,7 +200,7 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
           <span class="text-xs text-slate-500 w-4 flex-shrink-0">{{ lvl }}</span>
           <div class="flex gap-1.5 flex-wrap flex-1">
             <button
-              v-for="i in (character.spellSlots[lvl]?.max ?? 0)"
+              v-for="i in slotMax(lvl)"
               :key="i"
               class="w-5 h-5 rounded-full border text-xs transition-colors"
               :class="i <= (character.spellSlots[lvl]?.used ?? 0)
@@ -188,7 +209,7 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
               :title="i <= (character.spellSlots[lvl]?.used ?? 0) ? 'Restore slot' : 'Use slot'"
               @click="i <= (character.spellSlots[lvl]?.used ?? 0) ? restoreSlot(lvl) : useSlot(lvl)"
             />
-            <span v-if="!character.spellSlots[lvl]?.max" class="text-slate-600 text-xs">—</span>
+            <span v-if="slotMax(lvl) === 0" class="text-slate-600 text-xs">—</span>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import type { Character, AbilityKey, SpellSlotLevel } from '~/types/character'
 import type { Rulepack, OptionalClassFeature, FeatDefinition, FeatPrerequisite } from '~/types/rulepack'
+import { addHitDieForClass, multiclassProficiencies } from '~/services/multiclass'
 import type {
   LevelUpEvent,
   AutomaticLevelUpEvent,
@@ -85,39 +86,25 @@ export function resolveLevelUpEvents(
     hpFlatBonus: character.hpBonusPerLevel ?? 0,
   } satisfies AddHpEvent)
 
-  // Update hit die tracking
+  // Hit dice are pooled per class, since a fighter/wizard spends d10s and d6s separately
   events.push({
     type: 'UPDATE_HIT_DIE',
+    classId,
     die: classDef.hitDie,
-    totalDice: character.hitDice.total + 1,
   } satisfies UpdateHitDieEvent)
 
-  // Spell slots — pact magic classes (warlock) get separate warlock slots; regular casters
-  // use delta vs. previous level so manual overrides (e.g. magic items) are preserved
-  if (levelData.spellSlots) {
-    if (classDef.pactMagic) {
-      // Warlock pact magic: all slots are the same level — take absolute values, not deltas
-      const entries = Object.entries(levelData.spellSlots)
-      if (entries.length > 0) {
-        const [slotLvlStr, count] = entries.at(-1)! // highest (and only) key
-        events.push({
-          type: 'UPDATE_WARLOCK_SLOTS',
-          slotLevel: Number.parseInt(slotLvlStr) as SpellSlotLevel,
-          max: count ?? 0,
-        } satisfies UpdateWarlockSlotsEvent)
-      }
-    }
-    else {
-      const prevLevelData = classDef.levels.find(l => l.level === newLevel - 1)
-      const prevSlots = (prevLevelData?.spellSlots ?? {}) as Record<string, number>
-      const delta: Partial<Record<SpellSlotLevel, number>> = {}
-      for (const [slotLvlStr, newCount] of Object.entries(levelData.spellSlots)) {
-        const diff = (newCount ?? 0) - (prevSlots[slotLvlStr] ?? 0)
-        if (diff > 0) delta[parseInt(slotLvlStr) as SpellSlotLevel] = diff
-      }
-      if (Object.keys(delta).length > 0) {
-        events.push({ type: 'UPDATE_SPELL_SLOTS', slots: delta } satisfies UpdateSpellSlotsEvent)
-      }
+  // Only pact magic is tracked on the character: warlock slots are absolute and separate.
+  // Regular slots are derived from the combined caster level by baseSpellSlots(), so
+  // nothing is emitted for them — a new class level changes the derivation instead.
+  if (levelData.spellSlots && classDef.pactMagic) {
+    const entries = Object.entries(levelData.spellSlots)
+    if (entries.length > 0) {
+      const [slotLvlStr, count] = entries.at(-1)! // highest (and only) key
+      events.push({
+        type: 'UPDATE_WARLOCK_SLOTS',
+        slotLevel: Number.parseInt(slotLvlStr) as SpellSlotLevel,
+        max: count ?? 0,
+      } satisfies UpdateWarlockSlotsEvent)
     }
   }
 
@@ -344,17 +331,6 @@ export function applyAutomaticEvents(
         updated.hp.current += Math.max(gain, 1)
         break
       }
-      case 'UPDATE_SPELL_SLOTS': {
-        // slots contains deltas — add to current max to preserve manual overrides
-        for (const [lvlStr, delta] of Object.entries(event.slots)) {
-          const lvl = parseInt(lvlStr) as SpellSlotLevel
-          if (!updated.spellSlots[lvl]) {
-            updated.spellSlots[lvl] = { max: 0, used: 0 }
-          }
-          updated.spellSlots[lvl].max += delta
-        }
-        break
-      }
       case 'UPDATE_WARLOCK_SLOTS': {
         // Pact magic slots — absolute values; preserve used count up to new max
         updated.warlockSlots = {
@@ -421,11 +397,7 @@ export function applyAutomaticEvents(
         break
       }
       case 'UPDATE_HIT_DIE': {
-        updated.hitDice = {
-          total: event.totalDice,
-          remaining: Math.min(updated.hitDice.remaining + 1, event.totalDice),
-          die: event.die,
-        }
+        updated.hitDice = addHitDieForClass(updated.hitDice, event.classId, event.die)
         break
       }
       case 'UPDATE_FEATURE_USES': {

@@ -158,6 +158,27 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
   }),
 ])
 
+const MulticlassingRulesSchema = z.object({
+  prerequisites: z.partialRecord(AbilityKeySchema, z.number().int()).optional(),
+  prerequisiteOptions: z.object({
+    choose: z.number().int().min(1),
+    from: z.array(z.object({
+      ability: AbilityKeySchema,
+      minimum: z.number().int(),
+    })).min(1),
+  }).optional(),
+  armorProficiencies: z.array(z.string()).optional(),
+  weaponProficiencies: z.array(z.string()).optional(),
+  toolProficiencies: z.array(z.string()).optional(),
+  skillChoices: z.object({
+    count: z.number().int().min(0),
+    from: z.array(SkillKeySchema),
+  }).optional(),
+  toolChoices: z.array(z.object({
+    count: z.number().int().min(1),
+    label: z.string(),
+  })).optional(),
+})
 const ClassLevelSchema = z.object({
   level: z.number().int().min(1).max(20),
   features: z.array(z.string()),
@@ -208,6 +229,7 @@ const ClassDefinitionSchema = z.object({
     count: z.number().int().min(0),
     from: z.array(SkillKeySchema),
   }),
+  multiclassing: MulticlassingRulesSchema.optional(),
   spellcastingAbility: AbilityKeySchema.optional(),
   isFullCaster: z.boolean().optional(),
   isHalfCaster: z.boolean().optional(),

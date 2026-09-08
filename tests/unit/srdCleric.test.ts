@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
+import { baseSpellSlots, spellSlotMax } from '~/services/spellcasting'
 import {
   resolveLevelUpEvents,
   applyAutomaticEvents,
@@ -52,27 +53,34 @@ describe('SRD cleric data', () => {
     expect(c.levels[19]!.spellSlots).toEqual({ 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 })
   })
 
-  it('grants two 1st-level slots when a cleric reaches level 1', () => {
-    const events = resolveLevelUpEvents(cleric(0), 'cleric', 1, pack)
-    const applied = applyAutomaticEvents(cleric(0), getAutomaticEvents(events), 'average')
-    expect(applied.spellSlots[1]?.max).toBe(2)
+  it('derives two 1st-level slots for a level-1 cleric', () => {
+    // Slots are no longer written onto the character by level-up; they are derived from
+    // the classes against the caster-level table, so a class level change recomputes them.
+    expect(baseSpellSlots([{ classId: 'cleric', level: 1 }], pack)).toEqual({ 1: 2 })
   })
 
-  it('applies slots as a delta from level 4 to level 5', () => {
-    // L4 = {1:4, 2:3}; L5 = {1:4, 2:3, 3:2} → only a +2 delta on 3rd level
-    const before = cleric(4, { spellSlots: { 1: { max: 4, used: 0 }, 2: { max: 3, used: 0 } } })
-    const events = resolveLevelUpEvents(before, 'cleric', 5, pack)
-    const applied = applyAutomaticEvents(before, getAutomaticEvents(events), 'average')
-    expect(applied.spellSlots[1]?.max).toBe(4)
-    expect(applied.spellSlots[2]?.max).toBe(3)
-    expect(applied.spellSlots[3]?.max).toBe(2)
+  it('derives the whole cleric progression from the class table', () => {
+    expect(baseSpellSlots([{ classId: 'cleric', level: 5 }], pack))
+      .toEqual({ 1: 4, 2: 3, 3: 2 })
+    expect(baseSpellSlots([{ classId: 'cleric', level: 20 }], pack))
+      .toEqual({ 1: 4, 2: 3, 3: 3, 4: 3, 5: 3, 6: 2, 7: 2, 8: 1, 9: 1 })
   })
 
-  it('preserves a manual slot override when levelling', () => {
-    const before = cleric(4, { spellSlots: { 1: { max: 5, used: 0 }, 2: { max: 3, used: 0 } } })
+  it('emits no slot events at all, since slots are derived', () => {
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const events = resolveLevelUpEvents(cleric(lvl - 1), 'cleric', lvl, pack)
+      expect(events.some(e => e.type === 'UPDATE_SPELL_SLOTS'), `level ${lvl}`).toBe(false)
+    }
+  })
+
+  it('keeps a manual slot bonus across a level-up', () => {
+    const before = cleric(4, { spellSlots: { 1: { used: 0, bonus: 1 } } })
     const events = resolveLevelUpEvents(before, 'cleric', 5, pack)
     const applied = applyAutomaticEvents(before, getAutomaticEvents(events), 'average')
-    expect(applied.spellSlots[1]?.max).toBe(5)
+    expect(applied.spellSlots[1]?.bonus).toBe(1)
+    // base 4 from the level-5 table, plus the manual 1
+    expect(spellSlotMax(1, { ...applied, classes: [{ classId: 'cleric', level: 5 }] }, pack))
+      .toBe(5)
   })
 
   it('offers a Divine Domain choice at level 1, not level 3', () => {
