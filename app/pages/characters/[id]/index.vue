@@ -243,7 +243,10 @@ function doLevelUp() {
               <SheetAttacksList :character="character" @update="onUpdate" />
             </template>
             <SheetSpellsPanel v-else-if="activeTab === 'spells'" :character="character" @update="onUpdate" />
-            <SheetFeaturesTraits v-else-if="activeTab === 'features'" :character="character" @update="onUpdate" />
+            <template v-else-if="activeTab === 'features'">
+              <SheetWildShapePanel :character="character" @update="onUpdate" />
+              <SheetFeaturesTraits :character="character" @update="onUpdate" />
+            </template>
             <SheetEquipmentList v-else-if="activeTab === 'equipment'" :character="character" @update="onUpdate" />
             <SheetConditionsNotes v-else-if="activeTab === 'notes'" :character="character" @update="onUpdate" />
           </div>

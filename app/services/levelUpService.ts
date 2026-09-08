@@ -216,7 +216,9 @@ export function resolveLevelUpEvents(
           // omit the gates rather than having to re-state them as true.
           allowSwim: eventDef.allowSwim ?? true,
           allowFly: eventDef.allowFly ?? true,
-          types: eventDef.types,
+          // Copy: eventDef belongs to the reactive rulepack store, and a Vue proxy
+          // stored on the character makes the next structuredClone throw.
+          types: eventDef.types ? [...eventDef.types] : undefined,
         } satisfies SetWildShapeLimitsEvent)
         break
       case 'CHOOSE_FEAT':
@@ -290,7 +292,9 @@ export function resolveLevelUpEvents(
           // omit the gates rather than having to re-state them as true.
           allowSwim: eventDef.allowSwim ?? true,
           allowFly: eventDef.allowFly ?? true,
-          types: eventDef.types,
+          // Copy: eventDef belongs to the reactive rulepack store, and a Vue proxy
+          // stored on the character makes the next structuredClone throw.
+          types: eventDef.types ? [...eventDef.types] : undefined,
         } satisfies SetWildShapeLimitsEvent)
         break
       case 'ABILITY_SCORE_IMPROVEMENT':
@@ -405,7 +409,7 @@ export function applyAutomaticEvents(
             maxCR: event.maxCR,
             allowSwim: event.allowSwim,
             allowFly: event.allowFly,
-            ...(event.types ? { types: event.types } : {}),
+            ...(event.types ? { types: [...event.types] } : {}),
           },
         }
         break
