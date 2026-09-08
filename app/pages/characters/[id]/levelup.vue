@@ -240,7 +240,17 @@ function confirmSubclass() {
     if (eventDef.type === 'CHOOSE_OPTION')
       injected.push({ type: 'CHOOSE_OPTION', id: eventDef.id, label: eventDef.label, options: eventDef.options } satisfies ChooseOptionEvent)
     else if (eventDef.type === 'CHOOSE_SPELL')
-      injected.push({ type: 'CHOOSE_SPELL', addTo: eventDef.addTo, count: eventDef.count, cantrip: eventDef.cantrip ?? false, fromList: eventDef.fromList })
+      injected.push({
+        type: 'CHOOSE_SPELL',
+        addTo: eventDef.addTo,
+        count: eventDef.count,
+        cantrip: eventDef.cantrip ?? false,
+        fromList: eventDef.fromList,
+        // classes/schools must survive the injection: availableSpells falls through to
+        // offering every spell in every pack when both are absent.
+        classes: eventDef.classes,
+        schools: eventDef.schools,
+      } satisfies ChooseSpellEvent)
     else if (eventDef.type === 'ABILITY_SCORE_IMPROVEMENT')
       injected.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
   }
