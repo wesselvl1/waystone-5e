@@ -90,4 +90,6 @@ export const fighterRulepack: Rulepack = {
   backgrounds: [],
   feats: [],
   spells: [],
+  creatures: [],
+  optionalFeatures: [],
 }
