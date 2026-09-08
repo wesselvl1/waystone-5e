@@ -80,7 +80,7 @@ function assume(c: CreatureDefinition) {
   const form: ActiveCreatureForm = {
     creatureId: c.id,
     name: c.name,
-    hp: { max: c.hitPoints, current: c.hitPoints },
+    hp: { max: c.hitPoints, current: c.hitPoints, temp: 0 },
   }
   query.value = ''
   open.value = false
@@ -94,13 +94,85 @@ function revert() {
   emit('update', { wildShape: { ...rest } })
 }
 
-function adjustFormHp(delta: number) {
+/** Write new form hit points, keeping current within 0..max. */
+function setFormHp(hp: { max: number; current: number; temp?: number }) {
   const a = active.value
   if (!a) return
-  const current = Math.max(0, Math.min(a.hp.max, a.hp.current + delta))
+  const max = Math.max(1, Math.round(hp.max) || 1)
+  const current = Math.max(0, Math.min(max, Math.round(hp.current) || 0))
+  const temp = Math.max(0, Math.round(hp.temp ?? a.hp.temp ?? 0) || 0)
   emit('update', {
-    wildShape: { ...props.character.wildShape!, active: { ...a, hp: { ...a.hp, current } } },
+    wildShape: { ...props.character.wildShape!, active: { ...a, hp: { max, current, temp } } },
   })
+}
+
+// Bar geometry copied from CombatStats so the form reads identically to the character.
+const formHpPercent = computed(() => {
+  const hp = active.value?.hp
+  if (!hp || hp.max <= 0) return 0
+  return Math.max(0, Math.min(100, (hp.current / hp.max) * 100))
+})
+
+const formHpColor = computed(() => {
+  if (formHpPercent.value > 50) return 'bg-success-500'
+  if (formHpPercent.value > 25) return 'bg-accent-500'
+  return 'bg-danger-500'
+})
+
+
+// Click-to-edit, same shape as the character's own HP boxes in CombatStats: a draft
+// value committed on blur or Enter, so a 22-point hit is typed rather than clicked.
+const editingFormHp = ref<'current' | 'max' | 'temp' | null>(null)
+const draftFormHp = ref(0)
+
+// Damage/Heal modal, mirroring the character's own. Typing an amount beats clicking
+// a tick button once for every point of a 22-damage hit.
+const hpModalMode = ref<'damage' | 'heal' | null>(null)
+const hpModalAmount = ref(0)
+
+function openHpModal(mode: 'damage' | 'heal') {
+  hpModalMode.value = mode
+  hpModalAmount.value = 0
+  nextTick(() => document.getElementById('form-hp-modal-input')?.focus())
+}
+
+function closeHpModal() {
+  hpModalMode.value = null
+}
+
+const hpModalNewCurrent = computed(() => {
+  const hp = active.value?.hp
+  if (!hp) return 0
+  const amount = hpModalAmount.value || 0
+  if (hpModalMode.value === 'damage') return Math.max(0, hp.current - amount)
+  if (hpModalMode.value === 'heal') return Math.min(hp.max, hp.current + amount)
+  return hp.current
+})
+
+/** Damage beyond the form's hit points carries over to the character (SRD Wild Shape). */
+const carryOverDamage = computed(() => {
+  const hp = active.value?.hp
+  if (!hp || hpModalMode.value !== 'damage') return 0
+  return Math.max(0, (hpModalAmount.value || 0) - hp.current)
+})
+
+function applyHpChange() {
+  const a = active.value
+  if (!a || !hpModalMode.value || hpModalAmount.value <= 0) { closeHpModal(); return }
+  setFormHp({ ...a.hp, current: hpModalNewCurrent.value })
+  closeHpModal()
+}
+function startFormHpEdit(field: 'current' | 'max' | 'temp') {
+  if (!active.value) return
+  editingFormHp.value = field
+  draftFormHp.value = active.value.hp[field]
+}
+
+function commitFormHpEdit(field: 'current' | 'max' | 'temp') {
+  const a = active.value
+  if (!a) { editingFormHp.value = null; return }
+  setFormHp({ ...a.hp, [field]: draftFormHp.value })
+  editingFormHp.value = null
 }
 
 /** The statblock behind the active form, if the pack providing it is still loaded. */
@@ -142,26 +214,78 @@ function signed(n: number): string {
       </div>
 
       <div>
-        <p class="stat-label">Form HP</p>
-        <div class="flex items-center gap-2 mt-1">
-          <button
-            class="w-7 h-7 rounded bg-surface-700 border border-surface-600 text-slate-300 text-sm"
-            :disabled="active.hp.current === 0"
-            @click="adjustFormHp(-1)"
-          >
-            −
-          </button>
-          <span class="text-sm font-semibold tabular-nums" :class="active.hp.current === 0 ? 'text-danger-400' : 'text-white'">
-            {{ active.hp.current }} / {{ active.hp.max }}
-          </span>
-          <button
-            class="w-7 h-7 rounded bg-surface-700 border border-surface-600 text-slate-300 text-sm"
-            :disabled="active.hp.current >= active.hp.max"
-            @click="adjustFormHp(1)"
-          >
-            +
-          </button>
+        <!-- Mirrors the character HP block in CombatStats: bar, Damage/Heal, three boxes -->
+        <div class="flex items-baseline justify-between gap-2">
+          <p class="section-header mb-0">Form Hit Points</p>
+          <span class="text-xs text-slate-500 font-mono">{{ active.hp.current }} / {{ active.hp.max }}</span>
         </div>
+        <div class="h-2 bg-surface-700 rounded-full overflow-hidden mt-1">
+          <div
+            class="h-full rounded-full transition-all duration-300"
+            :class="formHpColor"
+            :style="{ width: `${formHpPercent}%` }"
+          />
+        </div>
+        <div class="flex gap-2 mt-2 mb-1">
+          <button
+            class="flex-1 py-1.5 rounded-md text-xs font-semibold bg-danger-600/20 border border-danger-500/40 text-danger-300 hover:bg-danger-600/40 transition-colors"
+            @click="openHpModal('damage')"
+          >Damage</button>
+          <button
+            class="flex-1 py-1.5 rounded-md text-xs font-semibold bg-success-600/20 border border-success-500/40 text-success-300 hover:bg-success-600/40 transition-colors"
+            @click="openHpModal('heal')"
+          >Heal</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="stat-box cursor-pointer" @click="startFormHpEdit('current')">
+            <span class="stat-label">Current</span>
+            <template v-if="editingFormHp === 'current'">
+              <input
+                v-model.number="draftFormHp"
+                type="number"
+                class="input text-center text-lg w-16 px-1 py-0"
+                autofocus
+                @blur="commitFormHpEdit('current')"
+                @keydown.enter="commitFormHpEdit('current')"
+                @click.stop
+              >
+            </template>
+            <span v-else class="stat-value" :class="active.hp.current === 0 ? 'text-danger-400' : ''">{{ active.hp.current }}</span>
+          </div>
+          <div class="stat-box cursor-pointer" @click="startFormHpEdit('max')">
+            <span class="stat-label">Max</span>
+            <template v-if="editingFormHp === 'max'">
+              <input
+                v-model.number="draftFormHp"
+                type="number"
+                class="input text-center text-lg w-16 px-1 py-0"
+                autofocus
+                @blur="commitFormHpEdit('max')"
+                @keydown.enter="commitFormHpEdit('max')"
+                @click.stop
+              >
+            </template>
+            <span v-else class="stat-value">{{ active.hp.max }}</span>
+          </div>
+          <div class="stat-box cursor-pointer" @click="startFormHpEdit('temp')">
+            <span class="stat-label">Temp</span>
+            <template v-if="editingFormHp === 'temp'">
+              <input
+                v-model.number="draftFormHp"
+                type="number"
+                class="input text-center text-lg w-16 px-1 py-0"
+                autofocus
+                @blur="commitFormHpEdit('temp')"
+                @keydown.enter="commitFormHpEdit('temp')"
+                @click.stop
+              >
+            </template>
+            <span v-else class="stat-value text-accent-400">{{ active.hp.temp || '—' }}</span>
+          </div>
+        </div>
+        <p v-if="activeStatblock" class="text-[10px] text-slate-500 mt-1">
+          Statblock has {{ activeStatblock.hitPoints }} hp ({{ activeStatblock.hitDice }}) — edit Max if you rolled instead.
+        </p>
         <p v-if="active.hp.current === 0" class="text-xs text-danger-400 mt-1">
           At 0 form hit points you revert and any excess damage carries over to your own hit points.
         </p>
@@ -263,5 +387,49 @@ function signed(n: number): string {
         Browse {{ eligible.length }} available forms
       </button>
     </template>
+    <!-- Damage / Heal -->
+    <div
+      v-if="hpModalMode && active"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      @click.self="closeHpModal"
+    >
+      <div class="bg-surface-800 border border-surface-600 rounded-xl p-5 w-72 shadow-xl">
+        <p class="text-sm font-semibold mb-1" :class="hpModalMode === 'damage' ? 'text-danger-300' : 'text-success-300'">
+          {{ hpModalMode === 'damage' ? '⚔ Damage' : '✚ Heal' }} {{ active.name }}
+        </p>
+        <p class="text-[10px] text-slate-500 mb-3">Applies to the form, not your own hit points.</p>
+        <input
+          id="form-hp-modal-input"
+          v-model.number="hpModalAmount"
+          type="number"
+          min="0"
+          class="input w-full text-center text-2xl font-bold mb-3"
+          @keydown.enter="applyHpChange"
+          @keydown.esc="closeHpModal"
+        >
+        <div class="flex items-center justify-between text-xs mb-1 px-1">
+          <div class="text-center">
+            <p class="text-slate-500 uppercase tracking-wider mb-0.5">Current</p>
+            <p class="text-lg font-bold text-slate-200">{{ active.hp.current }}</p>
+          </div>
+          <div class="text-slate-500 text-base">&rarr;</div>
+          <div class="text-center">
+            <p class="text-slate-500 uppercase tracking-wider mb-0.5">New</p>
+            <p class="text-lg font-bold" :class="hpModalMode === 'damage' ? 'text-danger-300' : 'text-success-300'">{{ hpModalNewCurrent }}</p>
+          </div>
+        </div>
+        <p v-if="carryOverDamage > 0" class="text-[10px] text-danger-400 mb-3 px-1">
+          {{ carryOverDamage }} excess damage carries over to your own hit points — apply it on the Combat tab after reverting.
+        </p>
+        <div class="flex gap-2 mt-3">
+          <button class="flex-1 btn-ghost text-sm py-1.5" @click="closeHpModal">Cancel</button>
+          <button
+            class="flex-1 py-1.5 rounded-md text-sm font-semibold transition-colors"
+            :class="hpModalMode === 'damage' ? 'bg-danger-600 hover:bg-danger-500 text-white' : 'bg-success-600 hover:bg-success-500 text-white'"
+            @click="applyHpChange"
+          >Apply</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

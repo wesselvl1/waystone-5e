@@ -139,7 +139,12 @@ export const CharacterSchema = z.object({
     active: z.object({
       creatureId: z.string(),
       name: z.string(),
-      hp: z.object({ max: z.number().int(), current: z.number().int() }),
+      hp: z.object({
+        max: z.number().int(),
+        current: z.number().int(),
+        // Defaulted: forms stored before temp existed have no value for it.
+        temp: z.number().int().optional().default(0),
+      }),
     }).optional(),
   }).optional(),
 

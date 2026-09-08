@@ -51,7 +51,8 @@ export interface ActiveCreatureForm {
   creatureId: string
   /** Denormalized so the sheet still renders if the pack providing the statblock is gone. */
   name: string
-  hp: { max: number; current: number }
+  /** Same shape as Character.hp, so the sheet can present it identically. */
+  hp: { max: number; current: number; temp: number }
 }
 
 export interface WildShapeState {

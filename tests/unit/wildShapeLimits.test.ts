@@ -155,13 +155,25 @@ describe('wildShape on the character schema', () => {
       ...validCharacter,
       wildShape: {
         limits: { maxCR: 0.5, allowSwim: true, allowFly: false, types: ['beast'] },
-        active: { creatureId: 'wolf', name: 'Wolf', hp: { max: 11, current: 7 } },
+        active: { creatureId: 'wolf', name: 'Wolf', hp: { max: 11, current: 7, temp: 0 } },
       },
     }
     const parsed = CharacterSchema.parse(JSON.parse(JSON.stringify(c)))
     expect(parsed.wildShape).toEqual(c.wildShape)
   })
 
+  it('defaults temp hit points on a form stored before the field existed', () => {
+    // Forms written by the first Wild Shape release have no temp value.
+    const legacy = {
+      ...validCharacter,
+      wildShape: {
+        limits: { maxCR: 1, allowSwim: true, allowFly: true },
+        active: { creatureId: 'wolf', name: 'Wolf', hp: { max: 11, current: 11 } },
+      },
+    }
+    const parsed = CharacterSchema.parse(JSON.parse(JSON.stringify(legacy)))
+    expect(parsed.wildShape!.active!.hp).toEqual({ max: 11, current: 11, temp: 0 })
+  })
   it('is optional, so characters without forms still validate', () => {
     const parsed = CharacterSchema.parse(JSON.parse(JSON.stringify(validCharacter)))
     expect(parsed.wildShape).toBeUndefined()
