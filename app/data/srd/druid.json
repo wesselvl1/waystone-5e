@@ -521,7 +521,7 @@
               "features": [
                 {
                   "name": "Circle Spells",
-                  "description": "At 3rd level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Hold Person, Spike Growth; coast \u2014 Mirror Image, Misty Step; desert \u2014 Blur, Silence; forest \u2014 Barkskin, Spider Climb; grassland \u2014 Invisibility, Pass without Trace; mountain \u2014 Spider Climb, Spike Growth; swamp \u2014 Acid Arrow, Darkness. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. These are not added to your spell list automatically \u2014 add them from the Spells tab."
+                  "description": "At 3rd level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Hold Person, Spike Growth; coast \u2014 Mirror Image, Misty Step; desert \u2014 Blur, Silence; forest \u2014 Barkskin, Spider Climb; grassland \u2014 Invisibility, Pass without Trace; mountain \u2014 Spider Climb, Spike Growth; swamp \u2014 Acid Arrow, Darkness. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. They are added to your spell list automatically once you choose your land."
                 }
               ],
               "levelUpEvents": [
@@ -566,6 +566,97 @@
                       "description": "Your circle spells are Acid Arrow and Darkness at 3rd level, Water Walk and Stinking Cloud at 5th level, Freedom of Movement and Locate Creature at 7th level, Insect Plague and Scrying at 9th level. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day."
                     }
                   ]
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "hold-person",
+                    "spike-growth"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "arctic"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "mirror-image",
+                    "misty-step"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "coast"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "blur",
+                    "silence"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "desert"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "barkskin",
+                    "spider-climb"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "forest"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "invisibility",
+                    "pass-without-trace"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "grassland"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "spider-climb",
+                    "spike-growth"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "mountain"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "acid-arrow",
+                    "darkness"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "swamp"
+                  }
                 }
               ]
             },
@@ -574,10 +665,102 @@
               "features": [
                 {
                   "name": "Circle Spells",
-                  "description": "At 5th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Sleet Storm, Slow; coast \u2014 Water Breathing, Water Walk; desert \u2014 Create Food and Water, Protection from Energy; forest \u2014 Call Lightning, Plant Growth; grassland \u2014 Daylight, Haste; mountain \u2014 Lightning Bolt, Meld into Stone; swamp \u2014 Water Walk, Stinking Cloud. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. These are not added to your spell list automatically \u2014 add them from the Spells tab."
+                  "description": "At 5th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Sleet Storm, Slow; coast \u2014 Water Breathing, Water Walk; desert \u2014 Create Food and Water, Protection from Energy; forest \u2014 Call Lightning, Plant Growth; grassland \u2014 Daylight, Haste; mountain \u2014 Lightning Bolt, Meld into Stone; swamp \u2014 Water Walk, Stinking Cloud. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. They are added to your spell list automatically once you choose your land."
                 }
               ],
-              "levelUpEvents": []
+              "levelUpEvents": [
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "sleet-storm",
+                    "slow"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "arctic"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "water-breathing",
+                    "water-walk"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "coast"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "create-food-and-water",
+                    "protection-from-energy"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "desert"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "call-lightning",
+                    "plant-growth"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "forest"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "daylight",
+                    "haste"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "grassland"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "lightning-bolt",
+                    "meld-into-stone"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "mountain"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "water-walk",
+                    "stinking-cloud"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "swamp"
+                  }
+                }
+              ]
             },
             {
               "level": 6,
@@ -594,20 +777,204 @@
               "features": [
                 {
                   "name": "Circle Spells",
-                  "description": "At 7th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Freedom of Movement, Ice Storm; coast \u2014 Control Water, Freedom of Movement; desert \u2014 Blight, Hallucinatory Terrain; forest \u2014 Divination, Freedom of Movement; grassland \u2014 Divination, Freedom of Movement; mountain \u2014 Stone Shape, Stoneskin; swamp \u2014 Freedom of Movement, Locate Creature. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. These are not added to your spell list automatically \u2014 add them from the Spells tab."
+                  "description": "At 7th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Freedom of Movement, Ice Storm; coast \u2014 Control Water, Freedom of Movement; desert \u2014 Blight, Hallucinatory Terrain; forest \u2014 Divination, Freedom of Movement; grassland \u2014 Divination, Freedom of Movement; mountain \u2014 Stone Shape, Stoneskin; swamp \u2014 Freedom of Movement, Locate Creature. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. They are added to your spell list automatically once you choose your land."
                 }
               ],
-              "levelUpEvents": []
+              "levelUpEvents": [
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "freedom-of-movement",
+                    "ice-storm"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "arctic"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "control-water",
+                    "freedom-of-movement"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "coast"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "blight",
+                    "hallucinatory-terrain"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "desert"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "divination",
+                    "freedom-of-movement"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "forest"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "divination",
+                    "freedom-of-movement"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "grassland"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "stone-shape",
+                    "stoneskin"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "mountain"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "freedom-of-movement",
+                    "locate-creature"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "swamp"
+                  }
+                }
+              ]
             },
             {
               "level": 9,
               "features": [
                 {
                   "name": "Circle Spells",
-                  "description": "At 9th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Commune with Nature, Cone of Cold; coast \u2014 Conjure Elemental, Scrying; desert \u2014 Insect Plague, Wall of Stone; forest \u2014 Commune with Nature, Tree Stride; grassland \u2014 Dream, Insect Plague; mountain \u2014 Passwall, Wall of Stone; swamp \u2014 Insect Plague, Scrying. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. These are not added to your spell list automatically \u2014 add them from the Spells tab."
+                  "description": "At 9th level you gain access to two more circle spells, determined by the land you chose: arctic \u2014 Commune with Nature, Cone of Cold; coast \u2014 Conjure Elemental, Scrying; desert \u2014 Insect Plague, Wall of Stone; forest \u2014 Commune with Nature, Tree Stride; grassland \u2014 Dream, Insect Plague; mountain \u2014 Passwall, Wall of Stone; swamp \u2014 Insect Plague, Scrying. Once you gain access to a circle spell you always have it prepared, and it does not count against the number of spells you can prepare each day. They are added to your spell list automatically once you choose your land."
                 }
               ],
-              "levelUpEvents": []
+              "levelUpEvents": [
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "commune-with-nature",
+                    "cone-of-cold"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "arctic"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "conjure-elemental",
+                    "scrying"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "coast"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "insect-plague",
+                    "wall-of-stone"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "desert"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "commune-with-nature",
+                    "tree-stride"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "forest"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "dream",
+                    "insect-plague"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "grassland"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "passwall",
+                    "wall-of-stone"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "mountain"
+                  }
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "druid",
+                  "spellIds": [
+                    "insect-plague",
+                    "scrying"
+                  ],
+                  "alwaysPrepared": true,
+                  "whenOption": {
+                    "choiceId": "land-circle",
+                    "optionId": "swamp"
+                  }
+                }
+              ]
             },
             {
               "level": 10,

@@ -67,6 +67,8 @@ export interface GrantSpellsEvent {
   addTo: string         // classId of the class spell list to add the spells to
   spells: Array<{ spellId: string; name: string; level: number }>
   alwaysPrepared: boolean   // Domain spells are always prepared and don't count against the prepared limit
+  /** Guard that was satisfied to produce this event, kept for traceability. */
+  whenOption?: { choiceId: string; optionId: string }
 }
 
 /** Sets or widens the creature forms a character may assume. Absolute, not a delta:

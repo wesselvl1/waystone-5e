@@ -57,6 +57,42 @@ function parseDieSides(die: string): number {
   return (match && match[1]) ? parseInt(match[1]) : 8
 }
 
+/** Turn spell ids into the denormalized shape a GRANT_SPELLS event carries. */
+function resolveGrantedSpells(spellIds: string[], rulepack: Rulepack) {
+  return spellIds
+    .map(id => rulepack.spells.find(s => s.id === id))
+    .filter((s): s is NonNullable<typeof s> => s !== undefined)
+    .map(s => ({ spellId: s.id, name: s.name, level: s.level }))
+}
+
+/** Add granted spells to a character in place, skipping ones already known. */
+function grantSpellsTo(
+  character: Character,
+  addTo: string,
+  spells: Array<{ spellId: string; name: string; level: number }>,
+  alwaysPrepared: boolean,
+): void {
+  for (const spell of spells) {
+    const existing = character.spells.find(s => s.spellId === spell.spellId)
+    if (existing) {
+      if (alwaysPrepared) {
+        existing.alwaysPrepared = true
+        existing.prepared = true
+      }
+      continue
+    }
+    character.spells.push({
+      id: crypto.randomUUID(),
+      spellId: spell.spellId,
+      name: spell.name,
+      level: spell.level,
+      prepared: alwaysPrepared || spell.level === 0,
+      alwaysPrepared: alwaysPrepared || undefined,
+      classId: addTo,
+    })
+  }
+}
+
 export function resolveLevelUpEvents(
   character: Character,
   classId: string,
@@ -211,16 +247,21 @@ export function resolveLevelUpEvents(
         })
         break
       case 'GRANT_SPELLS': {
-        const granted = eventDef.spellIds
-          .map(id => rulepack.spells.find(s => s.id === id))
-          .filter((s): s is NonNullable<typeof s> => s !== undefined)
-          .map(s => ({ spellId: s.id, name: s.name, level: s.level }))
+        // A guarded grant only fires once the option it depends on has been picked. At
+        // the level the option is chosen the answer is not known yet, so the grant is
+        // skipped here and applied by RESOLVED_OPTION instead.
+        if (eventDef.whenOption
+          && character.chosenOptions?.[eventDef.whenOption.choiceId] !== eventDef.whenOption.optionId) {
+          break
+        }
+        const granted = resolveGrantedSpells(eventDef.spellIds, rulepack)
         if (granted.length > 0) {
           events.push({
             type: 'GRANT_SPELLS',
             addTo: eventDef.addTo,
             spells: granted,
             alwaysPrepared: eventDef.alwaysPrepared ?? false,
+            ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
           } satisfies GrantSpellsEvent)
         }
         break
@@ -288,16 +329,21 @@ export function resolveLevelUpEvents(
         })
         break
       case 'GRANT_SPELLS': {
-        const granted = eventDef.spellIds
-          .map(id => rulepack.spells.find(s => s.id === id))
-          .filter((s): s is NonNullable<typeof s> => s !== undefined)
-          .map(s => ({ spellId: s.id, name: s.name, level: s.level }))
+        // A guarded grant only fires once the option it depends on has been picked. At
+        // the level the option is chosen the answer is not known yet, so the grant is
+        // skipped here and applied by RESOLVED_OPTION instead.
+        if (eventDef.whenOption
+          && character.chosenOptions?.[eventDef.whenOption.choiceId] !== eventDef.whenOption.optionId) {
+          break
+        }
+        const granted = resolveGrantedSpells(eventDef.spellIds, rulepack)
         if (granted.length > 0) {
           events.push({
             type: 'GRANT_SPELLS',
             addTo: eventDef.addTo,
             spells: granted,
             alwaysPrepared: eventDef.alwaysPrepared ?? false,
+            ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
           } satisfies GrantSpellsEvent)
         }
         break
@@ -642,7 +688,39 @@ export function applyResolvedChoices(
         }
         break
       }
-      case 'RESOLVED_OPTION': {        // Find the option definition from the rulepack across all subclass level events
+      case 'RESOLVED_OPTION': {
+        // Record the choice so later levels can act on it. Previously the pick lived only
+        // in a feature's name, which nothing could query.
+        updated.chosenOptions = {
+          ...updated.chosenOptions,
+          [choice.choiceId]: choice.optionId,
+        }
+
+        // Apply grants guarded by this option that sit on the level being gained.
+        // resolveLevelUpEvents could not emit them: the option was still unanswered when
+        // it ran, the same ordering problem RESOLVED_SUBCLASS has.
+        for (const cls of rulepack.classes) {
+          const entry = updated.classes.find(c => c.classId === cls.id)
+          if (!entry) continue
+          const levelEvents = [
+            ...(cls.levels.find(l => l.level === entry.level)?.levelUpEvents ?? []),
+            ...(cls.subclasses ?? [])
+              .filter(sub => sub.id === entry.subclassId)
+              .flatMap(sub => sub.levels.find(l => l.level === entry.level)?.levelUpEvents ?? []),
+          ]
+          for (const evt of levelEvents) {
+            if (evt.type !== 'GRANT_SPELLS' || !evt.whenOption) continue
+            if (evt.whenOption.choiceId !== choice.choiceId) continue
+            if (evt.whenOption.optionId !== choice.optionId) continue
+            grantSpellsTo(
+              updated,
+              evt.addTo,
+              resolveGrantedSpells(evt.spellIds, rulepack),
+              evt.alwaysPrepared ?? false,
+            )
+          }
+        }
+        // Find the option definition from the rulepack across all subclass level events
         let optionName: string | undefined
         let optionDescription: string | undefined
         outer: for (const cls of rulepack.classes) {

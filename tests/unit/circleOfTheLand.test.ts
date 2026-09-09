@@ -148,14 +148,15 @@ describe('Circle Spells features', () => {
     }
   })
 
-  it('says the spells are not added automatically', () => {
-    // GRANT_SPELLS cannot be made conditional on a CHOOSE_OPTION result, so the
-    // player adds them by hand. The text has to say so rather than leave it implied.
+  it('says the spells are granted automatically', () => {
+    // Was the opposite: GRANT_SPELLS could not be conditional on a CHOOSE_OPTION result,
+    // so the text told the player to add them by hand. whenOption fixed that.
     for (const tier of TIERS) {
       const feature = land.levels
         .find(l => l.level === tier)!
         .features.find(f => f.name === 'Circle Spells')!
-      expect(feature.description).toMatch(/not added to your spell list automatically/i)
+      expect(feature.description).toMatch(/added to your spell list automatically/i)
+      expect(feature.description).not.toMatch(/not added to your spell list automatically/i)
     }
   })
 })

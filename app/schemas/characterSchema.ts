@@ -146,6 +146,7 @@ export const CharacterSchema = z.object({
   warlockSlots: WarlockSlotsSchema.optional(),
   spells: z.array(SpellEntrySchema),
   concentrating: z.string().optional(),
+  chosenOptions: z.record(z.string(), z.string()).optional(),
   wildShape: z.object({
     limits: z.object({
       maxCR: z.number().min(0),

@@ -138,6 +138,10 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     addTo: z.string(),
     spellIds: z.array(z.string()).min(1),
     alwaysPrepared: z.boolean().optional(),
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
   }),
   z.object({
     type: z.literal('SET_WILD_SHAPE_LIMITS'),

@@ -58,7 +58,17 @@ export type LevelUpEventDef =
   | { type: 'GAIN_PROFICIENCY'; proficiency: string }
   | { type: 'CHOOSE_SPELL'; addTo: string; count: number; fromList?: string[]; cantrip?: boolean; classes?: string[]; schools?: string[] }
   | { type: 'CHANGE_SPELL'; addTo: string; amount: number; classes?: string[]; schools?: string[] }
-  | { type: 'GRANT_SPELLS'; addTo: string; spellIds: string[]; alwaysPrepared?: boolean }
+  | {
+      type: 'GRANT_SPELLS'
+      addTo: string
+      spellIds: string[]
+      alwaysPrepared?: boolean
+      /**
+       * Only granted when the player has picked this option. Lets a choice made at one
+       * level drive grants at later ones, which is how Circle of the Land works.
+       */
+      whenOption?: { choiceId: string; optionId: string }
+    }
   | { type: 'SET_WILD_SHAPE_LIMITS'; maxCR: number; allowSwim?: boolean; allowFly?: boolean; types?: CreatureType[] }
   | { type: 'CHOOSE_EXPERTISE'; label: string; options: SkillKey[]; count: number }
   | { type: 'CHOOSE_FEAT' }

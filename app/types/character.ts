@@ -210,6 +210,15 @@ export interface Character {
   warlockSlots?: WarlockSlots           // Pact magic slots — separate from regular slots
   spells: SpellEntry[]
   concentrating?: string                // Spell name if concentrating
+  /**
+   * Options the player has picked, keyed by CHOOSE_OPTION id (e.g. land-circle -> forest).
+   *
+   * Previously a choice was recorded only by rewriting a feature's name, which nothing
+   * could query. A later level needs to know what was picked — Circle of the Land chooses
+   * its terrain at 3 but gains spells for it at 3, 5, 7 and 9.
+   */
+  chosenOptions?: Record<string, string>
+
   /** Present once a feature grants creature forms (Wild Shape). */
   wildShape?: WildShapeState
 
