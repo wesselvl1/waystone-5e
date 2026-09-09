@@ -5,6 +5,7 @@ import { multiclassOptions, describeMulticlassPrerequisites, effectiveScores } f
 import { maxSpellLevelForClass, clampSpellSlots } from '~/services/spellcasting'
 import {
   resolveLevelUpEvents,
+  resolveOptionChoice,
   applyAutomaticEvents,
   applyResolvedChoices,
   getChoiceEvents,
@@ -309,6 +310,42 @@ function confirmSkills() {
   nextChoice()
 }
 
+/**
+ * The options still open for the current choice.
+ *
+ * The service already drops options taken on an earlier level. Two picks from the same pool
+ * on the *same* level (Metamagic at 3rd, Eldritch Invocations at 2nd) are two choices in one
+ * wizard run, and nothing is stored until the run is applied, so the second prompt has to
+ * exclude what the first one just took.
+ */
+const availableOptions = computed(() => {
+  const choiceEvent = currentChoice.value as ChooseOptionEvent | null
+  if (!choiceEvent || choiceEvent.type !== 'CHOOSE_OPTION') return []
+  if (!choiceEvent.group) return choiceEvent.options
+
+  const groupOf = (choiceId: string) => choiceEvents.value
+    .find((e): e is ChooseOptionEvent => e.type === 'CHOOSE_OPTION' && e.id === choiceId)
+    ?.group
+  const takenThisRun = new Set(
+    resolvedChoices.value
+      .filter(c => c.type === 'RESOLVED_OPTION' && groupOf(c.choiceId) === choiceEvent.group)
+      .map(c => (c as { optionId: string }).optionId),
+  )
+  return choiceEvent.options.filter(o => !takenThisRun.has(o.id))
+})
+
+/**
+ * How a resolved option reads on the summary. The picks were missing from it entirely,
+ * so a sorcerer confirmed two Metamagic options without seeing either.
+ */
+function optionSummary(choiceId: string, optionId: string): string {
+  const event = choiceEvents.value
+    .find((e): e is ChooseOptionEvent => e.type === 'CHOOSE_OPTION' && e.id === choiceId)
+  const name = event?.options.find(o => o.id === optionId)?.name ?? optionId
+  const label = (event?.label ?? choiceId).replace(/^Choose (a|an|your|the) /i, '')
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${name}`
+}
+
 function confirmOption() {
   const choiceEvent = currentChoice.value as ChooseOptionEvent
   if (!selectedOptionId.value) return
@@ -357,8 +394,14 @@ function confirmSubclass() {
   const subclassLevelDef = subclassDef?.levels.find(l => l.level === targetLevel.value)
   const injected: ChoiceLevelUpEvent[] = []
   for (const eventDef of subclassLevelDef?.levelUpEvents ?? []) {
-    if (eventDef.type === 'CHOOSE_OPTION')
-      injected.push({ type: 'CHOOSE_OPTION', id: eventDef.id, label: eventDef.label, options: eventDef.options } satisfies ChooseOptionEvent)
+    if (eventDef.type === 'CHOOSE_OPTION') {
+      // Through the service, so an option already taken from the same pool is dropped here
+      // too rather than only on the paths that go via resolveLevelUpEvents.
+      const choice = pack && character.value
+        ? resolveOptionChoice(eventDef, toRaw(character.value), pack)
+        : undefined
+      if (choice) injected.push(choice)
+    }
     else if (eventDef.type === 'CHOOSE_SPELL')
       injected.push({
         type: 'CHOOSE_SPELL',
@@ -744,7 +787,7 @@ watch(isFirstCharacterLevel, (val) => {
           <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ChooseOptionEvent).label }}</h2>
           <div class="space-y-2 mt-3">
             <button
-              v-for="opt in (currentChoice as ChooseOptionEvent).options"
+              v-for="opt in availableOptions"
               :key="opt.id"
               class="card w-full text-left hover:border-primary-500/50 transition-colors"
               :class="selectedOptionId === opt.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -971,6 +1014,9 @@ watch(isFirstCharacterLevel, (val) => {
               </span>
               <span v-else-if="choice.type === 'RESOLVED_SUBCLASS'">
                 Subclass: {{ choice.subclassId }}
+              </span>
+              <span v-else-if="choice.type === 'RESOLVED_OPTION'">
+                {{ optionSummary(choice.choiceId, choice.optionId) }}
               </span>
               <span v-else-if="choice.type === 'RESOLVED_OPTIONAL_FEATURES' && choice.taken.length > 0">
                 Optional features: {{ choice.taken.map(f => f.name).join(', ') }}

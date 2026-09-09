@@ -116,7 +116,18 @@ export type LevelUpEventDef =
   | { type: 'ABILITY_SCORE_IMPROVEMENT'; points: number }
   | { type: 'CHOOSE_SUBCLASS'; label: string }
   | { type: 'UPDATE_HIT_DIE'; die: string }
-  | { type: 'CHOOSE_OPTION'; id: string; label: string; options: ChooseOptionDef[] }
+  | {
+    type: 'CHOOSE_OPTION'
+    id: string
+    label: string
+    options: ChooseOptionDef[]
+    /**
+     * Choices that draw from one shared pool declare the same group, so an option
+     * already taken is not offered again. Metamagic, Eldritch Invocations and Fighting
+     * Style are each picked several times from one list, and the SRD forbids repeats.
+     */
+    group?: string
+  }
 
 export interface ClassLevel {
   level: number

@@ -1,5 +1,5 @@
 import type { Character, AbilityKey, SpellcastingOrigin, SpellSlotLevel } from '~/types/character'
-import type { Rulepack, OptionalClassFeature, FeatDefinition, FeatPrerequisite } from '~/types/rulepack'
+import type { Rulepack, OptionalClassFeature, FeatDefinition, FeatPrerequisite, LevelUpEventDef } from '~/types/rulepack'
 import { addHitDieForClass, multiclassProficiencies } from '~/services/multiclass'
 import type {
   LevelUpEvent,
@@ -13,6 +13,7 @@ import type {
   UpdateHitDieEvent,
   SetSpellcastingAbilityEvent,
   ChooseExpertiseEvent,
+  ChooseOptionEvent,
   UpdateFeatureUsesEvent,
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
@@ -122,6 +123,73 @@ function grantSpellsTo(
       ...(source.castAtLevel ? { castAtLevel: source.castAtLevel } : {}),
     })
   }
+}
+
+type ChooseOptionDefEvent = Extract<LevelUpEventDef, { type: 'CHOOSE_OPTION' }>
+
+/** Every CHOOSE_OPTION definition anywhere in a pack, so a stored answer can be traced. */
+function allOptionChoices(rulepack: Rulepack): ChooseOptionDefEvent[] {
+  const out: ChooseOptionDefEvent[] = []
+  const collect = (defs: LevelUpEventDef[] | undefined) => {
+    for (const def of defs ?? []) if (def.type === 'CHOOSE_OPTION') out.push(def)
+  }
+  for (const cls of rulepack.classes) {
+    for (const level of cls.levels) collect(level.levelUpEvents)
+    for (const sub of cls.subclasses ?? []) {
+      for (const level of sub.levels) collect(level.levelUpEvents)
+    }
+  }
+  for (const source of [...rulepack.races, ...rulepack.backgrounds]) {
+    for (const level of source.levelUpEvents ?? []) collect(level.levelUpEvents)
+  }
+  for (const race of rulepack.races) {
+    for (const sub of race.subraces ?? []) {
+      for (const level of sub.levelUpEvents ?? []) collect(level.levelUpEvents)
+    }
+  }
+  return out
+}
+
+/**
+ * Translates a CHOOSE_OPTION definition, dropping options the character has already taken
+ * from the same pool.
+ *
+ * Metamagic, Eldritch Invocations and Fighting Style are each picked more than once from
+ * one list, and the SRD forbids taking an option twice. Each pick is a separate choice with
+ * its own id (`metamagic-1`, `metamagic-2`, …) because a choice answers exactly one option,
+ * so nothing tied them together and every prompt offered the whole list again.
+ *
+ * `chosenOptions` is keyed by choice id, so the pack's own definitions are what say which
+ * ids belong to the group. Returns undefined when the group is spent, rather than offering
+ * an empty list.
+ */
+export function resolveOptionChoice(
+  eventDef: ChooseOptionDefEvent,
+  character: Character,
+  rulepack: Rulepack,
+): ChooseOptionEvent | undefined {
+  const base: ChooseOptionEvent = {
+    type: 'CHOOSE_OPTION',
+    id: eventDef.id,
+    label: eventDef.label,
+    options: eventDef.options,
+    group: eventDef.group,
+  }
+  if (!eventDef.group) return base
+
+  const inGroup = allOptionChoices(rulepack)
+    .filter(d => d.group === eventDef.group)
+    .map(d => d.id)
+  const taken = new Set(
+    inGroup
+      .filter(id => id !== eventDef.id)
+      .map(id => character.chosenOptions?.[id])
+      .filter((id): id is string => !!id),
+  )
+  if (taken.size === 0) return base
+
+  const options = eventDef.options.filter(o => !taken.has(o.id))
+  return options.length > 0 ? { ...base, options } : undefined
 }
 
 export function resolveLevelUpEvents(
@@ -329,9 +397,11 @@ export function resolveLevelUpEvents(
           events.push({ type: 'CHOOSE_SUBCLASS', label: eventDef.label })
         }
         break
-      case 'CHOOSE_OPTION':
-        events.push({ type: 'CHOOSE_OPTION', id: eventDef.id, label: eventDef.label, options: eventDef.options })
+      case 'CHOOSE_OPTION': {
+        const choice = resolveOptionChoice(eventDef, character, rulepack)
+        if (choice) events.push(choice)
         break
+      }
       case 'UPDATE_FEATURE_USES':
         events.push({
           type: 'UPDATE_FEATURE_USES',
@@ -345,9 +415,11 @@ export function resolveLevelUpEvents(
   // Process levelUpEvents defined on the subclass level (e.g. totem/archetype choices)
   for (const eventDef of subclassLevelEvents) {
     switch (eventDef.type) {
-      case 'CHOOSE_OPTION':
-        events.push({ type: 'CHOOSE_OPTION', id: eventDef.id, label: eventDef.label, options: eventDef.options })
+      case 'CHOOSE_OPTION': {
+        const choice = resolveOptionChoice(eventDef, character, rulepack)
+        if (choice) events.push(choice)
         break
+      }
       case 'CHOOSE_SPELL':
         events.push({
           type: 'CHOOSE_SPELL',
@@ -449,17 +521,14 @@ export function resolveLevelUpEvents(
             label: eventDef.label,
           })
           break
-        case 'CHOOSE_OPTION':
+        case 'CHOOSE_OPTION': {
           // Skip a choice already answered, so it is not asked again on a later level
           if (character.chosenOptions?.[eventDef.id] === undefined) {
-            events.push({
-              type: 'CHOOSE_OPTION',
-              id: eventDef.id,
-              label: eventDef.label,
-              options: eventDef.options,
-            })
+            const choice = resolveOptionChoice(eventDef, character, rulepack)
+            if (choice) events.push(choice)
           }
           break
+        }
         case 'GAIN_PROFICIENCY':
           events.push({
             type: 'GAIN_PROFICIENCY',
