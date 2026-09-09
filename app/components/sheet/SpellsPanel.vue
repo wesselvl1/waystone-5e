@@ -2,6 +2,7 @@
 import type { Character, SpellEntry, SpellSlotLevel, AbilityKey } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useRulepacksStore } from '~/stores/rulepacks'
+import { spellSlotMax, spellSaveDCFor, spellAttackBonusFor } from '~/services/spellcasting'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -12,42 +13,73 @@ const rulepackStore = useRulepacksStore()
 
 const SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as SpellSlotLevel[]
 
-// ── Class tabs ────────────────────────────────────────────────────────────────
+// ── Spellcasting sources ─────────────────────────────────────────────
 
-// Collect distinct classIds that have spells assigned
-const spellClassIds = computed(() => {
-  const ids = new Set<string>()
-  for (const spell of props.character.spells) {
-    if (spell.classId) ids.add(spell.classId)
+interface SpellcastingSource {
+  id: string
+  name: string
+  ability: AbilityKey
+  saveDC: number
+  attackBonus: number
+}
+
+/**
+ * One entry per spellcasting source, each with its own DC and attack bonus.
+ *
+ * A cleric/sorcerer has two: the DC is not a character-wide number. The ability comes
+ * from classSpellcasting[sourceId].ability, recorded per class on level-up, and falls
+ * back to the class definition so a character whose data predates that still resolves.
+ */
+const spellcastingSources = computed<SpellcastingSource[]>(() => {
+  const char = props.character
+  const prof = stats.profBonus.value
+  const mods = stats.abilityModifiers.value
+  const seen = new Map<string, SpellcastingSource>()
+
+  const add = (id: string, name: string, ability: AbilityKey) => {
+    if (seen.has(id)) return
+    seen.set(id, {
+      id,
+      name,
+      ability,
+      saveDC: spellSaveDCFor(ability, mods[ability], prof),
+      attackBonus: spellAttackBonusFor(mods[ability], prof),
+    })
   }
-  return [...ids]
+
+  // Classes first, in the character's own order, so the list reads predictably
+  for (const entry of char.classes) {
+    const def = rulepackStore.getClass(entry.classId)
+    const ability = char.classSpellcasting[entry.classId]?.ability ?? def?.spellcastingAbility
+    if (ability) add(entry.classId, def?.name ?? entry.classId, ability)
+  }
+
+  // Then any non-class source (a race or background grant), which has no class entry
+  for (const [id, source] of Object.entries(char.classSpellcasting)) {
+    add(id, source.label ?? rulepackStore.getClass(id)?.name ?? id, source.ability)
+  }
+
+  return [...seen.values()]
 })
 
-interface ClassTab { id: string; name: string }
+const classTabs = computed(() => spellcastingSources.value.map(s => ({ id: s.id, name: s.name })))
 
-const classTabs = computed<ClassTab[]>(() => {
-  const tabs: ClassTab[] = []
-  for (const classId of spellClassIds.value) {
-    const cls = rulepackStore.getClass(classId)
-    tabs.push({ id: classId, name: cls?.name ?? classId })
-  }
-  return tabs
-})
-
-// Show tabs only when there are multiple distinct class lists
+// Tabs only earn their space once there is more than one list
 const showTabs = computed(() => classTabs.value.length > 1)
 
 const activeTab = ref<string>('all')
 
-// Reset to 'all' when tabs disappear
 watch(showTabs, (show) => { if (!show) activeTab.value = 'all' })
+
+/** The source whose header is shown, or null on the All tab where every source is listed. */
+const activeSource = computed(() =>
+  spellcastingSources.value.find(s => s.id === activeTab.value) ?? null)
 
 const visibleSpells = computed(() =>
   activeTab.value === 'all'
     ? props.character.spells
     : props.character.spells.filter(s => s.classId === activeTab.value),
 )
-
 const spellsByLevel = computed(() => {
   const map = new Map<number, SpellEntry[]>()
   map.set(0, [])
@@ -61,23 +93,43 @@ const spellsByLevel = computed(() => {
 })
 
 // Whether any regular (non-warlock) spell slots exist
-const hasRegularSlots = computed(() =>
-  SLOT_LEVELS.some(lvl => (props.character.spellSlots[lvl]?.max ?? 0) > 0),
-)
+/**
+ * Slots are derived from the character's classes against the multiclass caster-level
+ * table rather than stored, so a new class level changes them without a migration.
+ * The merged pack is used because a class may come from any loaded rulepack.
+ */
+const mergedPack = computed(() => ({
+  id: 'merged',
+  name: 'merged',
+  version: '0',
+  races: [],
+  classes: rulepackStore.rulepacks.flatMap(p => p.classes),
+  backgrounds: [],
+  feats: [],
+  spells: [],
+  creatures: [],
+  optionalFeatures: [],
+}))
+
+function slotMax(lvl: SpellSlotLevel): number {
+  return spellSlotMax(lvl, props.character, mergedPack.value)
+}
+
+const hasRegularSlots = computed(() => SLOT_LEVELS.some(lvl => slotMax(lvl) > 0))
 
 // ── Regular slot actions ──────────────────────────────────────────────────────
 
 function useSlot(lvl: SpellSlotLevel) {
   const slots = { ...props.character.spellSlots }
-  const current = slots[lvl] ?? { max: 0, used: 0 }
-  if (current.used >= current.max) return
+  const current = slots[lvl] ?? { used: 0 }
+  if (current.used >= slotMax(lvl)) return
   slots[lvl] = { ...current, used: current.used + 1 }
   emit('update', { spellSlots: slots })
 }
 
 function restoreSlot(lvl: SpellSlotLevel) {
   const slots = { ...props.character.spellSlots }
-  const current = slots[lvl] ?? { max: 0, used: 0 }
+  const current = slots[lvl] ?? { used: 0 }
   if (current.used === 0) return
   slots[lvl] = { ...current, used: current.used - 1 }
   emit('update', { spellSlots: slots })
@@ -149,24 +201,33 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
 
 <template>
   <div class="space-y-3">
-    <!-- Spellcasting header -->
-    <div class="card flex items-center gap-4 flex-wrap">
-      <div>
-        <p class="stat-label">Ability</p>
-        <p class="text-sm font-semibold text-white">{{ character.spellcastingAbility ? ABILITY_LABELS[character.spellcastingAbility] : '—' }}</p>
-      </div>
-      <div>
-        <p class="stat-label">Spell Save DC</p>
-        <p class="text-sm font-semibold text-white">{{ stats.spellSaveDC.value ?? '—' }}</p>
-      </div>
-      <div>
-        <p class="stat-label">Spell Attack</p>
-        <p class="text-sm font-semibold text-white">
-          {{ stats.spellAttackBonus.value !== null ? (stats.spellAttackBonus.value >= 0 ? '+' : '') + stats.spellAttackBonus.value : '—' }}
-        </p>
+    <!-- Spellcasting: per source, because a multiclass caster has a DC per class -->
+    <div v-if="spellcastingSources.length > 0" class="card space-y-2">
+      <div
+        v-for="source in (activeSource ? [activeSource] : spellcastingSources)"
+        :key="source.id"
+        class="flex items-center gap-4 flex-wrap"
+      >
+        <div v-if="spellcastingSources.length > 1" class="min-w-[4.5rem]">
+          <p class="stat-label">List</p>
+          <p class="text-sm font-semibold text-white">{{ source.name }}</p>
+        </div>
+        <div>
+          <p class="stat-label">Ability</p>
+          <p class="text-sm font-semibold text-white">{{ ABILITY_LABELS[source.ability] }}</p>
+        </div>
+        <div>
+          <p class="stat-label">Spell Save DC</p>
+          <p class="text-sm font-semibold text-white">{{ source.saveDC }}</p>
+        </div>
+        <div>
+          <p class="stat-label">Spell Attack</p>
+          <p class="text-sm font-semibold text-white">
+            {{ source.attackBonus >= 0 ? '+' : '' }}{{ source.attackBonus }}
+          </p>
+        </div>
       </div>
     </div>
-
     <!-- Regular spell slots (only shown when character has them) -->
     <div v-if="hasRegularSlots" class="card">
       <p class="section-header">Spell Slots</p>
@@ -179,7 +240,7 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
           <span class="text-xs text-slate-500 w-4 flex-shrink-0">{{ lvl }}</span>
           <div class="flex gap-1.5 flex-wrap flex-1">
             <button
-              v-for="i in (character.spellSlots[lvl]?.max ?? 0)"
+              v-for="i in slotMax(lvl)"
               :key="i"
               class="w-5 h-5 rounded-full border text-xs transition-colors"
               :class="i <= (character.spellSlots[lvl]?.used ?? 0)
@@ -188,7 +249,7 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
               :title="i <= (character.spellSlots[lvl]?.used ?? 0) ? 'Restore slot' : 'Use slot'"
               @click="i <= (character.spellSlots[lvl]?.used ?? 0) ? restoreSlot(lvl) : useSlot(lvl)"
             />
-            <span v-if="!character.spellSlots[lvl]?.max" class="text-slate-600 text-xs">—</span>
+            <span v-if="slotMax(lvl) === 0" class="text-slate-600 text-xs">—</span>
           </div>
         </div>
       </div>
@@ -280,14 +341,14 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
             <option v-for="l in 9" :key="l" :value="l">Level {{ l }}</option>
           </select>
           <!-- Class selector for the spell being added -->
-          <select v-if="character.classes.length > 1 || spellClassIds.length > 0" v-model="addClassId" class="input w-32">
-            <option value="">No class</option>
+          <select v-if="spellcastingSources.length > 0" v-model="addClassId" class="input w-32">
+            <option value="">No list</option>
             <option
-              v-for="cls in character.classes"
-              :key="cls.classId"
-              :value="cls.classId"
+              v-for="cls in spellcastingSources"
+              :key="cls.id"
+              :value="cls.id"
             >
-              {{ rulepackStore.getClass(cls.classId)?.name ?? cls.classId }}
+              {{ cls.name }}
             </option>
           </select>
           <input v-model="searchQuery" class="input flex-1 min-w-24" placeholder="Search spells…" />

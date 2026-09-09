@@ -38,6 +38,11 @@
           "religion"
         ]
       },
+      "multiclassing": {
+        "prerequisites": {
+          "cha": 13
+        }
+      },
       "levels": [
         {
           "level": 1,

@@ -1,5 +1,6 @@
 import type { Character, AbilityKey, SpellSlotLevel } from '~/types/character'
 import type { Rulepack, OptionalClassFeature, FeatDefinition, FeatPrerequisite } from '~/types/rulepack'
+import { addHitDieForClass, multiclassProficiencies } from '~/services/multiclass'
 import type {
   LevelUpEvent,
   AutomaticLevelUpEvent,
@@ -10,6 +11,8 @@ import type {
   UpdateSpellSlotsEvent,
   UpdateWarlockSlotsEvent,
   UpdateHitDieEvent,
+  SetSpellcastingAbilityEvent,
+  ChooseExpertiseEvent,
   UpdateFeatureUsesEvent,
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
@@ -85,39 +88,35 @@ export function resolveLevelUpEvents(
     hpFlatBonus: character.hpBonusPerLevel ?? 0,
   } satisfies AddHpEvent)
 
-  // Update hit die tracking
+  // Record this class's spellcasting ability against its own source, so a multiclass
+  // caster gets a DC per class rather than one taken from whichever class came first.
+  if (classDef.spellcastingAbility) {
+    events.push({
+      type: 'SET_SPELLCASTING_ABILITY',
+      sourceId: classId,
+      ability: classDef.spellcastingAbility,
+    } satisfies SetSpellcastingAbilityEvent)
+  }
+
+  // Hit dice are pooled per class, since a fighter/wizard spends d10s and d6s separately
   events.push({
     type: 'UPDATE_HIT_DIE',
+    classId,
     die: classDef.hitDie,
-    totalDice: character.hitDice.total + 1,
   } satisfies UpdateHitDieEvent)
 
-  // Spell slots — pact magic classes (warlock) get separate warlock slots; regular casters
-  // use delta vs. previous level so manual overrides (e.g. magic items) are preserved
-  if (levelData.spellSlots) {
-    if (classDef.pactMagic) {
-      // Warlock pact magic: all slots are the same level — take absolute values, not deltas
-      const entries = Object.entries(levelData.spellSlots)
-      if (entries.length > 0) {
-        const [slotLvlStr, count] = entries.at(-1)! // highest (and only) key
-        events.push({
-          type: 'UPDATE_WARLOCK_SLOTS',
-          slotLevel: Number.parseInt(slotLvlStr) as SpellSlotLevel,
-          max: count ?? 0,
-        } satisfies UpdateWarlockSlotsEvent)
-      }
-    }
-    else {
-      const prevLevelData = classDef.levels.find(l => l.level === newLevel - 1)
-      const prevSlots = (prevLevelData?.spellSlots ?? {}) as Record<string, number>
-      const delta: Partial<Record<SpellSlotLevel, number>> = {}
-      for (const [slotLvlStr, newCount] of Object.entries(levelData.spellSlots)) {
-        const diff = (newCount ?? 0) - (prevSlots[slotLvlStr] ?? 0)
-        if (diff > 0) delta[parseInt(slotLvlStr) as SpellSlotLevel] = diff
-      }
-      if (Object.keys(delta).length > 0) {
-        events.push({ type: 'UPDATE_SPELL_SLOTS', slots: delta } satisfies UpdateSpellSlotsEvent)
-      }
+  // Only pact magic is tracked on the character: warlock slots are absolute and separate.
+  // Regular slots are derived from the combined caster level by baseSpellSlots(), so
+  // nothing is emitted for them — a new class level changes the derivation instead.
+  if (levelData.spellSlots && classDef.pactMagic) {
+    const entries = Object.entries(levelData.spellSlots)
+    if (entries.length > 0) {
+      const [slotLvlStr, count] = entries.at(-1)! // highest (and only) key
+      events.push({
+        type: 'UPDATE_WARLOCK_SLOTS',
+        slotLevel: Number.parseInt(slotLvlStr) as SpellSlotLevel,
+        max: count ?? 0,
+      } satisfies UpdateWarlockSlotsEvent)
     }
   }
 
@@ -167,8 +166,26 @@ export function resolveLevelUpEvents(
   }
 
   // Process levelUpEvents from the rulepack definition
-  for (const eventDef of levelData.levelUpEvents) {
-    switch (eventDef.type) {
+  // Taking a class as an additional class grants the SRD's reduced proficiency set, never
+  // saving throws. Level 1 of the *first* class is handled at character creation instead,
+  // so this only fires when the character already has levels elsewhere.
+  const enteringAsMulticlass = newLevel === 1
+    && character.classes.some(c => c.classId !== classId && c.level > 0)
+  if (enteringAsMulticlass && classDef.multiclassing) {
+    for (const proficiency of multiclassProficiencies(classDef)) {
+      events.push({
+        type: 'GAIN_PROFICIENCY',
+        proficiency,
+        category: 'armor',
+      } satisfies GainProficiencyEvent)
+    }
+    const skills = classDef.multiclassing.skillChoices
+    if (skills && skills.count > 0) {
+      events.push({ type: 'CHOOSE_SKILL', count: skills.count, from: skills.from })
+    }
+  }
+
+  for (const eventDef of levelData.levelUpEvents) {    switch (eventDef.type) {
       case 'ADD_FEATURE':
         // Already handled above via feature names; skip duplicate
         break
@@ -220,6 +237,14 @@ export function resolveLevelUpEvents(
           // stored on the character makes the next structuredClone throw.
           types: eventDef.types ? [...eventDef.types] : undefined,
         } satisfies SetWildShapeLimitsEvent)
+        break
+      case 'CHOOSE_EXPERTISE':
+        events.push({
+          type: 'CHOOSE_EXPERTISE',
+          label: eventDef.label,
+          options: eventDef.options,
+          count: eventDef.count,
+        } satisfies ChooseExpertiseEvent)
         break
       case 'CHOOSE_FEAT':
         events.push({ type: 'CHOOSE_FEAT' })
@@ -312,7 +337,7 @@ export function resolveLevelUpEvents(
 }
 
 export function isChoiceEvent(event: LevelUpEvent): event is ChoiceLevelUpEvent {
-  return ['CHOOSE_SPELL', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
+  return ['CHOOSE_SPELL', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
 }
 
 export function getChoiceEvents(events: LevelUpEvent[]): ChoiceLevelUpEvent[] {
@@ -342,17 +367,6 @@ export function applyAutomaticEvents(
         const gain = baseHp + event.conBonus + event.hpFlatBonus
         updated.hp.max += Math.max(gain, 1)
         updated.hp.current += Math.max(gain, 1)
-        break
-      }
-      case 'UPDATE_SPELL_SLOTS': {
-        // slots contains deltas — add to current max to preserve manual overrides
-        for (const [lvlStr, delta] of Object.entries(event.slots)) {
-          const lvl = parseInt(lvlStr) as SpellSlotLevel
-          if (!updated.spellSlots[lvl]) {
-            updated.spellSlots[lvl] = { max: 0, used: 0 }
-          }
-          updated.spellSlots[lvl].max += delta
-        }
         break
       }
       case 'UPDATE_WARLOCK_SLOTS': {
@@ -420,12 +434,22 @@ export function applyAutomaticEvents(
         }
         break
       }
-      case 'UPDATE_HIT_DIE': {
-        updated.hitDice = {
-          total: event.totalDice,
-          remaining: Math.min(updated.hitDice.remaining + 1, event.totalDice),
-          die: event.die,
+      case 'SET_SPELLCASTING_ABILITY': {
+        // Recorded per source so a cleric/sorcerer has two DCs. The deprecated
+        // character.spellcastingAbility is left alone: feat prerequisites still read it.
+        // Absent on characters stored before per-source lists existed
+        const sources = updated.classSpellcasting ?? {}
+        const existing = sources[event.sourceId]
+        updated.classSpellcasting = {
+          ...sources,
+          [event.sourceId]: existing
+            ? { ...existing, ability: event.ability }
+            : { ability: event.ability, origin: 'class', spells: [] },
         }
+        break
+      }
+      case 'UPDATE_HIT_DIE': {
+        updated.hitDice = addHitDieForClass(updated.hitDice, event.classId, event.die)
         break
       }
       case 'UPDATE_FEATURE_USES': {
@@ -599,8 +623,26 @@ export function applyResolvedChoices(
         }
         break
       }
-      case 'RESOLVED_OPTION': {
-        // Find the option definition from the rulepack across all subclass level events
+      case 'RESOLVED_EXPERTISE': {
+        for (const skill of choice.skills) {
+          // Expertise doubles an existing proficiency, so it only applies where the
+          // character is already proficient; granting it outright would be a free skill.
+          if ((updated.skillProficiencies[skill] ?? 0) === 1) {
+            updated.skillProficiencies[skill] = 2
+          }
+        }
+        break
+      }
+      case 'RESOLVED_SKILL': {
+        for (const skill of choice.skills) {
+          // Never downgrade: a skill already at expertise (2) stays there.
+          if ((updated.skillProficiencies[skill] ?? 0) === 0) {
+            updated.skillProficiencies[skill] = 1
+          }
+        }
+        break
+      }
+      case 'RESOLVED_OPTION': {        // Find the option definition from the rulepack across all subclass level events
         let optionName: string | undefined
         let optionDescription: string | undefined
         outer: for (const cls of rulepack.classes) {

@@ -17,7 +17,19 @@ export interface ClassEntry {
 
 export type SpellSlotLevel = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
 
-export type SpellSlots = Record<SpellSlotLevel, { max: number; used: number }>
+/**
+ * Per-level slot state. `base` is NOT stored: it is derived from the character's
+ * classes against the multiclass caster-level table, so a corrected rulepack or a new
+ * class level recomputes it. Only expenditure and manual adjustments persist — the same
+ * base/bonus split used for limited-use features.
+ */
+export interface SpellSlotState {
+  used: number
+  /** Manual adjustment (a magic item granting an extra slot). Survives levelling. */
+  bonus?: number
+}
+
+export type SpellSlots = Partial<Record<SpellSlotLevel, SpellSlotState>>
 
 export interface AttackEntry {
   id: string
@@ -59,9 +71,27 @@ export interface WildShapeState {
   limits: CreatureFormLimits
   active?: ActiveCreatureForm
 }
+/**
+ * Where a spellcasting source came from. Not every source is a class: a race, a
+ * background or a feat can grant spells that use their own ability, so the key in
+ * Character.classSpellcasting is a source id rather than always a classId.
+ */
+export type SpellcastingOrigin = 'class' | 'race' | 'background' | 'feat'
+
 export interface ClassSpellcasting {
-  ability: AbilityKey               // Spellcasting ability used for DC and attack bonus
-  spells: SpellEntry[]              // Spells known/prepared for this class
+  /** Spellcasting ability for this source's DC and attack bonus. */
+  ability: AbilityKey
+  /** Defaults to 'class' when absent, which is what existing data means. */
+  origin?: SpellcastingOrigin
+  /** Display name for a non-class source, e.g. "Infernal Legacy". */
+  label?: string
+  /**
+   * True when the player picked the ability rather than the source dictating it,
+   * so the sheet can offer to change it.
+   */
+  abilityChosen?: boolean
+  /** Spells known or prepared for this source. */
+  spells: SpellEntry[]
 }
 
 export interface SpellEntry {
@@ -127,6 +157,13 @@ export interface Currency {
   pp: number
 }
 
+export interface HitDicePool {
+  classId: string
+  die: string
+  total: number
+  remaining: number
+}
+
 export interface DeathSaves {
   successes: number   // 0-3
   failures: number    // 0-3
@@ -151,7 +188,11 @@ export interface Character {
   armorClass: number | null             // null = use computed value
   speeds: { walk: number; climb?: number; swim?: number; fly?: number }
   initiative: number | null             // null = use dex modifier
-  hitDice: { total: number; remaining: number; die: string }
+  /**
+   * One pool per class. A fighter/wizard spends d10s and d6s separately, so a single
+   * pool cannot represent them. Ordered to match `classes`.
+   */
+  hitDice: HitDicePool[]
   deathSaves: DeathSaves
   conditions: string[]
 

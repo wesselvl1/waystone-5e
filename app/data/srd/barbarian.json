@@ -37,6 +37,18 @@
           "survival"
         ]
       },
+      "multiclassing": {
+        "prerequisites": {
+          "str": 13
+        },
+        "armorProficiencies": [
+          "shields"
+        ],
+        "weaponProficiencies": [
+          "simple",
+          "martial"
+        ]
+      },
       "levels": [
         {
           "level": 1,

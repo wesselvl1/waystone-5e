@@ -105,7 +105,7 @@ async function createCharacter() {
   const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === draft.classId))
   const hasLevel1Choices = pack
     ? getChoiceEvents(resolveLevelUpEvents(
-        { abilityScores: effectiveAbilities.value, hitDice: { total: 0, remaining: 0, die: cls?.hitDie ?? 'd8' }, classes: [{ classId: draft.classId, level: 0 }], spells: [] } as any,
+        { abilityScores: effectiveAbilities.value, hitDice: [], classes: [{ classId: draft.classId, level: 0 }], spells: [] } as any,
         draft.classId, 1, pack,
       )).length > 0
     : false
@@ -136,7 +136,9 @@ async function createCharacter() {
     armorClass: null,
     speeds: selectedRace.value?.speeds ?? { walk: 30 },
     initiative: null,
-    hitDice: { total: startingLevel, remaining: startingLevel, die: cls?.hitDie ?? 'd8' },
+    hitDice: startingLevel > 0
+      ? [{ classId: draft.classId, die: cls?.hitDie ?? 'd8', total: startingLevel, remaining: startingLevel }]
+      : [],
     deathSaves: { successes: 0, failures: 0 },
     conditions: [],
 

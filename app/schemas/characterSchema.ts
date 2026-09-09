@@ -1,3 +1,4 @@
+import { migrateCharacterShape } from '~/services/characterMigration'
 import { z } from 'zod'
 
 const AbilityScoresSchema = z.object({
@@ -20,9 +21,17 @@ const SpellSlotLevelSchema = z.union([
   z.literal(6), z.literal(7), z.literal(8), z.literal(9),
 ])
 
-const SpellSlotsSchema = z.record(
+/**
+ * Slot state as stored. `max` was persisted before slots became derived from the
+ * multiclass caster-level table; it is accepted and dropped so old characters load.
+ */
+const SpellSlotsSchema = z.partialRecord(
   SpellSlotLevelSchema,
-  z.object({ max: z.number().int().min(0), used: z.number().int().min(0) }),
+  z.object({
+    used: z.number().int().min(0),
+    bonus: z.number().int().optional(),
+    max: z.number().int().min(0).optional(),
+  }).transform(({ used, bonus }) => (bonus === undefined ? { used } : { used, bonus })),
 )
 
 const AttackEntrySchema = z.object({
@@ -107,12 +116,20 @@ export const CharacterSchema = z.object({
     fly: z.number().int().min(0).optional(),
   }),
   initiative: z.number().nullable(),
-  hitDice: z.object({
-    total: z.number().int().min(1),
-    remaining: z.number().int().min(0),
-    die: z.string(),
-  }),
-  deathSaves: z.object({
+  // Either the pre-multiclass single pool or the per-class array; normalised below.
+  hitDice: z.union([
+    z.object({
+      total: z.number().int().min(1),
+      remaining: z.number().int().min(0),
+      die: z.string(),
+    }),
+    z.array(z.object({
+      classId: z.string(),
+      die: z.string(),
+      total: z.number().int().min(0),
+      remaining: z.number().int().min(0),
+    })),
+  ]),  deathSaves: z.object({
     successes: z.number().int().min(0).max(3),
     failures: z.number().int().min(0).max(3),
   }),
@@ -166,6 +183,6 @@ export const CharacterSchema = z.object({
   rulepackIds: z.array(z.string()),
   hpBonusPerLevel: z.number().int().min(0).optional(),
   bardicInspirationUsed: z.number().int().min(0).optional(),
-}).strip()
+}).strip().transform(c => migrateCharacterShape(c))
 
 export type CharacterInput = z.input<typeof CharacterSchema>

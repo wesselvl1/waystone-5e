@@ -24,8 +24,13 @@ pnpm test -t "applies an ASI"
 Typecheck (no npm script exists for this):
 
 ```bash
-pnpm exec vue-tsc --noEmit -p tsconfig.json
+pnpm exec vue-tsc -b --force
 ```
+
+**Build mode (`-b`) is required.** `tsconfig.json` has `"files": []` plus `"references"`, so
+`vue-tsc --noEmit -p tsconfig.json` type-checks *nothing* and exits 0 — it silently passes
+even with dozens of real errors, including template errors in `.vue` files. Note `tests/`
+is not covered by either form, since the `.nuxt` project configs only include `app/`.
 
 `@antfu/eslint-config` and `eslint` are installed but there is **no `eslint.config.*` file and no `lint` script** — `pnpm exec eslint .` fails. Don't tell the user to run lint; match surrounding style manually.
 
@@ -39,13 +44,13 @@ Nuxt 4 with `ssr: false` — a pure client-side SPA/PWA. There is no backend and
 
 Game content is data, not code. A **rulepack** (`app/types/rulepack.ts`) holds races, classes, subclasses, backgrounds, feats, spells and optional features. Characters store only ids (`race`, `background`, `classes[].classId`, `spells[].spellId`) plus denormalized display names so a sheet still renders if a pack is missing.
 
-`RulepackSchema` (`app/schemas/rulepackSchema.ts`) is actually a **fragment** schema: every content array is optional and defaults to `[]`, and it accepts top-level `subclasses` / `subraces` arrays whose entries carry a `classId` / `raceId`. `useRulepacksStore().add(fragment)` merges a fragment into an existing pack **by matching `id`** (`mergeById`, incoming wins) and distributes those patch entries into the target class/race. This is how the bundled SRD is assembled from seven separate JSON files that all share `"id": "srd-5.1"`.
+`RulepackSchema` (`app/schemas/rulepackSchema.ts`) is actually a **fragment** schema: every content array is optional and defaults to `[]`, and it accepts top-level `subclasses` / `subraces` arrays whose entries carry a `classId` / `raceId`. `useRulepacksStore().add(fragment)` merges a fragment into an existing pack **by matching `id`** (`mergeById`, incoming wins) and distributes those patch entries into the target class/race. This is how the bundled SRD is assembled from the JSON files in `app/data/srd/`, which all share `"id": "srd-5.1"`. There is one fragment per class (`fighter.json`, `wizard.json`, …), each carrying its own subclasses nested inside the class, plus `races.json`, `subraces.json`, `backgrounds.json`, `feats.json`, `spells.json` and `beasts.json`. No SRD fragment uses the top-level `subclasses` patch array any more — `subraces.json` is the only remaining patch fragment.
 
-The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
+The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass`, `getAllCreatures`, `getCreature`, `getCreaturesMatching` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
 
 ### SRD seeding
 
-`app/plugins/srd-loader.client.ts` merges the files in `app/data/srd/` in a fixed order (`races → subraces → classes → subclasses → backgrounds → feats → spells`) on client startup. Re-seeding is gated by two things: the pack's `version` field and a `SRD_SEED_REVISION` constant tracked in `localStorage`.
+`app/plugins/srd-loader.client.ts` merges the files in `app/data/srd/` on client startup. Only `SRD_FRAGMENT_ORDER` (`races`, then `subraces`) is ordered, because a patch fragment must follow the fragment defining its target; everything else is self-contained and loads alphabetically after. The loader globs the directory rather than importing each file, so adding a fragment needs no loader change. Re-seeding is gated by two things: the pack's `version` field and a `SRD_SEED_REVISION` constant tracked in `localStorage`.
 
 **When you change anything in `app/data/srd/*.json`, bump `SRD_SEED_REVISION` in the loader** — otherwise existing users keep their stale IndexedDB copy. Load order matters: a fragment that patches a class (e.g. `subclasses.json`) must come after the fragment that defines it.
 
@@ -63,7 +68,9 @@ There are three distinct type families here — `*EventDef` (JSON/rulepack), `*E
 
 Non-obvious rules encoded in that service:
 
-- **Regular spell slots are applied as deltas** against the previous level's table so manual/magic-item overrides survive; **warlock `pactMagic` slots are absolute** and live in `character.warlockSlots`, separate from `character.spellSlots`.
+- **Regular spell slots are derived, not stored.** `baseSpellSlots()` in `app/services/spellcasting.ts` reads them off the character's classes: full casters count fully, half casters halve rounded down, pact magic not at all. With a *single* spellcasting class that class's own table applies — a paladin 5 has four 1st- and two 2nd-level slots, where a caster level of 2 would give three 1st only. `character.spellSlots` persists only `used` plus an optional manual `bonus`, so no level-up event writes slots. **Warlock `pactMagic` slots are absolute** and live in `character.warlockSlots`, separate from `character.spellSlots`.
+- Slots come from the combined caster level, but **what a class may learn is capped by that class's own level** (`maxSpellLevelForClass`): a cleric 1 / wizard 1 has a 2nd-level slot yet may only prepare 1st-level spells from either list.
+- **Multiclassing** lives in `app/services/multiclass.ts`. Entering a class as an additional class grants the SRD's reduced proficiency set from `ClassDefinition.multiclassing` and never saving throws; prerequisites warn rather than block.
 - Class level tables contain placeholder feature names for subclass features ("Primal Path Feature", "Martial Archetype"). `isSubclassPlaceholder` regex-filters them out when the character's subclass supplies real features at that level.
 - Changing CON (via ASI or feat) retroactively adjusts `hp.max`/`hp.current` by the modifier delta × total level. Feats with `hpBonusPerLevel` (Tough) apply retroactively *and* set `character.hpBonusPerLevel` for future level-ups.
 
@@ -77,13 +84,17 @@ Dexie cannot structured-clone Vue reactive proxies. Anything going into IndexedD
 
 `app/pages/characters/[id]/index.vue` also runs `repairFeatures()` on load — back-filling missing `description`/`usesMax`/`recharge` on stored features from the rulepack's `featureDefinitions` and re-saving. This is the migration mechanism for characters created before feature data was enriched; there is no Dexie version migration (schema is still `version(1)`).
 
+**Shape migrations go in `app/services/characterMigration.ts`.** The characters store reads raw from Dexie in *both* `loadAll` and `getById`, so a migration placed only in `CharacterSchema` never runs for stored characters — the schema guards the import boundary alone. `migrateCharacterShape()` is called from both the store and the schema's transform so there is one implementation, and it is deliberately tolerant: it never rejects a character.
+
 ### Validation boundary
 
 All external JSON (character import, rulepack import from file or URL) goes through Zod in `app/services/characterIO.ts` / `rulepackImport.ts`. `importFromUrl` restricts to http/https and uses `credentials: 'omit'`; the *caller* is responsible for showing the URL to the user for confirmation before fetching (documented anti-SSRF contract in that file). `CharacterSchema` must stay in sync with `app/types/character.ts` by hand — they are separate declarations.
 
 ## Notes
 
-- All seven SRD fragments declare `"version": "5.1"`. Keep them in sync — the loader reads the version from `races.json` only, so a mismatch there silently changes re-seed behavior for existing users.
-- `Character` carries a few deprecated/transitional fields: `spellcastingAbility` (superseded by `classSpellcasting[classId].ability`, but still what `useCharacterStats` reads for spell DC/attack and what feat `spellcasting` prerequisites check) and a flat `spells` array alongside per-class lists.
+- Every SRD fragment declares `"version": "5.1"`. Keep them in sync — the loader reads the version from `races.json` only, so a mismatch there silently changes re-seed behavior for existing users.
+- `Character` carries a few deprecated/transitional fields. `spellcastingAbility` is superseded by `classSpellcasting[sourceId].ability`, which `SpellsPanel` now reads so a multiclass caster gets a DC per list; the old field is still what `useCharacterStats` exposes as `spellSaveDC`/`spellAttackBonus` and what feat `spellcasting` prerequisites check, so it is written at creation and left alone. The flat `spells` array is still the source the sheet renders from; `classSpellcasting` carries the per-source ability and is populated by migration and by `SET_SPELLCASTING_ABILITY` on level-up.
+- `classSpellcasting` is keyed by *source*, not strictly by class: entries carry `origin` (`class` | `race` | `background` | `feat`), an optional `label`, and `abilityChosen`, so a race or background grant can use its own ability without another shape change.
+- `Character.hitDice` is one pool **per class** (`HitDicePool[]`), because a fighter/wizard spends d10s and d6s separately. A long rest recovers half the character's total, largest die first.
 - Tailwind uses a custom dark palette (`surface`, `primary`, `accent`, `danger`, `success`) in `tailwind.config.ts` with `darkMode: 'class'`; the app is dark-only in practice. Prefer these tokens over raw hex/slate values in new components.
 - The sheet is mobile-first: five tabs with touch-swipe navigation implemented in `app/pages/characters/[id]/index.vue`; tab components in `app/components/sheet/` receive the character and emit `update` patches upward (the page owns saving).

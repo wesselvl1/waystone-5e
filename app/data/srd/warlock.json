@@ -37,6 +37,17 @@
           "religion"
         ]
       },
+      "multiclassing": {
+        "prerequisites": {
+          "cha": 13
+        },
+        "armorProficiencies": [
+          "light"
+        ],
+        "weaponProficiencies": [
+          "simple"
+        ]
+      },
       "levels": [
         {
           "level": 1,

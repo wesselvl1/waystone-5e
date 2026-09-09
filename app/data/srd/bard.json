@@ -53,6 +53,43 @@
           "survival"
         ]
       },
+      "multiclassing": {
+        "prerequisites": {
+          "cha": 13
+        },
+        "armorProficiencies": [
+          "light"
+        ],
+        "skillChoices": {
+          "count": 1,
+          "from": [
+            "acrobatics",
+            "animalHandling",
+            "arcana",
+            "athletics",
+            "deception",
+            "history",
+            "insight",
+            "intimidation",
+            "investigation",
+            "medicine",
+            "nature",
+            "perception",
+            "performance",
+            "persuasion",
+            "religion",
+            "sleightOfHand",
+            "stealth",
+            "survival"
+          ]
+        },
+        "toolChoices": [
+          {
+            "count": 1,
+            "label": "musical instrument"
+          }
+        ]
+      },
       "levels": [
         {
           "level": 1,

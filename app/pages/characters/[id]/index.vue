@@ -129,13 +129,19 @@ async function doLongRest() {
       return { ...f, usesRemaining: featureUsesMax(f) }
     return f
   })
-  const hitDice = {
-    ...character.value.hitDice,
-    remaining: Math.min(
-      character.value.hitDice.total,
-      character.value.hitDice.remaining + Math.max(1, Math.floor(character.value.hitDice.total / 2)),
-    ),
-  }
+  // A long rest recovers half the character's TOTAL hit dice, minimum one. Which pools
+  // those come back in is the player's choice in the rules; recovering the largest dice
+  // first is the conventional default and needs no prompt.
+  const totalDice = character.value.hitDice.reduce((s, p) => s + p.total, 0)
+  let toRecover = Math.max(1, Math.floor(totalDice / 2))
+  const hitDice = [...character.value.hitDice]
+    .sort((a, b) => Number.parseInt(b.die.slice(1)) - Number.parseInt(a.die.slice(1)))
+    .map((p) => {
+      const spent = p.total - p.remaining
+      const give = Math.min(spent, toRecover)
+      toRecover -= give
+      return { ...p, remaining: p.remaining + give }
+    })
   const hp = { ...character.value.hp, current: character.value.hp.max }
   // Regular spell slots recharge on a long rest
   const spellSlots = Object.fromEntries(

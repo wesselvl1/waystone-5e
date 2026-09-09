@@ -114,6 +114,8 @@ export interface ClassDefinition {
   weaponProficiencies: string[]
   toolProficiencies: string[]
   skillChoices: { count: number; from: SkillKey[] }
+  /** Absent means the class cannot be multiclassed into. */
+  multiclassing?: MulticlassingRules
   spellcastingAbility?: AbilityKey
   isFullCaster?: boolean
   isHalfCaster?: boolean
@@ -192,6 +194,27 @@ export interface CreatureFilter {
   allowFly?: boolean
   /** Restrict to these creature ids exactly, ignoring the other fields. */
   ids?: string[]
+}
+/**
+ * What a class demands and grants when taken as an additional class rather than at
+ * character creation. The SRD grants a reduced proficiency set on multiclassing — never
+ * saving throws, and often fewer armour, weapon and skill proficiencies.
+ */
+export interface MulticlassingRules {
+  /** Every listed minimum must be met (monk needs both DEX 13 and WIS 13). */
+  prerequisites?: Partial<Record<AbilityKey, number>>
+  /** Any `choose` of these suffice (fighter needs STR 13 *or* DEX 13). */
+  prerequisiteOptions?: {
+    choose: number
+    from: Array<{ ability: AbilityKey; minimum: number }>
+  }
+  armorProficiencies?: string[]
+  weaponProficiencies?: string[]
+  toolProficiencies?: string[]
+  /** Usually a single skill, versus the two or more granted at creation. */
+  skillChoices?: { count: number; from: SkillKey[] }
+  /** Free-text choices with no machine-checkable option list (bard's instrument). */
+  toolChoices?: Array<{ count: number; label: string }>
 }
 export interface Background {
   id: string
