@@ -1,6 +1,8 @@
 import type { AbilityKey, Character, ClassEntry, SpellSlotLevel, SpellSlots } from '~/types/character'
 import type { ClassDefinition, Rulepack } from '~/types/rulepack'
-import { preparedBonusTotal } from '~/utils/preparedSpells'
+import {
+  spellLimitBonusTotal, preparedSpellCount, knownSpellCount,
+} from '~/utils/spellLimits'
 
 const SLOT_LEVELS: SpellSlotLevel[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -158,7 +160,7 @@ export function preparesSpells(def: ClassDefinition | undefined): boolean {
  */
 export function preparedSpellLimit(
   sourceId: string,
-  character: Pick<Character, 'classes' | 'preparedBonuses'>,
+  character: Pick<Character, 'classes' | 'spellLimitBonuses'>,
   rulepack: Rulepack,
   abilityMod: number,
 ): number | null {
@@ -170,5 +172,71 @@ export function preparedSpellLimit(
 
   const divisor = def!.spellPreparation!.levelDivisor ?? 1
   const base = Math.max(1, abilityMod + Math.floor(entry.level / divisor))
-  return Math.max(1, base + preparedBonusTotal(character, sourceId))
+  return Math.max(1, base + spellLimitBonusTotal(character, sourceId))
+}
+
+/**
+ * How many spells a known-list class may have learned at its current level, read off its
+ * own level table plus any manual bonus.
+ *
+ * Returns null for a class that prepares instead, or for a source with no class behind it.
+ * Ranger 1 legitimately knows none, so 0 is a real answer and not the same as null.
+ */
+export function knownSpellLimit(
+  sourceId: string,
+  character: Pick<Character, 'classes' | 'spellLimitBonuses'>,
+  rulepack: Rulepack,
+): number | null {
+  const entry = character.classes.find(c => c.classId === sourceId)
+  if (!entry) return null
+
+  const def = rulepack.classes.find(c => c.id === sourceId)
+  if (def?.spellPreparation?.kind !== 'known') return null
+
+  const base = def.levels.find(l => l.level === entry.level)?.spellsKnown
+  if (base === undefined) return null
+  return Math.max(0, base + spellLimitBonusTotal(character, sourceId))
+}
+
+/** Whichever limit a spell list actually has, with what it currently holds. */
+export interface SpellListLimit {
+  kind: 'prepared' | 'known'
+  used: number
+  max: number
+  bonus: number
+}
+
+/**
+ * The one limit worth showing for a spell list: how many spells it may prepare, or how
+ * many it may know. Null for a list with neither — a race or background grant, or a
+ * known-list class whose table names no number at this level.
+ *
+ * Both kinds are reported the same way so the sheet renders one counter rather than two
+ * near-identical ones. Which kind it is decides the label, since knowing you are at the
+ * cap is what matters when swapping spells around at a table that allows it.
+ */
+export function spellListLimit(
+  sourceId: string,
+  character: Pick<Character, 'classes' | 'spells' | 'spellLimitBonuses'>,
+  rulepack: Rulepack,
+  abilityMod: number,
+): SpellListLimit | null {
+  const bonus = spellLimitBonusTotal(character, sourceId)
+
+  const prepared = preparedSpellLimit(sourceId, character, rulepack, abilityMod)
+  if (prepared !== null) {
+    return {
+      kind: 'prepared',
+      used: preparedSpellCount(character, sourceId),
+      max: prepared,
+      bonus,
+    }
+  }
+
+  const known = knownSpellLimit(sourceId, character, rulepack)
+  if (known !== null) {
+    return { kind: 'known', used: knownSpellCount(character, sourceId), max: known, bonus }
+  }
+
+  return null
 }

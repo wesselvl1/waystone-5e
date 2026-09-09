@@ -151,7 +151,7 @@ export const CharacterSchema = z.object({
   attacks: z.array(AttackEntrySchema),
   spellcastingAbility: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']).optional(),
   classSpellcasting: z.record(z.string(), ClassSpellcastingSchema).default({}),
-  preparedBonuses: z.record(z.string(), BonusesSchema).optional(),
+  spellLimitBonuses: z.record(z.string(), BonusesSchema).optional(),
   spellSlots: SpellSlotsSchema,
   warlockSlots: WarlockSlotsSchema.optional(),
   spells: z.array(SpellEntrySchema),

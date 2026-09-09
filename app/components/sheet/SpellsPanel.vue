@@ -3,8 +3,9 @@ import type { Character, SpellEntry, SpellSlotLevel, AbilityKey } from '~/types/
 import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import {
-  spellSlotMax, spellSaveDCFor, spellAttackBonusFor, preparedSpellLimit, preparesSpells,
+  spellSlotMax, spellSaveDCFor, spellAttackBonusFor, spellListLimit, preparesSpells,
 } from '~/services/spellcasting'
+import type { SpellListLimit } from '~/services/spellcasting'
 import type { FeatureUsesBonusSource } from '~/types/character'
 
 const props = defineProps<{ character: Character }>()
@@ -62,10 +63,11 @@ interface SpellcastingSource {
   ability: AbilityKey
   saveDC: number
   attackBonus: number
-  /** null when the source works from a known list, or is a race or background grant. */
-  preparedLimit: number | null
-  prepared: number
-  preparedBonus: number
+  /**
+   * How many spells this list may prepare, or may know — whichever it has. Null for a
+   * race or background grant, which has neither.
+   */
+  limit: SpellListLimit | null
 }
 
 /**
@@ -89,9 +91,7 @@ const spellcastingSources = computed<SpellcastingSource[]>(() => {
       ability,
       saveDC: spellSaveDCFor(ability, mods[ability], prof),
       attackBonus: spellAttackBonusFor(mods[ability], prof),
-      preparedLimit: preparedSpellLimit(id, char, mergedPack.value, mods[ability]),
-      prepared: preparedSpellCount(char, id),
-      preparedBonus: preparedBonusTotal(char, id),
+      limit: spellListLimit(id, char, mergedPack.value, mods[ability]),
     })
   }
 
@@ -207,19 +207,19 @@ function togglePrepared(spellId: string) {
   emit('update', { spells: updated })
 }
 
-// ── Prepared-spell limit ─────────────────────────────────────────────────────
+// ── Spell list limits ────────────────────────────────────────────────────────
 
 /** The list whose bonus editor is open, if any. */
-const editingPreparedBonus = ref<string | null>(null)
+const editingLimitBonus = ref<string | null>(null)
 
-function togglePreparedBonusEditor(sourceId: string) {
-  editingPreparedBonus.value = editingPreparedBonus.value === sourceId ? null : sourceId
+function toggleLimitBonusEditor(sourceId: string) {
+  editingLimitBonus.value = editingLimitBonus.value === sourceId ? null : sourceId
 }
 
-function adjustPreparedBonus(sourceId: string, source: FeatureUsesBonusSource, delta: number) {
-  const current = props.character.preparedBonuses?.[sourceId]?.[source] ?? 0
+function adjustLimitBonus(sourceId: string, source: FeatureUsesBonusSource, delta: number) {
+  const current = props.character.spellLimitBonuses?.[sourceId]?.[source] ?? 0
   emit('update', {
-    preparedBonuses: setPreparedBonus(props.character, sourceId, source, current + delta),
+    spellLimitBonuses: setSpellLimitBonus(props.character, sourceId, source, current + delta),
   })
 }
 
@@ -307,27 +307,31 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
               {{ source.attackBonus >= 0 ? '+' : '' }}{{ source.attackBonus }}
             </p>
           </div>
-          <!-- Only a class that prepares has a limit; a known list has none to track -->
-          <div v-if="source.preparedLimit !== null" class="w-28">
-            <p class="stat-label">Prepared</p>
+          <!--
+            One counter, labelled for whichever limit the list has: a class that prepares
+            shows how many it has prepared, one with a fixed list how many it knows. Being
+            at the cap is what matters when swapping spells at a table that allows it.
+          -->
+          <div v-if="source.limit" class="w-28">
+            <p class="stat-label">{{ source.limit.kind === 'prepared' ? 'Prepared' : 'Known' }}</p>
             <button
               class="text-sm font-semibold tabular-nums"
-              :class="source.prepared > source.preparedLimit ? 'text-danger-400' : 'text-white'"
-              :title="source.preparedBonus !== 0
-                ? `${source.preparedLimit - source.preparedBonus} base, ${source.preparedBonus > 0 ? '+' : ''}${source.preparedBonus} bonus`
+              :class="source.limit.used > source.limit.max ? 'text-danger-400' : 'text-white'"
+              :title="source.limit.bonus !== 0
+                ? `${source.limit.max - source.limit.bonus} base, ${source.limit.bonus > 0 ? '+' : ''}${source.limit.bonus} bonus`
                 : 'Add a bonus'"
-              @click="togglePreparedBonusEditor(source.id)"
+              @click="toggleLimitBonusEditor(source.id)"
             >
-              {{ source.prepared }}/{{ source.preparedLimit }}
-              <span v-if="source.preparedBonus !== 0" class="text-accent-400 text-[10px] align-super">
-                {{ source.preparedBonus > 0 ? '+' : '' }}{{ source.preparedBonus }}
+              {{ source.limit.used }}/{{ source.limit.max }}
+              <span v-if="source.limit.bonus !== 0" class="text-accent-400 text-[10px] align-super">
+                {{ source.limit.bonus > 0 ? '+' : '' }}{{ source.limit.bonus }}
               </span>
             </button>
             <div class="h-1 rounded-full bg-surface-700 mt-1 overflow-hidden">
               <div
                 class="h-full rounded-full transition-all"
-                :class="source.prepared > source.preparedLimit ? 'bg-danger-500' : 'bg-primary-500'"
-                :style="{ width: `${Math.min(100, (source.prepared / Math.max(1, source.preparedLimit)) * 100)}%` }"
+                :class="source.limit.used > source.limit.max ? 'bg-danger-500' : 'bg-primary-500'"
+                :style="{ width: `${Math.min(100, (source.limit.used / Math.max(1, source.limit.max)) * 100)}%` }"
               />
             </div>
           </div>
@@ -335,29 +339,29 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
 
         <!-- Manual bonus on the limit: survives level-ups, so an item is entered once -->
         <div
-          v-if="editingPreparedBonus === source.id && source.preparedLimit !== null"
+          v-if="editingLimitBonus === source.id && source.limit"
           class="space-y-1.5 pt-2 border-t border-surface-700"
         >
           <div
-            v-for="src in PREPARED_BONUS_SOURCES"
+            v-for="src in SPELL_LIMIT_BONUS_SOURCES"
             :key="src.key"
             class="flex items-center gap-2"
           >
             <span class="stat-label flex-1" :title="src.hint">{{ src.label }}</span>
             <button
               class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 flex items-center justify-center text-base leading-none"
-              @click="adjustPreparedBonus(source.id, src.key, -1)"
+              @click="adjustLimitBonus(source.id, src.key, -1)"
             >−</button>
             <span
               class="text-sm font-mono tabular-nums w-10 text-center"
-              :class="(character.preparedBonuses?.[source.id]?.[src.key] ?? 0) === 0 ? 'text-slate-500' : 'text-accent-400'"
+              :class="(character.spellLimitBonuses?.[source.id]?.[src.key] ?? 0) === 0 ? 'text-slate-500' : 'text-accent-400'"
             >
-              {{ (character.preparedBonuses?.[source.id]?.[src.key] ?? 0) > 0 ? '+' : ''
-              }}{{ character.preparedBonuses?.[source.id]?.[src.key] ?? 0 }}
+              {{ (character.spellLimitBonuses?.[source.id]?.[src.key] ?? 0) > 0 ? '+' : ''
+              }}{{ character.spellLimitBonuses?.[source.id]?.[src.key] ?? 0 }}
             </span>
             <button
               class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 flex items-center justify-center text-base leading-none"
-              @click="adjustPreparedBonus(source.id, src.key, 1)"
+              @click="adjustLimitBonus(source.id, src.key, 1)"
             >+</button>
           </div>
         </div>

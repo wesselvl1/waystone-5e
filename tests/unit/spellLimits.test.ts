@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
 import { CharacterSchema } from '~/schemas/characterSchema'
-import { preparedSpellLimit, preparesSpells } from '~/services/spellcasting'
 import {
-  preparedBonusTotal,
+  preparedSpellLimit, knownSpellLimit, spellListLimit, preparesSpells,
+} from '~/services/spellcasting'
+import {
+  spellLimitBonusTotal,
   preparedSpellCount,
-  setPreparedBonus,
-  PREPARED_BONUS_SOURCES,
-} from '~/utils/preparedSpells'
+  knownSpellCount,
+  setSpellLimitBonus,
+  SPELL_LIMIT_BONUS_SOURCES,
+} from '~/utils/spellLimits'
 import type { Character, SpellEntry } from '~/types/character'
 import type { Rulepack } from '~/types/rulepack'
 import { validCharacter } from '../fixtures'
@@ -143,24 +146,24 @@ describe('the prepared limit', () => {
   })
 
   it('adds a manual bonus', () => {
-    const c = { preparedBonuses: { cleric: { magic: 2 } } }
+    const c = { spellLimitBonuses: { cleric: { magic: 2 } } }
     expect(limit('cleric', 5, 3, c)).toBe(10)
   })
 
   it('sums bonuses from every source, and honours a penalty', () => {
     expect(limit('cleric', 5, 3, {
-      preparedBonuses: { cleric: { magic: 2, feat: 1, misc: -1 } },
+      spellLimitBonuses: { cleric: { magic: 2, feat: 1, misc: -1 } },
     })).toBe(10)
   })
 
   it('still never drops below one however negative the bonus', () => {
-    expect(limit('cleric', 5, 3, { preparedBonuses: { cleric: { misc: -99 } } })).toBe(1)
+    expect(limit('cleric', 5, 3, { spellLimitBonuses: { cleric: { misc: -99 } } })).toBe(1)
   })
 
   it('applies a bonus only to the list it was entered on', () => {
     const c = char({
       classes: [{ classId: 'cleric', level: 3 }, { classId: 'wizard', level: 3 }],
-      preparedBonuses: { cleric: { magic: 3 } },
+      spellLimitBonuses: { cleric: { magic: 3 } },
     })
     expect(preparedSpellLimit('cleric', c, rulepack, 3)).toBe(9)
     expect(preparedSpellLimit('wizard', c, rulepack, 3)).toBe(6)
@@ -210,51 +213,210 @@ describe('counting what is prepared', () => {
 
 describe('the bonus editor', () => {
   it('offers the same three sources as the feature-use editor', () => {
-    expect(PREPARED_BONUS_SOURCES.map(s => s.key)).toEqual(['magic', 'feat', 'misc'])
+    expect(SPELL_LIMIT_BONUS_SOURCES.map(s => s.key)).toEqual(['magic', 'feat', 'misc'])
   })
 
   it('totals nothing for a character who has never set one', () => {
-    expect(preparedBonusTotal(char(), 'cleric')).toBe(0)
+    expect(spellLimitBonusTotal(char(), 'cleric')).toBe(0)
   })
 
   it('stores a bonus under its list and source', () => {
-    const next = setPreparedBonus(char(), 'cleric', 'magic', 2)
+    const next = setSpellLimitBonus(char(), 'cleric', 'magic', 2)
     expect(next).toEqual({ cleric: { magic: 2 } })
   })
 
   it('keeps the other sources and the other lists when one changes', () => {
-    const c = char({ preparedBonuses: { cleric: { magic: 2 }, wizard: { feat: 1 } } })
-    expect(setPreparedBonus(c, 'cleric', 'misc', -1))
+    const c = char({ spellLimitBonuses: { cleric: { magic: 2 }, wizard: { feat: 1 } } })
+    expect(setSpellLimitBonus(c, 'cleric', 'misc', -1))
       .toEqual({ cleric: { magic: 2, misc: -1 }, wizard: { feat: 1 } })
   })
 
   it('drops a source set back to zero rather than storing it', () => {
-    const c = char({ preparedBonuses: { cleric: { magic: 2, feat: 1 } } })
-    expect(setPreparedBonus(c, 'cleric', 'magic', 0)).toEqual({ cleric: { feat: 1 } })
+    const c = char({ spellLimitBonuses: { cleric: { magic: 2, feat: 1 } } })
+    expect(setSpellLimitBonus(c, 'cleric', 'magic', 0)).toEqual({ cleric: { feat: 1 } })
   })
 
   it('drops the whole record once the last bonus is cleared', () => {
     // So a character who never had one stays byte-identical in IndexedDB.
-    const c = char({ preparedBonuses: { cleric: { magic: 2 } } })
-    expect(setPreparedBonus(c, 'cleric', 'magic', 0)).toBeUndefined()
+    const c = char({ spellLimitBonuses: { cleric: { magic: 2 } } })
+    expect(setSpellLimitBonus(c, 'cleric', 'magic', 0)).toBeUndefined()
   })
 
   it('does not mutate the character it was given', () => {
-    const c = char({ preparedBonuses: { cleric: { magic: 2 } } })
-    setPreparedBonus(c, 'cleric', 'feat', 3)
-    expect(c.preparedBonuses).toEqual({ cleric: { magic: 2 } })
+    const c = char({ spellLimitBonuses: { cleric: { magic: 2 } } })
+    setSpellLimitBonus(c, 'cleric', 'feat', 3)
+    expect(c.spellLimitBonuses).toEqual({ cleric: { magic: 2 } })
   })
 })
 
-describe('preparedBonuses on the schema', () => {
+describe('spellLimitBonuses on the schema', () => {
   it('round-trips', () => {
-    const c = { ...validCharacter, preparedBonuses: { cleric: { magic: 2, misc: -1 } } }
+    const c = { ...validCharacter, spellLimitBonuses: { cleric: { magic: 2, misc: -1 } } }
     const parsed = CharacterSchema.parse(JSON.parse(JSON.stringify(c)))
-    expect(parsed.preparedBonuses).toEqual({ cleric: { magic: 2, misc: -1 } })
+    expect(parsed.spellLimitBonuses).toEqual({ cleric: { magic: 2, misc: -1 } })
   })
 
   it('is optional, so characters predating it still validate', () => {
     const parsed = CharacterSchema.parse(JSON.parse(JSON.stringify(validCharacter)))
-    expect(parsed.preparedBonuses).toBeUndefined()
+    expect(parsed.spellLimitBonuses).toBeUndefined()
+  })
+})
+
+describe('the known limit', () => {
+  const limit = (classId: string, level: number, c: Partial<Character> = {}) =>
+    knownSpellLimit(classId, char({ classes: [{ classId, level }], ...c }), rulepack)
+
+  it('reads the class table', () => {
+    // SRD spells known: bard 4 at 1st, sorcerer 6 at 5th, warlock 2 at 1st.
+    expect(limit('bard', 1)).toBe(4)
+    expect(limit('sorcerer', 5)).toBe(6)
+    expect(limit('warlock', 1)).toBe(2)
+  })
+
+  it('grows with the class level', () => {
+    expect([1, 2, 3, 4, 5].map(l => limit('sorcerer', l))).toEqual([2, 3, 4, 5, 6])
+  })
+
+  it('is zero for a ranger 1, which knows none yet', () => {
+    // A real answer, not the same as "this list has no limit".
+    expect(limit('ranger', 1)).toBe(0)
+    expect(limit('ranger', 2)).toBe(2)
+  })
+
+  it('is null for a class that prepares instead', () => {
+    for (const id of ['cleric', 'druid', 'paladin', 'wizard']) {
+      expect(limit(id, 5), id).toBeNull()
+    }
+  })
+
+  it('is null for a non-caster and for a source with no class behind it', () => {
+    expect(limit('fighter', 5)).toBeNull()
+    const c = char({
+      classes: [{ classId: 'fighter', level: 3 }],
+      classSpellcasting: {
+        tiefling: { ability: 'cha', origin: 'race', label: 'Infernal Legacy', spells: [] },
+      },
+    })
+    expect(knownSpellLimit('tiefling', c, rulepack)).toBeNull()
+  })
+
+  it('takes the same manual bonus as a prepared limit', () => {
+    expect(limit('sorcerer', 5, { spellLimitBonuses: { sorcerer: { magic: 2 } } })).toBe(8)
+  })
+
+  it('never goes negative, however large the penalty', () => {
+    expect(limit('bard', 1, { spellLimitBonuses: { bard: { misc: -99 } } })).toBe(0)
+  })
+
+  it('counts each class separately for a multiclass', () => {
+    const c = char({
+      classes: [{ classId: 'bard', level: 3 }, { classId: 'sorcerer', level: 2 }],
+    })
+    expect(knownSpellLimit('bard', c, rulepack)).toBe(6)
+    expect(knownSpellLimit('sorcerer', c, rulepack)).toBe(3)
+  })
+})
+
+describe('counting what is known', () => {
+  it('counts the levelled spells on that list', () => {
+    const c = char({
+      spells: [
+        spell({ classId: 'sorcerer' }),
+        spell({ classId: 'sorcerer', prepared: false }),
+        spell({ classId: 'bard' }),
+      ],
+    })
+    // Unlike prepared, a known spell counts whether the flag is set or not
+    expect(knownSpellCount(c, 'sorcerer')).toBe(2)
+    expect(knownSpellCount(c, 'bard')).toBe(1)
+  })
+
+  it('ignores cantrips, which the SRD counts separately', () => {
+    const c = char({
+      spells: [
+        spell({ classId: 'sorcerer', level: 0 }),
+        spell({ classId: 'sorcerer', level: 1 }),
+      ],
+    })
+    expect(knownSpellCount(c, 'sorcerer')).toBe(1)
+  })
+
+  it('ignores a granted spell, which was not chosen out of the limit', () => {
+    const c = char({
+      spells: [
+        spell({ classId: 'warlock', alwaysPrepared: true }),
+        spell({ classId: 'warlock' }),
+      ],
+    })
+    expect(knownSpellCount(c, 'warlock')).toBe(1)
+  })
+})
+
+describe('the one limit a list actually has', () => {
+  const at = (classId: string, level: number, mod: number, over: Partial<Character> = {}) =>
+    spellListLimit(
+      classId,
+      char({ classes: [{ classId, level }], ...over }),
+      rulepack,
+      mod,
+    )
+
+  it('reports a preparer as prepared', () => {
+    const c = char({
+      classes: [{ classId: 'cleric', level: 5 }],
+      spells: [spell({ classId: 'cleric' }), spell({ classId: 'cleric' })],
+    })
+    expect(spellListLimit('cleric', c, rulepack, 4))
+      .toEqual({ kind: 'prepared', used: 2, max: 9, bonus: 0 })
+  })
+
+  it('reports a known-list class as known', () => {
+    const c = char({
+      classes: [{ classId: 'sorcerer', level: 5 }],
+      spells: [spell({ classId: 'sorcerer' })],
+    })
+    expect(spellListLimit('sorcerer', c, rulepack, 3))
+      .toEqual({ kind: 'known', used: 1, max: 6, bonus: 0 })
+  })
+
+  it('carries the bonus so the sheet can show base and bonus apart', () => {
+    expect(at('sorcerer', 5, 3, { spellLimitBonuses: { sorcerer: { feat: 1 } } }))
+      .toMatchObject({ kind: 'known', max: 7, bonus: 1 })
+  })
+
+  it('is null for a race grant and for a non-caster', () => {
+    const c = char({
+      classes: [{ classId: 'fighter', level: 3 }],
+      classSpellcasting: {
+        tiefling: { ability: 'cha', origin: 'race', label: 'Infernal Legacy', spells: [] },
+      },
+    })
+    expect(spellListLimit('tiefling', c, rulepack, 3)).toBeNull()
+    expect(at('fighter', 3, 0)).toBeNull()
+  })
+
+  it('gives every SRD caster class exactly one kind of limit', () => {
+    for (const cls of rulepack.classes.filter(c => c.spellcastingAbility)) {
+      const got = at(cls.id, 5, 3)
+      expect(got, cls.id).not.toBeNull()
+      expect(got!.kind, cls.id)
+        .toBe(cls.spellPreparation!.kind === 'known' ? 'known' : 'prepared')
+    }
+  })
+
+  it('gives a multiclass preparer and known-list caster one each', () => {
+    const c = char({
+      classes: [{ classId: 'cleric', level: 5 }, { classId: 'sorcerer', level: 3 }],
+      spells: [
+        spell({ classId: 'cleric' }),
+        spell({ classId: 'cleric', alwaysPrepared: true }),
+        spell({ classId: 'sorcerer' }),
+        spell({ classId: 'sorcerer' }),
+      ],
+    })
+    expect(spellListLimit('cleric', c, rulepack, 4))
+      .toEqual({ kind: 'prepared', used: 1, max: 9, bonus: 0 })
+    expect(spellListLimit('sorcerer', c, rulepack, 3))
+      .toEqual({ kind: 'known', used: 2, max: 4, bonus: 0 })
   })
 })
