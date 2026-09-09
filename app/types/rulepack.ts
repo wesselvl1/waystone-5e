@@ -377,6 +377,14 @@ export interface Rulepack {
   spells: SpellDefinition[]
   creatures: CreatureDefinition[]
   optionalFeatures: OptionalClassFeature[]
+  /**
+   * Patch entries whose target class/race lives in ANOTHER loaded pack, so they could not
+   * be distributed at merge time. They stay here, owned by the pack that supplied them,
+   * and the rulepacks store folds them in at lookup time. Keeping them on their own pack
+   * is what lets a sourcebook be listed — and removed — independently of the SRD.
+   */
+  subclasses?: SubclassPatchEntry[]
+  subraces?: SubracePatchEntry[]
 }
 
 /** A subclass entry in a patch file — carries the target classId alongside the subclass definition. */

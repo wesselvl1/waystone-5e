@@ -43,7 +43,7 @@ const nonSrdFragments = import.meta.glob<{ default: unknown }>([
  * Increment this when bundled SRD data changes in a way that requires re-seeding,
  * without changing the official SRD version number.
  */
-const SRD_SEED_REVISION = 11
+const SRD_SEED_REVISION = 12
 
 function fragmentName(path: string): string {
   return path.split('/').pop()!.replace(/\.json$/, '')
@@ -101,6 +101,12 @@ export default defineNuxtPlugin(async () => {
   const needsSeeding = existing?.version !== version || storedRevision < SRD_SEED_REVISION
 
   if (needsSeeding) {
+    // Drop the stored pack before re-merging. add() merges by id, so anything that ever
+    // merged into srd-5.1 would otherwise survive here forever — including non-SRD dev
+    // fragments from before each sourcebook declared its own pack id. The SRD ships whole
+    // in this bundle, so nothing is lost by rebuilding it from the fragments below.
+    if (existing) await rulepackStore.remove(packId)
+
     for (const path of srdPaths) {
       const result = RulepackSchema.safeParse(srdFragments[path]!.default)
       if (!result.success) {
