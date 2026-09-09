@@ -30,3 +30,6 @@ logs
 # folder under app/data is non-SRD dev data and must never enter git.
 /app/data/*
 !/app/data/srd/
+
+# MCP server config: points at an absolute path on one machine, so it is local-only
+/.mcp.json
