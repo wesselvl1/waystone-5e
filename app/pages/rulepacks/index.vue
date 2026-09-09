@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { importFromFile, importFromUrl } from '~/services/rulepackImport'
+import type { Rulepack } from '~/types/rulepack'
 
 const rulepackStore = useRulepacksStore()
 
@@ -55,6 +56,31 @@ async function confirmUrlImport() {
   }
 }
 
+/**
+ * What a pack actually contributes, skipping categories it has none of. A sourcebook pack
+ * usually holds only subclasses or subraces patched onto classes and races from another
+ * pack, so counting just races/classes/spells/feats would report it as empty.
+ */
+function packContents(pack: Rulepack) {
+  const subclasses
+    = pack.classes.reduce((n, c) => n + (c.subclasses?.length ?? 0), 0)
+    + (pack.subclasses?.length ?? 0)
+  const subraces
+    = pack.races.reduce((n, r) => n + (r.subraces?.length ?? 0), 0)
+    + (pack.subraces?.length ?? 0)
+
+  return [
+    { label: 'races', count: pack.races.length },
+    { label: 'subraces', count: subraces },
+    { label: 'classes', count: pack.classes.length },
+    { label: 'subclasses', count: subclasses },
+    { label: 'backgrounds', count: pack.backgrounds.length },
+    { label: 'feats', count: pack.feats.length },
+    { label: 'spells', count: pack.spells.length },
+    { label: 'optional features', count: pack.optionalFeatures.length },
+  ].filter(entry => entry.count > 0)
+}
+
 async function removePack(id: string, name: string) {
   if (!confirm(`Remove "${name}"? Characters using it won't be affected but lookups will break.`)) return
   await rulepackStore.remove(id)
@@ -105,11 +131,9 @@ async function removePack(id: string, name: string) {
             <p class="font-semibold text-white">{{ pack.name }}</p>
             <p class="text-xs text-slate-500 mt-0.5">v{{ pack.version }}<span v-if="pack.author"> · {{ pack.author }}</span></p>
             <p v-if="pack.description" class="text-xs text-slate-400 mt-1">{{ pack.description }}</p>
-            <div class="flex gap-3 mt-2 text-[11px] text-slate-500">
-              <span>{{ pack.races.length }} races</span>
-              <span>{{ pack.classes.length }} classes</span>
-              <span>{{ pack.spells.length }} spells</span>
-              <span>{{ pack.feats.length }} feats</span>
+            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-slate-500">
+              <span v-for="entry in packContents(pack)" :key="entry.label">{{ entry.count }} {{ entry.label }}</span>
+              <span v-if="packContents(pack).length === 0">empty</span>
             </div>
           </NuxtLink>
           <button class="btn-danger flex-shrink-0 p-2" @click="removePack(pack.id, pack.name)">

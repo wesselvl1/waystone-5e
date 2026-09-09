@@ -69,20 +69,13 @@ function initWizard() {
   }
 }
 
-/** All loaded packs as one, since a class may come from any of them. */
+/**
+ * All loaded packs as one, since a class may come from any of them — and a sourcebook
+ * pack may attach a subclass to a class defined in another pack, so picking the single
+ * pack that declares the class would lose that subclass.
+ */
 function mergedPack() {
-  return {
-    id: 'merged',
-    name: 'merged',
-    version: '0',
-    races: [],
-    classes: rulepackStore.rulepacks.flatMap(p => p.classes),
-    backgrounds: [],
-    feats: [],
-    spells: [],
-    creatures: [],
-    optionalFeatures: [],
-  }
+  return rulepackStore.composedPack()
 }
 
 // ── Multiclassing ─────────────────────────────────────────────────────────────
@@ -120,9 +113,7 @@ function resolveEvents() {
   const currentEntry = character.value.classes.find(c => c.classId === targetClassId.value)
   const newLevel = ((currentEntry?.level) ?? 0) + 1
 
-  // Find the rulepack that has this class
-  const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === targetClassId.value))
-  if (!pack) return
+  const pack = mergedPack()
 
   allEvents.value = resolveLevelUpEvents(
     character.value,
@@ -391,15 +382,15 @@ function confirmSubclass() {
   selectedSubclassId.value = ''
 
   // Inject subclass-level choice events for this level now that we know the subclass
-  const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === targetClassId.value))
-  const subclassDef = pack?.classes.flatMap(c => c.subclasses ?? []).find(s => s.id === subclassId)
+  const pack = mergedPack()
+  const subclassDef = pack.classes.flatMap(c => c.subclasses ?? []).find(s => s.id === subclassId)
   const subclassLevelDef = subclassDef?.levels.find(l => l.level === targetLevel.value)
   const injected: ChoiceLevelUpEvent[] = []
   for (const eventDef of subclassLevelDef?.levelUpEvents ?? []) {
     if (eventDef.type === 'CHOOSE_OPTION') {
       // Through the service, so an option already taken from the same pool is dropped here
       // too rather than only on the paths that go via resolveLevelUpEvents.
-      const choice = pack && character.value
+      const choice = character.value
         ? resolveOptionChoice(eventDef, toRaw(character.value), pack)
         : undefined
       if (choice) injected.push(choice)
@@ -443,9 +434,7 @@ async function applyLevelUp() {
   if (!character.value) return
   saving.value = true
 
-  // Find the rulepack
-  const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === targetClassId.value))
-  if (!pack) { saving.value = false; return }
+  const pack = mergedPack()
 
   // Apply automatic events (toRaw strips the Vue Proxy so structuredClone can clone it)
   let updated = applyAutomaticEvents(toRaw(character.value), automaticEvents.value, hpChoice.value, hpChoice.value === 'manual' ? manualHp.value : undefined)

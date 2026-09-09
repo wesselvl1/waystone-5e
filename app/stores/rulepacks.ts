@@ -1,14 +1,8 @@
 import { defineStore } from 'pinia'
 import { db } from '~/db'
-import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter } from '~/types/rulepack'
+import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
-
-/** Merge two arrays by id — incoming items overwrite existing ones with the same id. */
-function mergeById<T extends { id: string }>(existing: T[], incoming: T[]): T[] {
-  const map = new Map(existing.map(item => [item.id, item]))
-  for (const item of incoming) map.set(item.id, item)
-  return [...map.values()]
-}
+import { mergeById, distributeSubclasses, distributeSubraces } from '~/services/rulepackMerge'
 
 /**
  * Apply a parsed rulepack fragment onto an existing fully-hydrated Rulepack.
@@ -16,31 +10,11 @@ function mergeById<T extends { id: string }>(existing: T[], incoming: T[]): T[] 
  */
 function applyFragment(existing: Rulepack, fragment: RulepackFragment): Rulepack {
   // Merge all regular content arrays (incoming overwrites by id)
-  let classes = mergeById(existing.classes, fragment.classes ?? [])
+  const classes = mergeById(existing.classes, fragment.classes ?? [])
+  const pendingSubclasses = distributeSubclasses(classes, fragment.subclasses ?? [])
 
-  // Distribute top-level subclass patches to their target classes
-  for (const { classId, ...subclassDef } of fragment.subclasses ?? []) {
-    const cls = classes.find(c => c.id === classId)
-    if (cls) {
-      cls.subclasses = mergeById(cls.subclasses ?? [], [subclassDef])
-    }
-    else {
-      console.warn(`[Waystone] Subclass "${subclassDef.id}" targets class "${classId}" which is not in rulepack "${existing.id}".`)
-    }
-  }
-
-  let races = mergeById(existing.races, fragment.races ?? [])
-
-  // Distribute top-level subrace patches to their target races
-  for (const { raceId, ...subraceDef } of fragment.subraces ?? []) {
-    const race = races.find(r => r.id === raceId)
-    if (race) {
-      race.subraces = mergeById(race.subraces ?? [], [subraceDef])
-    }
-    else {
-      console.warn(`[Waystone] Subrace "${subraceDef.id}" targets race "${raceId}" which is not in rulepack "${existing.id}".`)
-    }
-  }
+  const races = mergeById(existing.races, fragment.races ?? [])
+  const pendingSubraces = distributeSubraces(races, fragment.subraces ?? [])
 
   return {
     ...existing,
@@ -54,34 +28,18 @@ function applyFragment(existing: Rulepack, fragment: RulepackFragment): Rulepack
     spells: mergeById(existing.spells, fragment.spells ?? []),
     creatures: mergeById(existing.creatures ?? [], fragment.creatures ?? []),
     optionalFeatures: mergeById(existing.optionalFeatures, fragment.optionalFeatures ?? []),
+    subclasses: mergeById(existing.subclasses ?? [], pendingSubclasses),
+    subraces: mergeById(existing.subraces ?? [], pendingSubraces),
   }
 }
 
 /** Convert a fragment into a fresh Rulepack, distributing any top-level subclass patches. */
 function fragmentToRulepack(fragment: RulepackFragment): Rulepack {
   const classes = (fragment.classes ?? []).map(cls => ({ ...cls }))
-
-  for (const { classId, ...subclassDef } of fragment.subclasses ?? []) {
-    const cls = classes.find(c => c.id === classId)
-    if (cls) {
-      cls.subclasses = mergeById(cls.subclasses ?? [], [subclassDef])
-    }
-    else {
-      console.warn(`[Waystone] Subclass "${subclassDef.id}" targets class "${classId}" which was not found in the fragment.`)
-    }
-  }
+  const pendingSubclasses = distributeSubclasses(classes, fragment.subclasses ?? [])
 
   const races = (fragment.races ?? []).map(r => ({ ...r }))
-
-  for (const { raceId, ...subraceDef } of fragment.subraces ?? []) {
-    const race = races.find(r => r.id === raceId)
-    if (race) {
-      race.subraces = mergeById(race.subraces ?? [], [subraceDef])
-    }
-    else {
-      console.warn(`[Waystone] Subrace "${subraceDef.id}" targets race "${raceId}" which was not found in the fragment.`)
-    }
-  }
+  const pendingSubraces = distributeSubraces(races, fragment.subraces ?? [])
 
   return {
     id: fragment.id,
@@ -96,6 +54,8 @@ function fragmentToRulepack(fragment: RulepackFragment): Rulepack {
     spells: fragment.spells ?? [],
     creatures: fragment.creatures ?? [],
     optionalFeatures: fragment.optionalFeatures ?? [],
+    subclasses: pendingSubclasses,
+    subraces: pendingSubraces,
   }
 }
 
@@ -139,17 +99,46 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     return rulepacks.value.find(r => r.id === id)
   }
 
+  /** Cross-pack subclass patches aimed at a class, from every loaded pack. */
+  function pendingSubclassesFor(classId: string): SubclassDefinition[] {
+    return rulepacks.value.flatMap(p =>
+      (p.subclasses ?? [])
+        .filter(entry => entry.classId === classId)
+        .map(({ classId: _classId, ...sub }) => sub),
+    )
+  }
+
+  /** Cross-pack subrace patches aimed at a race, from every loaded pack. */
+  function pendingSubracesFor(raceId: string) {
+    return rulepacks.value.flatMap(p =>
+      (p.subraces ?? [])
+        .filter(entry => entry.raceId === raceId)
+        .map(({ raceId: _raceId, ...sub }) => sub),
+    )
+  }
+
+  /**
+   * A race with subraces contributed by other packs folded in. The stored pack is never
+   * written to, so removing the pack that supplied a subrace removes the subrace with it.
+   */
   function getRace(raceId: string): Race | undefined {
     for (const pack of rulepacks.value) {
       const race = pack.races.find(r => r.id === raceId)
-      if (race) return race
+      if (!race) continue
+      const pending = pendingSubracesFor(raceId)
+      if (pending.length === 0) return race
+      return { ...race, subraces: mergeById(race.subraces ?? [], pending) }
     }
   }
 
+  /** As getRace, for classes: subclasses from sourcebook packs are folded in on read. */
   function getClass(classId: string): ClassDefinition | undefined {
     for (const pack of rulepacks.value) {
       const cls = pack.classes.find(c => c.id === classId)
-      if (cls) return cls
+      if (!cls) continue
+      const pending = pendingSubclassesFor(classId)
+      if (pending.length === 0) return cls
+      return { ...cls, subclasses: mergeById(cls.subclasses ?? [], pending) }
     }
   }
 
@@ -239,6 +228,35 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
         const sub = cls.subclasses?.find(s => s.id === subclassId)
         if (sub) return sub
       }
+      const { classId: _classId, ...patch }
+        = (pack.subclasses ?? []).find(s => s.id === subclassId) ?? { classId: '' }
+      if ('id' in patch) return patch as SubclassDefinition
+    }
+  }
+
+  /**
+   * Every loaded pack folded into one, with cross-pack patches resolved. The level-up
+   * pipeline takes a single Rulepack, so anything spanning packs — a sourcebook subclass
+   * on an SRD class, a feature granting an SRD spell — has to be handed this rather than
+   * whichever individual pack happened to define the class.
+   */
+  function composedPack(): Rulepack {
+    const classes = rulepacks.value.flatMap(p => p.classes.map(c => ({ ...c })))
+    const races = rulepacks.value.flatMap(p => p.races.map(r => ({ ...r })))
+    distributeSubclasses(classes, rulepacks.value.flatMap(p => p.subclasses ?? []))
+    distributeSubraces(races, rulepacks.value.flatMap(p => p.subraces ?? []))
+
+    return {
+      id: 'composed',
+      name: 'All loaded rulepacks',
+      version: '0',
+      races,
+      classes,
+      backgrounds: getAllBackgrounds(),
+      feats: getAllFeats(),
+      spells: getAllSpells(),
+      creatures: getAllCreatures(),
+      optionalFeatures: rulepacks.value.flatMap(p => p.optionalFeatures),
     }
   }
 
@@ -282,6 +300,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     getAllBackgrounds,
     getSubclassesForClass,
     getSubclass,
+    composedPack,
     getOptionalFeaturesForClass,
   }
 })
