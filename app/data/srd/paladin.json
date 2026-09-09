@@ -15,6 +15,10 @@
       ],
       "spellcastingAbility": "cha",
       "isHalfCaster": true,
+      "spellPreparation": {
+        "kind": "prepared",
+        "levelDivisor": 2
+      },
       "savingThrowProficiencies": [
         "wis",
         "cha"

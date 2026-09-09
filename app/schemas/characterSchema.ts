@@ -64,17 +64,20 @@ const SpellEntrySchema = z.object({
   classId: z.string().optional(),
 })
 
+/** The three manual bonus sources, shared by feature uses and prepared-spell limits. */
+const BonusesSchema = z.object({
+  magic: z.number().int().optional(),
+  feat: z.number().int().optional(),
+  misc: z.number().int().optional(),
+})
+
 const FeatureSchema = z.object({
   id: z.string(),
   name: z.string(),
   source: z.string(),
   description: z.string(),
   usesMax: z.number().optional(),
-  usesBonuses: z.object({
-    magic: z.number().int().optional(),
-    feat: z.number().int().optional(),
-    misc: z.number().int().optional(),
-  }).optional(),
+  usesBonuses: BonusesSchema.optional(),
   usesRemaining: z.number().optional(),
   recharge: z.enum(['short', 'long', 'dawn']).optional(),
 })
@@ -148,6 +151,7 @@ export const CharacterSchema = z.object({
   attacks: z.array(AttackEntrySchema),
   spellcastingAbility: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']).optional(),
   classSpellcasting: z.record(z.string(), ClassSpellcastingSchema).default({}),
+  preparedBonuses: z.record(z.string(), BonusesSchema).optional(),
   spellSlots: SpellSlotsSchema,
   warlockSlots: WarlockSlotsSchema.optional(),
   spells: z.array(SpellEntrySchema),

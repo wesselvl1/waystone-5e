@@ -1,5 +1,6 @@
 import type { AbilityKey, Character, ClassEntry, SpellSlotLevel, SpellSlots } from '~/types/character'
 import type { ClassDefinition, Rulepack } from '~/types/rulepack'
+import { preparedBonusTotal } from '~/utils/preparedSpells'
 
 const SLOT_LEVELS: SpellSlotLevel[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -133,4 +134,41 @@ export function clampSpellSlots(
     out[lvl] = state.bonus === undefined ? { used } : { used, bonus: state.bonus }
   }
   return out
+}
+
+/**
+ * Whether a spellcasting source prepares spells each day, or works from a fixed list of
+ * known ones.
+ *
+ * Only a class can prepare: a race or background grant has no class definition behind it,
+ * and its spells are always prepared by their nature.
+ */
+export function preparesSpells(def: ClassDefinition | undefined): boolean {
+  return def?.spellPreparation?.kind === 'prepared'
+}
+
+/**
+ * How many spells a list may have prepared: the spellcasting ability modifier plus the
+ * class level over its divisor (1 for cleric, druid and wizard; 2 for paladin), never
+ * below one, plus any manual bonus.
+ *
+ * Returns null when the source does not prepare at all — a known-list class such as
+ * sorcerer, or a race or background grant. Callers use null to mean "show no limit"
+ * rather than a limit of zero.
+ */
+export function preparedSpellLimit(
+  sourceId: string,
+  character: Pick<Character, 'classes' | 'preparedBonuses'>,
+  rulepack: Rulepack,
+  abilityMod: number,
+): number | null {
+  const entry = character.classes.find(c => c.classId === sourceId)
+  if (!entry) return null
+
+  const def = rulepack.classes.find(c => c.id === sourceId)
+  if (!preparesSpells(def)) return null
+
+  const divisor = def!.spellPreparation!.levelDivisor ?? 1
+  const base = Math.max(1, abilityMod + Math.floor(entry.level / divisor))
+  return Math.max(1, base + preparedBonusTotal(character, sourceId))
 }

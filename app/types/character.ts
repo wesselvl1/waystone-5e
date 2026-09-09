@@ -213,6 +213,13 @@ export interface Character {
   /** @deprecated Use classSpellcasting[classId].ability for per-class DC tracking. */
   spellcastingAbility?: AbilityKey
   classSpellcasting: Record<string, ClassSpellcasting>   // Keyed by classId
+  /**
+   * Manual additions to a source's prepared-spell limit, keyed by spellcasting source
+   * id then by where the bonus comes from. The limit itself is derived from the class
+   * and ability modifier, so these are the only part that has to persist — and being
+   * separate they survive a level-up without re-applying, like feature-use bonuses.
+   */
+  preparedBonuses?: Record<string, FeatureUsesBonuses>
   spellSlots: SpellSlots
   warlockSlots?: WarlockSlots           // Pact magic slots — separate from regular slots
   spells: SpellEntry[]
