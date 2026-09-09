@@ -158,6 +158,16 @@ export interface SubclassDefinition {
   levels: SubclassLevel[]
 }
 
+/**
+ * How a class comes by its spells. `known` classes have a fixed list; `prepared`
+ * classes choose from a larger one each day.
+ */
+export interface SpellPreparation {
+  kind: 'known' | 'prepared'
+  /** Only meaningful for `prepared`; defaults to 1 (the whole class level counts). */
+  levelDivisor?: number
+}
+
 export interface ClassFeatureDefinition {
   name: string
   description: string
@@ -182,6 +192,13 @@ export interface ClassDefinition {
   isFullCaster?: boolean
   isHalfCaster?: boolean
   pactMagic?: boolean                  // Warlock-style pact magic (slots separate from regular slots)
+  /**
+   * How the class comes by its spells. A `known` class has a fixed list and never
+   * prepares, so the sheet shows no prepared toggle for it. A `prepared` class prepares
+   * `spellcasting ability modifier + floor(class level / levelDivisor)` each day,
+   * minimum one — the divisor is 1 for cleric, druid and wizard, 2 for paladin.
+   */
+  spellPreparation?: SpellPreparation
   levels: ClassLevel[]                 // index 0 = level 1
   featureDefinitions?: ClassFeatureDefinition[]
   subclasses?: SubclassDefinition[]

@@ -15,6 +15,9 @@
       ],
       "spellcastingAbility": "wis",
       "isHalfCaster": true,
+      "spellPreparation": {
+        "kind": "known"
+      },
       "savingThrowProficiencies": [
         "str",
         "dex"

@@ -2,7 +2,11 @@
 import type { Character, SpellEntry, SpellSlotLevel, AbilityKey } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useRulepacksStore } from '~/stores/rulepacks'
-import { spellSlotMax, spellSaveDCFor, spellAttackBonusFor } from '~/services/spellcasting'
+import {
+  spellSlotMax, spellSaveDCFor, spellAttackBonusFor, spellListLimit, preparesSpells,
+} from '~/services/spellcasting'
+import type { SpellListLimit } from '~/services/spellcasting'
+import type { FeatureUsesBonusSource } from '~/types/character'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -13,6 +17,44 @@ const rulepackStore = useRulepacksStore()
 
 const SLOT_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as SpellSlotLevel[]
 
+// ── Spell details ────────────────────────────────────────────────────
+
+/** The spell being read, by rulepack id. Null closes the modal. */
+const detailSpellId = ref<string | null>(null)
+
+/**
+ * The character's own entry for the spell on show, when they have one. Looked up by
+ * spellId, so opening a spell from the add list before it is known shows the definition
+ * alone rather than another spell's free casts.
+ */
+const detailEntry = computed(() =>
+  props.character.spells.find(s => s.spellId === detailSpellId.value) ?? null)
+
+function showDetails(spellId: string) {
+  detailSpellId.value = spellId
+}
+
+/**
+ * Every loaded pack as one, because a class may come from any of them. Declared before
+ * the spellcasting sources that read it: `watch(showTabs)` evaluates that chain during
+ * setup, so a `const` further down the file would still be in its temporal dead zone.
+ *
+ * Slots are derived from the character's classes against the multiclass caster-level
+ * table rather than stored, so a new class level changes them without a migration.
+ */
+const mergedPack = computed(() => ({
+  id: 'merged',
+  name: 'merged',
+  version: '0',
+  races: [],
+  classes: rulepackStore.rulepacks.flatMap(p => p.classes),
+  backgrounds: [],
+  feats: [],
+  spells: [],
+  creatures: [],
+  optionalFeatures: [],
+}))
+
 // ── Spellcasting sources ─────────────────────────────────────────────
 
 interface SpellcastingSource {
@@ -21,6 +63,11 @@ interface SpellcastingSource {
   ability: AbilityKey
   saveDC: number
   attackBonus: number
+  /**
+   * How many spells this list may prepare, or may know — whichever it has. Null for a
+   * race or background grant, which has neither.
+   */
+  limit: SpellListLimit | null
 }
 
 /**
@@ -44,6 +91,7 @@ const spellcastingSources = computed<SpellcastingSource[]>(() => {
       ability,
       saveDC: spellSaveDCFor(ability, mods[ability], prof),
       attackBonus: spellAttackBonusFor(mods[ability], prof),
+      limit: spellListLimit(id, char, mergedPack.value, mods[ability]),
     })
   }
 
@@ -92,25 +140,6 @@ const spellsByLevel = computed(() => {
   return map
 })
 
-// Whether any regular (non-warlock) spell slots exist
-/**
- * Slots are derived from the character's classes against the multiclass caster-level
- * table rather than stored, so a new class level changes them without a migration.
- * The merged pack is used because a class may come from any loaded rulepack.
- */
-const mergedPack = computed(() => ({
-  id: 'merged',
-  name: 'merged',
-  version: '0',
-  races: [],
-  classes: rulepackStore.rulepacks.flatMap(p => p.classes),
-  backgrounds: [],
-  feats: [],
-  spells: [],
-  creatures: [],
-  optionalFeatures: [],
-}))
-
 function slotMax(lvl: SpellSlotLevel): number {
   return spellSlotMax(lvl, props.character, mergedPack.value)
 }
@@ -151,11 +180,47 @@ function restorePactSlot() {
 
 // ── Spell list actions ────────────────────────────────────────────────────────
 
+/**
+ * Whether a spell's own list prepares spells at all. Rows from every source are mixed
+ * together on the All tab, so this is asked per spell rather than per tab.
+ *
+ * A spell on no list keeps its toggle: nothing says it does not need preparing.
+ */
+function preparesFor(spell: SpellEntry): boolean {
+  if (!spell.classId) return true
+  const def = rulepackStore.getClass(spell.classId)
+  if (!def) return true
+  return preparesSpells(def)
+}
+
+/** An always-prepared spell shows a filled dot that does nothing; the rest toggle. */
+function canTogglePrepared(spell: SpellEntry): boolean {
+  return spell.level > 0 && !spell.alwaysPrepared && preparesFor(spell)
+}
+
 function togglePrepared(spellId: string) {
+  const target = props.character.spells.find(s => s.id === spellId)
+  if (!target || !canTogglePrepared(target)) return
   const updated = props.character.spells.map(s =>
     s.id === spellId ? { ...s, prepared: !s.prepared } : s,
   )
   emit('update', { spells: updated })
+}
+
+// ── Spell list limits ────────────────────────────────────────────────────────
+
+/** The list whose bonus editor is open, if any. */
+const editingLimitBonus = ref<string | null>(null)
+
+function toggleLimitBonusEditor(sourceId: string) {
+  editingLimitBonus.value = editingLimitBonus.value === sourceId ? null : sourceId
+}
+
+function adjustLimitBonus(sourceId: string, source: FeatureUsesBonusSource, delta: number) {
+  const current = props.character.spellLimitBonuses?.[sourceId]?.[source] ?? 0
+  emit('update', {
+    spellLimitBonuses: setSpellLimitBonus(props.character, sourceId, source, current + delta),
+  })
 }
 
 /**
@@ -201,7 +266,9 @@ function addSpellFromList(spellDef: { id: string; name: string; level: number })
     spellId: spellDef.id,
     name: spellDef.name,
     level: spellDef.level,
-    prepared: spellDef.level === 0,
+    // A known-list class never prepares, so its spells arrive ready to cast
+    prepared: spellDef.level === 0
+      || (!!addClassId.value && !preparesSpells(rulepackStore.getClass(addClassId.value))),
     classId: addClassId.value || undefined,
   }
   emit('update', { spells: [...props.character.spells, entry] })
@@ -219,25 +286,84 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
       <div
         v-for="source in (activeSource ? [activeSource] : spellcastingSources)"
         :key="source.id"
-        class="flex items-center gap-4 flex-wrap"
+        class="space-y-2 pt-2 border-t border-surface-700/50 first:pt-0 first:border-t-0"
       >
-        <div v-if="spellcastingSources.length > 1" class="min-w-[4.5rem]">
-          <p class="stat-label">List</p>
-          <p class="text-sm font-semibold text-white">{{ source.name }}</p>
+        <div class="flex items-center gap-4 flex-wrap">
+          <div v-if="spellcastingSources.length > 1" class="min-w-[4.5rem]">
+            <p class="stat-label">List</p>
+            <p class="text-sm font-semibold text-white">{{ source.name }}</p>
+          </div>
+          <div>
+            <p class="stat-label">Ability</p>
+            <p class="text-sm font-semibold text-white">{{ ABILITY_LABELS[source.ability] }}</p>
+          </div>
+          <div>
+            <p class="stat-label">Spell Save DC</p>
+            <p class="text-sm font-semibold text-white">{{ source.saveDC }}</p>
+          </div>
+          <div>
+            <p class="stat-label">Spell Attack</p>
+            <p class="text-sm font-semibold text-white">
+              {{ source.attackBonus >= 0 ? '+' : '' }}{{ source.attackBonus }}
+            </p>
+          </div>
+          <!--
+            One counter, labelled for whichever limit the list has: a class that prepares
+            shows how many it has prepared, one with a fixed list how many it knows. Being
+            at the cap is what matters when swapping spells at a table that allows it.
+          -->
+          <div v-if="source.limit" class="w-28">
+            <p class="stat-label">{{ source.limit.kind === 'prepared' ? 'Prepared' : 'Known' }}</p>
+            <button
+              class="text-sm font-semibold tabular-nums"
+              :class="source.limit.used > source.limit.max ? 'text-danger-400' : 'text-white'"
+              :title="source.limit.bonus !== 0
+                ? `${source.limit.max - source.limit.bonus} base, ${source.limit.bonus > 0 ? '+' : ''}${source.limit.bonus} bonus`
+                : 'Add a bonus'"
+              @click="toggleLimitBonusEditor(source.id)"
+            >
+              {{ source.limit.used }}/{{ source.limit.max }}
+              <span v-if="source.limit.bonus !== 0" class="text-accent-400 text-[10px] align-super">
+                {{ source.limit.bonus > 0 ? '+' : '' }}{{ source.limit.bonus }}
+              </span>
+            </button>
+            <div class="h-1 rounded-full bg-surface-700 mt-1 overflow-hidden">
+              <div
+                class="h-full rounded-full transition-all"
+                :class="source.limit.used > source.limit.max ? 'bg-danger-500' : 'bg-primary-500'"
+                :style="{ width: `${Math.min(100, (source.limit.used / Math.max(1, source.limit.max)) * 100)}%` }"
+              />
+            </div>
+          </div>
         </div>
-        <div>
-          <p class="stat-label">Ability</p>
-          <p class="text-sm font-semibold text-white">{{ ABILITY_LABELS[source.ability] }}</p>
-        </div>
-        <div>
-          <p class="stat-label">Spell Save DC</p>
-          <p class="text-sm font-semibold text-white">{{ source.saveDC }}</p>
-        </div>
-        <div>
-          <p class="stat-label">Spell Attack</p>
-          <p class="text-sm font-semibold text-white">
-            {{ source.attackBonus >= 0 ? '+' : '' }}{{ source.attackBonus }}
-          </p>
+
+        <!-- Manual bonus on the limit: survives level-ups, so an item is entered once -->
+        <div
+          v-if="editingLimitBonus === source.id && source.limit"
+          class="space-y-1.5 pt-2 border-t border-surface-700"
+        >
+          <div
+            v-for="src in SPELL_LIMIT_BONUS_SOURCES"
+            :key="src.key"
+            class="flex items-center gap-2"
+          >
+            <span class="stat-label flex-1" :title="src.hint">{{ src.label }}</span>
+            <button
+              class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 flex items-center justify-center text-base leading-none"
+              @click="adjustLimitBonus(source.id, src.key, -1)"
+            >−</button>
+            <span
+              class="text-sm font-mono tabular-nums w-10 text-center"
+              :class="(character.spellLimitBonuses?.[source.id]?.[src.key] ?? 0) === 0 ? 'text-slate-500' : 'text-accent-400'"
+            >
+              {{ (character.spellLimitBonuses?.[source.id]?.[src.key] ?? 0) > 0 ? '+' : ''
+              }}{{ character.spellLimitBonuses?.[source.id]?.[src.key] ?? 0 }}
+            </span>
+            <button
+              class="w-7 h-7 rounded-md border border-surface-600 bg-surface-700 text-slate-300 hover:bg-surface-600 flex items-center justify-center text-base leading-none"
+              @click="adjustLimitBonus(source.id, src.key, 1)"
+            >+</button>
+          </div>
         </div>
       </div>
     </div>
@@ -322,20 +448,31 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
             :key="spell.id"
             class="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
           >
+            <!-- A known-list class never prepares, and an always-prepared spell cannot
+                 be unprepared, so neither gets a toggle. -->
             <button
-              v-if="lvl > 0"
+              v-if="canTogglePrepared(spell)"
               class="proficiency-dot flex-shrink-0"
               :class="{ active: spell.prepared }"
               title="Toggle prepared"
               @click="togglePrepared(spell.id)"
             />
+            <div
+              v-else-if="spell.alwaysPrepared && preparesFor(spell)"
+              class="proficiency-dot expertise flex-shrink-0 cursor-default"
+              title="Always prepared — does not count against your limit"
+            />
             <div v-else class="w-3 h-3 flex-shrink-0" />
-            <span class="flex-1 text-sm text-slate-200">
+            <button
+              class="flex-1 text-left text-sm text-slate-200 hover:text-white transition-colors"
+              title="Show spell details"
+              @click="showDetails(spell.spellId)"
+            >
               {{ spell.name }}
               <span v-if="spell.castAtLevel" class="text-[10px] text-slate-500">
                 (as level {{ spell.castAtLevel }})
               </span>
-            </span>
+            </button>
 
             <!-- Free casts from a race or background: no slot spent, tracked here -->
             <div v-if="spell.uses" class="flex items-center gap-1 flex-shrink-0">
@@ -392,19 +529,42 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
           <input v-model="searchQuery" class="input flex-1 min-w-24" placeholder="Search spells…" />
         </div>
         <div class="max-h-40 overflow-y-auto space-y-0.5">
-          <button
+          <div
             v-for="spell in filteredSpells.slice(0, 50)"
             :key="spell.id"
-            class="w-full text-left px-2 py-1.5 text-sm text-slate-300 hover:bg-surface-700 rounded transition-colors"
-            @click="addSpellFromList(spell)"
+            class="flex items-center rounded hover:bg-surface-700 transition-colors"
           >
-            {{ spell.name }}
-          </button>
+            <button
+              class="flex-1 text-left px-2 py-1.5 text-sm text-slate-300"
+              @click="addSpellFromList(spell)"
+            >
+              {{ spell.name }}
+            </button>
+            <!-- Reading a spell here is how you decide whether to add it, so the row
+                 keeps adding on tap and details get their own control. -->
+            <button
+              class="px-2 py-1.5 text-slate-500 hover:text-slate-200 transition-colors"
+              title="Show spell details"
+              @click.stop="showDetails(spell.id)"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9" />
+                <path stroke-linecap="round" d="M12 11v5" />
+                <path stroke-linecap="round" d="M12 8h.01" />
+              </svg>
+            </button>
+          </div>
           <p v-if="filteredSpells.length === 0" class="text-slate-500 text-xs text-center py-2">
             {{ allSpells.length === 0 ? 'No rulepacks loaded' : 'No matching spells' }}
           </p>
         </div>
       </div>
     </div>
+
+    <SheetSpellDetailModal
+      :spell-id="detailSpellId"
+      :entry="detailEntry"
+      @close="detailSpellId = null"
+    />
   </div>
 </template>

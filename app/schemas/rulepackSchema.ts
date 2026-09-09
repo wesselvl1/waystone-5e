@@ -269,6 +269,11 @@ const ClassDefinitionSchema = z.object({
   isHalfCaster: z.boolean().optional(),
   /** Warlock-style pact magic: slots are absolute and live in character.warlockSlots. */
   pactMagic: z.boolean().optional(),
+  /** Known-list vs prepared-each-day, and how the prepared limit scales. */
+  spellPreparation: z.object({
+    kind: z.enum(['known', 'prepared']),
+    levelDivisor: z.number().int().min(1).optional(),
+  }).optional(),
   levels: z.array(ClassLevelSchema),
   featureDefinitions: z.array(ClassFeatureDefinitionSchema).optional(),
   subclasses: z.array(SubclassDefinitionSchema).optional(),
