@@ -23,6 +23,7 @@ import type {
   ChooseOptionEvent,
   OfferOptionalFeaturesEvent,
   ChooseSkillEvent,
+  ChooseExpertiseEvent,
 } from '~/types/events'
 
 const route = useRoute()
@@ -273,6 +274,30 @@ function toggleSkill(skill: SkillKey, count: number) {
 /** Skills the character already has, which cannot be picked again. */
 function alreadyProficient(skill: SkillKey): boolean {
   return (character.value?.skillProficiencies[skill] ?? 0) > 0
+}
+
+const selectedExpertise = ref<SkillKey[]>([])
+
+/**
+ * Expertise doubles an existing proficiency, so only skills the character is already
+ * proficient in are eligible, and ones already at expertise are excluded.
+ */
+function expertiseCandidates(options: SkillKey[]): SkillKey[] {
+  const profs = character.value?.skillProficiencies
+  if (!profs) return []
+  return options.filter(s => (profs[s] ?? 0) === 1)
+}
+
+function toggleExpertise(skill: SkillKey, count: number) {
+  const picked = selectedExpertise.value
+  if (picked.includes(skill)) selectedExpertise.value = picked.filter(s => s !== skill)
+  else if (picked.length < count) selectedExpertise.value = [...picked, skill]
+}
+
+function confirmExpertise() {
+  resolvedChoices.value.push({ type: 'RESOLVED_EXPERTISE', skills: [...selectedExpertise.value] })
+  selectedExpertise.value = []
+  nextChoice()
 }
 
 function confirmSkills() {
@@ -729,6 +754,40 @@ watch(isFirstCharacterLevel, (val) => {
           <div class="flex gap-2 mt-2">
             <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
             <button class="btn-primary flex-1 text-sm" :disabled="!selectedOptionId" @click="confirmOption">Confirm</button>
+          </div>
+        </template>
+
+        <!-- Expertise -->
+        <template v-else-if="currentChoice.type === 'CHOOSE_EXPERTISE'">
+          <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ChooseExpertiseEvent).label }}</h2>
+          <p class="text-xs text-slate-500 mt-1">
+            {{ selectedExpertise.length }}/{{ (currentChoice as ChooseExpertiseEvent).count }} selected
+            · doubles your proficiency bonus for the chosen skills
+          </p>
+          <div
+            v-if="expertiseCandidates((currentChoice as ChooseExpertiseEvent).options).length === 0"
+            class="text-sm text-slate-500 py-4 text-center"
+          >
+            No eligible skills — expertise applies only to skills you are already proficient in.
+          </div>
+          <div v-else class="grid grid-cols-2 gap-2 mt-3">
+            <button
+              v-for="skill in expertiseCandidates((currentChoice as ChooseExpertiseEvent).options)"
+              :key="skill"
+              class="card text-left text-sm transition-colors"
+              :class="selectedExpertise.includes(skill) ? 'border-primary-500 bg-primary-900/20' : ''"
+              @click="toggleExpertise(skill, (currentChoice as ChooseExpertiseEvent).count)"
+            >
+              <span class="text-white">{{ SKILL_LABELS[skill] ?? skill }}</span>
+            </button>
+          </div>
+          <div class="flex gap-2 mt-3">
+            <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
+            <button
+              class="btn-primary flex-1 text-sm"
+              :disabled="selectedExpertise.length !== (currentChoice as ChooseExpertiseEvent).count"
+              @click="confirmExpertise"
+            >Confirm</button>
           </div>
         </template>
 

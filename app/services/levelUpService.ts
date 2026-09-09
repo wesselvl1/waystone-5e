@@ -12,6 +12,7 @@ import type {
   UpdateWarlockSlotsEvent,
   UpdateHitDieEvent,
   SetSpellcastingAbilityEvent,
+  ChooseExpertiseEvent,
   UpdateFeatureUsesEvent,
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
@@ -237,6 +238,14 @@ export function resolveLevelUpEvents(
           types: eventDef.types ? [...eventDef.types] : undefined,
         } satisfies SetWildShapeLimitsEvent)
         break
+      case 'CHOOSE_EXPERTISE':
+        events.push({
+          type: 'CHOOSE_EXPERTISE',
+          label: eventDef.label,
+          options: eventDef.options,
+          count: eventDef.count,
+        } satisfies ChooseExpertiseEvent)
+        break
       case 'CHOOSE_FEAT':
         events.push({ type: 'CHOOSE_FEAT' })
         break
@@ -328,7 +337,7 @@ export function resolveLevelUpEvents(
 }
 
 export function isChoiceEvent(event: LevelUpEvent): event is ChoiceLevelUpEvent {
-  return ['CHOOSE_SPELL', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
+  return ['CHOOSE_SPELL', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
 }
 
 export function getChoiceEvents(events: LevelUpEvent[]): ChoiceLevelUpEvent[] {
@@ -610,6 +619,16 @@ export function applyResolvedChoices(
                 }
               }
             }
+          }
+        }
+        break
+      }
+      case 'RESOLVED_EXPERTISE': {
+        for (const skill of choice.skills) {
+          // Expertise doubles an existing proficiency, so it only applies where the
+          // character is already proficient; granting it outright would be a free skill.
+          if ((updated.skillProficiencies[skill] ?? 0) === 1) {
+            updated.skillProficiencies[skill] = 2
           }
         }
         break

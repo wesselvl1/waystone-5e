@@ -234,6 +234,12 @@ export type ChoiceLevelUpEvent =
 
 export type LevelUpEvent = AutomaticLevelUpEvent | ChoiceLevelUpEvent
 
+/** Skills picked for a CHOOSE_EXPERTISE: proficiency doubled, not newly granted. */
+export interface ResolvedExpertise {
+  type: 'RESOLVED_EXPERTISE'
+  skills: SkillKey[]
+}
+
 /** Skills picked for a CHOOSE_SKILL, e.g. the single skill a multiclass bard gains. */
 export interface ResolvedSkill {
   type: 'RESOLVED_SKILL'
@@ -247,3 +253,4 @@ export type ResolvedChoice =  | ResolvedChoiceSpell
   | ResolvedOption
   | ResolvedOptionalFeatures
   | ResolvedSkill
+  | ResolvedExpertise
