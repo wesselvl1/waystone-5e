@@ -1,4 +1,4 @@
-import type { AbilityKey, AbilityScores, Character, HitDicePool } from '~/types/character'
+import type { AbilityKey, AbilityScores, Character, ClassEntry, HitDicePool } from '~/types/character'
 import type { ClassDefinition, Rulepack } from '~/types/rulepack'
 
 export interface UnmetRequirement {
@@ -117,6 +117,26 @@ export function addHitDieForClass(
     p.classId === classId
       ? { ...p, die, total: p.total + 1, remaining: Math.min(p.remaining + 1, p.total + 1) }
       : p)
+}
+
+/**
+ * The class list as it will be once `classId` sits at `level` — appending the entry when
+ * the character does not have that class yet.
+ *
+ * A brand-new class has no entry to `map()` over, so anything asking "what will this class
+ * be able to do at the level being gained?" has to be handed the projected list rather than
+ * the stored one. The level-up wizard needs it before the level is applied, to work out
+ * which spells the class may learn.
+ */
+export function projectClassLevel(
+  classes: ClassEntry[],
+  classId: string,
+  level: number,
+): ClassEntry[] {
+  if (classes.some(c => c.classId === classId)) {
+    return classes.map(c => (c.classId === classId ? { ...c, level } : c))
+  }
+  return [...classes, { classId, level }]
 }
 
 /** Total hit dice across every class, for features that scale on it. */
