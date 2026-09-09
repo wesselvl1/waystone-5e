@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
-import { multiclassOptions, describeMulticlassPrerequisites, effectiveScores } from '~/services/multiclass'
+import { multiclassOptions, describeMulticlassPrerequisites, effectiveScores, projectClassLevel } from '~/services/multiclass'
 import { maxSpellLevelForClass, clampSpellSlots } from '~/services/spellcasting'
 import {
   resolveLevelUpEvents,
@@ -201,10 +201,12 @@ function toggleSpell(spellId: string) {
 /** Highest spell level the targeted class can learn at the level being gained. */
 const maxLearnableSpellLevel = computed(() => {
   if (!character.value) return 0
-  const classes = character.value.classes.map(c =>
-    c.classId === targetClassId.value ? { ...c, level: targetLevel.value } : c)
-  const pack = mergedPack()
-  return maxSpellLevelForClass(targetClassId.value, classes, pack)
+  // Project the level being gained onto the class list. Multiclassing into a class the
+  // character does not have yet has no entry to update, so the class has to be appended:
+  // without it the cap read 0 and every levelled spell was filtered out of the picker.
+  const classes = projectClassLevel(
+    character.value.classes, targetClassId.value, targetLevel.value)
+  return maxSpellLevelForClass(targetClassId.value, classes, mergedPack())
 })
 
 const availableSpells = computed(() => {
@@ -407,13 +409,9 @@ async function applyLevelUp() {
 
   // Bump the class level, or add the class when this is a first level in it. Without the
   // append a multiclass level-up silently did nothing: map() only touches existing entries.
-  const alreadyHas = updated.classes.some(c => c.classId === targetClassId.value)
   updated = {
     ...updated,
-    classes: alreadyHas
-      ? updated.classes.map(c =>
-          c.classId === targetClassId.value ? { ...c, level: c.level + 1 } : c)
-      : [...updated.classes, { classId: targetClassId.value, level: 1 }],
+    classes: projectClassLevel(updated.classes, targetClassId.value, targetLevel.value),
   }
 
   // Apply resolved choices

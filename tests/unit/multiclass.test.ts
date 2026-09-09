@@ -8,6 +8,7 @@ import {
   multiclassOptions,
   addHitDieForClass,
   multiclassProficiencies,
+  projectClassLevel,
 } from '~/services/multiclass'
 import {
   baseSpellSlots,
@@ -66,6 +67,101 @@ const def = (id: string) => rulepack.classes.find(c => c.id === id)!
 function scores(over: Partial<AbilityScores> = {}): AbilityScores {
   return { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, ...over }
 }
+
+describe('projecting the level being gained', () => {
+  it('raises the level of a class the character already has', () => {
+    const projected = projectClassLevel(
+      [{ classId: 'druid', level: 5 }, { classId: 'rogue', level: 2 }], 'druid', 6)
+    expect(projected).toEqual([
+      { classId: 'druid', level: 6 }, { classId: 'rogue', level: 2 }])
+  })
+
+  it('appends a class the character does not have yet', () => {
+    const projected = projectClassLevel([{ classId: 'druid', level: 5 }], 'warlock', 1)
+    expect(projected).toEqual([
+      { classId: 'druid', level: 5 }, { classId: 'warlock', level: 1 }])
+  })
+
+  it('keeps the subclass and other fields of the entry it raises', () => {
+    const projected = projectClassLevel(
+      [{ classId: 'druid', level: 5, subclassId: 'circle-of-the-land' }], 'druid', 6)
+    expect(projected[0]).toEqual(
+      { classId: 'druid', level: 6, subclassId: 'circle-of-the-land' })
+  })
+
+  it('does not mutate the list it was given', () => {
+    const before = [{ classId: 'druid', level: 5 }]
+    projectClassLevel(before, 'warlock', 1)
+    expect(before).toEqual([{ classId: 'druid', level: 5 }])
+  })
+})
+
+describe('the spell level a multiclass entry may learn', () => {
+  // The level-up wizard caps its spell picker with maxSpellLevelForClass. Taking a first
+  // level in a new class means the character has no entry for it yet, so the wizard has to
+  // project one — reading the stored list returned 0 and offered no levelled spells at all.
+  const entering = (from: { classId: string, level: number }[], classId: string) =>
+    maxSpellLevelForClass(classId, projectClassLevel(from, classId, 1), rulepack)
+
+  it('offers 1st-level spells when a druid 5 takes warlock 1', () => {
+    expect(entering([{ classId: 'druid', level: 5 }], 'warlock')).toBe(1)
+  })
+
+  it('reads 0 from the stored list, which is what broke the picker', () => {
+    expect(maxSpellLevelForClass('warlock', [{ classId: 'druid', level: 5 }], rulepack))
+      .toBe(0)
+  })
+
+  it('offers 1st-level spells entering any full caster, whatever the slots say', () => {
+    // A druid 5 already has 3rd-level slots; the new class may still only learn 1st.
+    for (const id of ['bard', 'cleric', 'sorcerer', 'wizard', 'warlock']) {
+      expect(entering([{ classId: 'druid', level: 5 }], id), id).toBe(1)
+    }
+  })
+
+  it('offers nothing entering a class with no spellcasting', () => {
+    for (const id of ['barbarian', 'fighter', 'monk', 'rogue']) {
+      expect(entering([{ classId: 'druid', level: 5 }], id), id).toBe(0)
+    }
+  })
+
+  it('offers nothing entering a half caster, which gains no slots at 1st', () => {
+    for (const id of ['paladin', 'ranger']) {
+      expect(entering([{ classId: 'druid', level: 5 }], id), id).toBe(0)
+    }
+  })
+
+  it('follows the warlock pact table up, not the shared slot table', () => {
+    // Pact slots replace rather than accumulate, so each row names a single level.
+    for (const [level, expected] of [[1, 1], [3, 2], [5, 3], [7, 4], [9, 5]] as const) {
+      expect(maxSpellLevelForClass(
+        'warlock',
+        projectClassLevel([{ classId: 'druid', level: 5 }], 'warlock', level),
+        rulepack,
+      ), `warlock ${level}`).toBe(expected)
+    }
+  })
+
+  it('lets a warlock 1 in a multiclass learn a 1st-level spell it is offered', () => {
+    // The engine offers the choice; it was the wizard's cap that emptied the list.
+    const char = {
+      ...validCharacter,
+      classes: [{ classId: 'druid', level: 5 }],
+      spells: [],
+      spellSlots: {},
+    } as Character
+    const events = resolveLevelUpEvents(char, 'warlock', 1, rulepack)
+    const levelled = getChoiceEvents(events)
+      .filter(e => e.type === 'CHOOSE_SPELL' && !e.cantrip)
+    expect(levelled).toHaveLength(1)
+
+    const cap = entering(char.classes, 'warlock')
+    const offered = rulepack.spells.filter(s =>
+      s.level > 0 && s.level <= cap && s.classes.includes('warlock'))
+    expect(offered.length).toBeGreaterThan(0)
+    expect(offered.every(s => s.level === 1)).toBe(true)
+  })
+})
 
 describe('seeding', () => {
   it('gives every class multiclassing data', () => {
