@@ -1,0 +1,456 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1 \u2014 Rogue class. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).",
+  "author": "Wizards of the Coast",
+  "classes": [
+    {
+      "id": "rogue",
+      "name": "Rogue",
+      "hitDie": "d8",
+      "primaryAbility": [
+        "dex"
+      ],
+      "savingThrowProficiencies": [
+        "dex",
+        "int"
+      ],
+      "armorProficiencies": [
+        "light"
+      ],
+      "weaponProficiencies": [
+        "simple",
+        "hand crossbow",
+        "longsword",
+        "rapier",
+        "shortsword"
+      ],
+      "toolProficiencies": [
+        "thieves' tools"
+      ],
+      "skillChoices": {
+        "count": 4,
+        "from": [
+          "acrobatics",
+          "athletics",
+          "deception",
+          "insight",
+          "intimidation",
+          "investigation",
+          "perception",
+          "performance",
+          "persuasion",
+          "sleightOfHand",
+          "stealth"
+        ]
+      },
+      "multiclassing": {
+        "prerequisites": {
+          "dex": 13
+        },
+        "armorProficiencies": [
+          "light"
+        ],
+        "toolProficiencies": [
+          "thieves' tools"
+        ],
+        "skillChoices": {
+          "count": 1,
+          "from": [
+            "acrobatics",
+            "athletics",
+            "deception",
+            "insight",
+            "intimidation",
+            "investigation",
+            "perception",
+            "performance",
+            "persuasion",
+            "sleightOfHand",
+            "stealth"
+          ]
+        }
+      },
+      "levels": [
+        {
+          "level": 1,
+          "features": [
+            "Expertise",
+            "Sneak Attack",
+            "Thieves' Cant"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_EXPERTISE",
+              "label": "Choose two proficiencies for Expertise",
+              "options": [
+                "acrobatics",
+                "animalHandling",
+                "arcana",
+                "athletics",
+                "deception",
+                "history",
+                "insight",
+                "intimidation",
+                "investigation",
+                "medicine",
+                "nature",
+                "perception",
+                "performance",
+                "persuasion",
+                "religion",
+                "sleightOfHand",
+                "stealth",
+                "survival"
+              ],
+              "count": 2
+            }
+          ]
+        },
+        {
+          "level": 2,
+          "features": [
+            "Cunning Action"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 3,
+          "features": [
+            "Roguish Archetype",
+            "Sneak Attack (2d6)"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Roguish Archetype"
+            }
+          ]
+        },
+        {
+          "level": 4,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 5,
+          "features": [
+            "Uncanny Dodge",
+            "Sneak Attack (3d6)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 6,
+          "features": [
+            "Expertise"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_EXPERTISE",
+              "label": "Choose two more proficiencies for Expertise",
+              "options": [
+                "acrobatics",
+                "animalHandling",
+                "arcana",
+                "athletics",
+                "deception",
+                "history",
+                "insight",
+                "intimidation",
+                "investigation",
+                "medicine",
+                "nature",
+                "perception",
+                "performance",
+                "persuasion",
+                "religion",
+                "sleightOfHand",
+                "stealth",
+                "survival"
+              ],
+              "count": 2
+            }
+          ]
+        },
+        {
+          "level": 7,
+          "features": [
+            "Evasion",
+            "Sneak Attack (4d6)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 8,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 9,
+          "features": [
+            "Roguish Archetype Feature",
+            "Sneak Attack (5d6)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 10,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 11,
+          "features": [
+            "Reliable Talent",
+            "Sneak Attack (6d6)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 12,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "features": [
+            "Roguish Archetype Feature",
+            "Sneak Attack (7d6)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 14,
+          "features": [
+            "Blindsense"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 15,
+          "features": [
+            "Slippery Mind",
+            "Sneak Attack (8d6)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 16,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "features": [
+            "Roguish Archetype Feature",
+            "Sneak Attack (9d6)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 18,
+          "features": [
+            "Elusive"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 19,
+          "features": [
+            "Sneak Attack (10d6)"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "features": [
+            "Stroke of Luck"
+          ],
+          "levelUpEvents": []
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Roguish Archetype",
+          "description": "At 3rd level, you choose an archetype that you emulate in the exercise of your rogue abilities, such as Thief. Additional archetypes are available in the original source material. Your archetype choice grants you features at 3rd level and then again at 9th, 13th, and 17th level."
+        },
+        {
+          "name": "Expertise",
+          "description": "At 1st level, choose two of your skill proficiencies, or one of your skill proficiencies and your proficiency with thieves' tools. Your proficiency bonus is doubled for any ability check you make that uses either of the chosen proficiencies.\n\nAt 6th level, you can choose two more of your proficiencies (in skills or with thieves' tools) to gain this benefit"
+        },
+        {
+          "name": "Sneak Attack",
+          "description": "Beginning at 1st level, you know how to strike subtly and exploit a foe's distraction. Once per turn, you can deal an extra 1d6 damage to one creature you hit with an attack if you have advantage on the attack roll. The attack must use a finesse or a ranged weapon.\n\nYou don't need advantage on the attack roll if another enemy of the target is within 5 feet of it, that enemy isn't incapacitated, and you don't have disadvantage on the attack roll.\n\nThe amount of the extra damage increases as you gain levels in this class, as shown in the Sneak Attack column of the Rogue table."
+        },
+        {
+          "name": "Sneak Attack (2d6)",
+          "description": "Your Sneak Attack damage increases to 2d6.",
+          "replaces": "Sneak Attack"
+        },
+        {
+          "name": "Sneak Attack (3d6)",
+          "description": "Your Sneak Attack damage increases to 3d6.",
+          "replaces": "Sneak Attack (2d6)"
+        },
+        {
+          "name": "Sneak Attack (4d6)",
+          "description": "Your Sneak Attack damage increases to 4d6.",
+          "replaces": "Sneak Attack (3d6)"
+        },
+        {
+          "name": "Sneak Attack (5d6)",
+          "description": "Your Sneak Attack damage increases to 5d6.",
+          "replaces": "Sneak Attack (4d6)"
+        },
+        {
+          "name": "Sneak Attack (6d6)",
+          "description": "Your Sneak Attack damage increases to 6d6.",
+          "replaces": "Sneak Attack (5d6)"
+        },
+        {
+          "name": "Sneak Attack (7d6)",
+          "description": "Your Sneak Attack damage increases to 7d6.",
+          "replaces": "Sneak Attack (6d6)"
+        },
+        {
+          "name": "Sneak Attack (8d6)",
+          "description": "Your Sneak Attack damage increases to 8d6.",
+          "replaces": "Sneak Attack (7d6)"
+        },
+        {
+          "name": "Sneak Attack (9d6)",
+          "description": "Your Sneak Attack damage increases to 9d6.",
+          "replaces": "Sneak Attack (8d6)"
+        },
+        {
+          "name": "Sneak Attack (10d6)",
+          "description": "Your Sneak Attack damage increases to 10d6.",
+          "replaces": "Sneak Attack (9d6)"
+        },
+        {
+          "name": "Thieves' Cant",
+          "description": "During your rogue training you learned thieves' cant, a secret mix of dialect, jargon, and code that allows you to hide messages in seemingly normal conversation. Only another creature that knows thieves' cant understands such messages. It takes four times longer to convey such a message than it does to speak the same idea plainly.\n\nIn addition, you understand a set of secret signs and symbols used to convey short, simple messages, such as whether an area is dangerous or the territory of a thieves' guild, whether loot is nearby, or whether the people in an area are easy marks or will provide a safe house for thieves on the run."
+        },
+        {
+          "name": "Cunning Action",
+          "description": "Starting at 2nd level, your quick thinking and agility allow you to move and act quickly. You can take a bonus action on each of your turns in combat. This action can be used only to take the Dash, Disengage, or Hide action."
+        },
+        {
+          "name": "Uncanny Dodge",
+          "description": "Starting at 5th level, when an attacker that you can see hits you with an attack, you can use your reaction to halve the attack's damage against you."
+        },
+        {
+          "name": "Evasion",
+          "description": "Beginning at 7th level, you can nimbly dodge out of the way of certain area effects, such as a red dragon's fiery breath or an ice storm spell. When you are subjected to an effect that allows you to make a Dexterity saving throw to take only half damage, you instead take no damage if you succeed on the saving throw, and only half damage if you fail."
+        },
+        {
+          "name": "Reliable Talent",
+          "description": "By 11th level, you have refined your chosen skills until they approach perfection. Whenever you make an ability check that lets you add your proficiency bonus, you can treat a d20 roll of 9 or lower as a 10."
+        },
+        {
+          "name": "Blindsense",
+          "description": "Starting at 14th level, if you are able to hear, you are aware of the location of any hidden or invisible creature within 10 feet of you."
+        },
+        {
+          "name": "Slippery Mind",
+          "description": "By 15th level, you have acquired greater mental strength. You gain proficiency in Wisdom saving throws."
+        },
+        {
+          "name": "Elusive",
+          "description": "Beginning at 18th level, you are so evasive that attackers rarely gain the upper hand against you. No attack roll has advantage against you while you aren't incapacitated."
+        },
+        {
+          "name": "Stroke of Luck",
+          "description": "At 20th level, you have an uncanny knack for succeeding when you need to. If your attack misses a target within range, you can turn the miss into a hit. Alternatively, if you fail an ability check, you can treat the d20 roll as a 20.\n\nOnce you use this feature, you can't use it again until you finish a short or long rest.",
+          "usesMax": 1,
+          "recharge": "short"
+        }
+      ],
+      "subclasses": [
+        {
+          "id": "thief",
+          "name": "Thief",
+          "description": "You hone your skills in the larcenous arts. Burglars, bandits, cutpurses and other criminals typically follow this archetype, but so do rogues who prefer to think of themselves as professional treasure seekers, explorers, delvers and investigators.",
+          "levels": [
+            {
+              "level": 3,
+              "features": [
+                {
+                  "name": "Fast Hands",
+                  "description": "Starting at 3rd level, you can use the bonus action granted by your Cunning Action to make a Dexterity (Sleight of Hand) check, use your thieves' tools to disarm a trap or open a lock, or take the Use an Object action."
+                },
+                {
+                  "name": "Second-Story Work",
+                  "description": "When you choose this archetype at 3rd level, you gain the ability to climb faster than normal; climbing no longer costs you extra movement.\n\nIn addition, when you make a running jump, the distance you cover increases by a number of feet equal to your Dexterity modifier."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 9,
+              "features": [
+                {
+                  "name": "Supreme Sneak",
+                  "description": "Starting at 9th level, you have advantage on a Dexterity (Stealth) check if you move no more than half your speed on the same turn."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 13,
+              "features": [
+                {
+                  "name": "Use Magic Device",
+                  "description": "By 13th level, you have learned enough about the workings of magic that you can improvise the use of items even when they are not intended for you. You ignore all class, race, and level requirements on the use of magic items."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 17,
+              "features": [
+                {
+                  "name": "Thief's Reflexes",
+                  "description": "When you reach 17th level, you have become adept at laying ambushes and quickly escaping danger. You can take two turns during the first round of any combat. You take your first turn at your normal initiative and your second turn at your initiative minus 10. You can't use this feature when you are surprised."
+                }
+              ],
+              "levelUpEvents": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

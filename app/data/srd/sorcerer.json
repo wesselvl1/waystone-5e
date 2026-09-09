@@ -1,0 +1,967 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1 \u2014 Sorcerer class. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).",
+  "author": "Wizards of the Coast",
+  "classes": [
+    {
+      "id": "sorcerer",
+      "name": "Sorcerer",
+      "hitDie": "d6",
+      "primaryAbility": [
+        "cha"
+      ],
+      "spellcastingAbility": "cha",
+      "isFullCaster": true,
+      "savingThrowProficiencies": [
+        "con",
+        "cha"
+      ],
+      "armorProficiencies": [],
+      "weaponProficiencies": [
+        "dagger",
+        "dart",
+        "sling",
+        "quarterstaff",
+        "light crossbow"
+      ],
+      "toolProficiencies": [],
+      "skillChoices": {
+        "count": 2,
+        "from": [
+          "arcana",
+          "deception",
+          "insight",
+          "intimidation",
+          "persuasion",
+          "religion"
+        ]
+      },
+      "multiclassing": {
+        "prerequisites": {
+          "cha": 13
+        }
+      },
+      "levels": [
+        {
+          "level": 1,
+          "spellSlots": {
+            "1": 2
+          },
+          "cantripsKnown": 4,
+          "spellsKnown": 2,
+          "features": [
+            "Spellcasting",
+            "Sorcerous Origin"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Sorcerous Origin"
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 4,
+              "cantrip": true,
+              "classes": [
+                "sorcerer"
+              ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 2,
+          "spellSlots": {
+            "1": 3
+          },
+          "cantripsKnown": 4,
+          "spellsKnown": 3,
+          "features": [
+            "Font of Magic"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 3,
+          "spellSlots": {
+            "1": 4,
+            "2": 2
+          },
+          "cantripsKnown": 4,
+          "spellsKnown": 4,
+          "features": [
+            "Metamagic"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 3
+            },
+            {
+              "type": "CHOOSE_OPTION",
+              "id": "metamagic-1",
+              "label": "Choose a Metamagic option",
+              "options": [
+                {
+                  "id": "careful-spell",
+                  "name": "Careful Spell",
+                  "description": "When you cast a spell that forces other creatures to make a saving throw, you can protect some of those creatures from the spell's full force. To do so, you spend 1 sorcery point and choose a number of those creatures up to your Charisma modifier (minimum of one creature). A chosen creature automatically succeeds on its saving throw against the spell."
+                },
+                {
+                  "id": "distant-spell",
+                  "name": "Distant Spell",
+                  "description": "When you cast a spell that has a range of 5 feet or greater, you can spend 1 sorcery point to double the range of the spell.\n\nWhen you cast a spell that has a range of touch, you can spend 1 sorcery point to make the range of the spell 30 feet."
+                },
+                {
+                  "id": "empowered-spell",
+                  "name": "Empowered Spell",
+                  "description": "When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls.\n\nYou can use Empowered Spell even if you have already used a different Metamagic option during the casting of the spell."
+                },
+                {
+                  "id": "extended-spell",
+                  "name": "Extended Spell",
+                  "description": "When you cast a spell that has a duration of 1 minute or longer, you can spend 1 sorcery point to double its duration, to a maximum duration of 24 hours."
+                },
+                {
+                  "id": "heightened-spell",
+                  "name": "Heightened Spell",
+                  "description": "When you cast a spell that forces a creature to make a saving throw to resist its effects, you can spend 3 sorcery points to give one target of the spell disadvantage on its first saving throw made against the spell."
+                },
+                {
+                  "id": "quickened-spell",
+                  "name": "Quickened Spell",
+                  "description": "When you cast a spell that has a casting time of 1 action, you can spend 2 sorcery points to change the casting time to 1 bonus action for this casting."
+                },
+                {
+                  "id": "subtle-spell",
+                  "name": "Subtle Spell",
+                  "description": "When you cast a spell, you can spend 1 sorcery point to cast it without any somatic or verbal components."
+                },
+                {
+                  "id": "twinned-spell",
+                  "name": "Twinned Spell",
+                  "description": "When you cast a spell that targets only one creature and doesn't have a range of self, you can spend a number of sorcery points equal to the spell's level to target a second creature in range with the same spell (1 sorcery point if the spell is a cantrip).\n\nTo be eligible, a spell must be incapable of targeting more than one creature at the spell's current level. For example, magic missile and scorching ray aren't eligible, but ray of frost is."
+                }
+              ]
+            },
+            {
+              "type": "CHOOSE_OPTION",
+              "id": "metamagic-2",
+              "label": "Choose a second Metamagic option",
+              "options": [
+                {
+                  "id": "careful-spell",
+                  "name": "Careful Spell",
+                  "description": "When you cast a spell that forces other creatures to make a saving throw, you can protect some of those creatures from the spell's full force. To do so, you spend 1 sorcery point and choose a number of those creatures up to your Charisma modifier (minimum of one creature). A chosen creature automatically succeeds on its saving throw against the spell."
+                },
+                {
+                  "id": "distant-spell",
+                  "name": "Distant Spell",
+                  "description": "When you cast a spell that has a range of 5 feet or greater, you can spend 1 sorcery point to double the range of the spell.\n\nWhen you cast a spell that has a range of touch, you can spend 1 sorcery point to make the range of the spell 30 feet."
+                },
+                {
+                  "id": "empowered-spell",
+                  "name": "Empowered Spell",
+                  "description": "When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls.\n\nYou can use Empowered Spell even if you have already used a different Metamagic option during the casting of the spell."
+                },
+                {
+                  "id": "extended-spell",
+                  "name": "Extended Spell",
+                  "description": "When you cast a spell that has a duration of 1 minute or longer, you can spend 1 sorcery point to double its duration, to a maximum duration of 24 hours."
+                },
+                {
+                  "id": "heightened-spell",
+                  "name": "Heightened Spell",
+                  "description": "When you cast a spell that forces a creature to make a saving throw to resist its effects, you can spend 3 sorcery points to give one target of the spell disadvantage on its first saving throw made against the spell."
+                },
+                {
+                  "id": "quickened-spell",
+                  "name": "Quickened Spell",
+                  "description": "When you cast a spell that has a casting time of 1 action, you can spend 2 sorcery points to change the casting time to 1 bonus action for this casting."
+                },
+                {
+                  "id": "subtle-spell",
+                  "name": "Subtle Spell",
+                  "description": "When you cast a spell, you can spend 1 sorcery point to cast it without any somatic or verbal components."
+                },
+                {
+                  "id": "twinned-spell",
+                  "name": "Twinned Spell",
+                  "description": "When you cast a spell that targets only one creature and doesn't have a range of self, you can spend a number of sorcery points equal to the spell's level to target a second creature in range with the same spell (1 sorcery point if the spell is a cantrip).\n\nTo be eligible, a spell must be incapable of targeting more than one creature at the spell's current level. For example, magic missile and scorching ray aren't eligible, but ray of frost is."
+                }
+              ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 4,
+          "spellSlots": {
+            "1": 4,
+            "2": 3
+          },
+          "cantripsKnown": 5,
+          "spellsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 4
+            },
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": true,
+              "classes": [
+                "sorcerer"
+              ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 5,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 2
+          },
+          "cantripsKnown": 5,
+          "spellsKnown": 6,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 5
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 6,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3
+          },
+          "cantripsKnown": 5,
+          "spellsKnown": 7,
+          "features": [
+            "Sorcerous Origin Feature"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 6
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 7,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 1
+          },
+          "cantripsKnown": 5,
+          "spellsKnown": 8,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 7
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 8,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 2
+          },
+          "cantripsKnown": 5,
+          "spellsKnown": 9,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 8
+            },
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 9,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 1
+          },
+          "cantripsKnown": 5,
+          "spellsKnown": 10,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 9
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 10,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 11,
+          "features": [
+            "Metamagic"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 10
+            },
+            {
+              "type": "CHOOSE_OPTION",
+              "id": "metamagic-3",
+              "label": "Choose a third Metamagic option",
+              "options": [
+                {
+                  "id": "careful-spell",
+                  "name": "Careful Spell",
+                  "description": "When you cast a spell that forces other creatures to make a saving throw, you can protect some of those creatures from the spell's full force. To do so, you spend 1 sorcery point and choose a number of those creatures up to your Charisma modifier (minimum of one creature). A chosen creature automatically succeeds on its saving throw against the spell."
+                },
+                {
+                  "id": "distant-spell",
+                  "name": "Distant Spell",
+                  "description": "When you cast a spell that has a range of 5 feet or greater, you can spend 1 sorcery point to double the range of the spell.\n\nWhen you cast a spell that has a range of touch, you can spend 1 sorcery point to make the range of the spell 30 feet."
+                },
+                {
+                  "id": "empowered-spell",
+                  "name": "Empowered Spell",
+                  "description": "When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls.\n\nYou can use Empowered Spell even if you have already used a different Metamagic option during the casting of the spell."
+                },
+                {
+                  "id": "extended-spell",
+                  "name": "Extended Spell",
+                  "description": "When you cast a spell that has a duration of 1 minute or longer, you can spend 1 sorcery point to double its duration, to a maximum duration of 24 hours."
+                },
+                {
+                  "id": "heightened-spell",
+                  "name": "Heightened Spell",
+                  "description": "When you cast a spell that forces a creature to make a saving throw to resist its effects, you can spend 3 sorcery points to give one target of the spell disadvantage on its first saving throw made against the spell."
+                },
+                {
+                  "id": "quickened-spell",
+                  "name": "Quickened Spell",
+                  "description": "When you cast a spell that has a casting time of 1 action, you can spend 2 sorcery points to change the casting time to 1 bonus action for this casting."
+                },
+                {
+                  "id": "subtle-spell",
+                  "name": "Subtle Spell",
+                  "description": "When you cast a spell, you can spend 1 sorcery point to cast it without any somatic or verbal components."
+                },
+                {
+                  "id": "twinned-spell",
+                  "name": "Twinned Spell",
+                  "description": "When you cast a spell that targets only one creature and doesn't have a range of self, you can spend a number of sorcery points equal to the spell's level to target a second creature in range with the same spell (1 sorcery point if the spell is a cantrip).\n\nTo be eligible, a spell must be incapable of targeting more than one creature at the spell's current level. For example, magic missile and scorching ray aren't eligible, but ray of frost is."
+                }
+              ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": true,
+              "classes": [
+                "sorcerer"
+              ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 11,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 12,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 11
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 12,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 12,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 12
+            },
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 13,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 13
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 14,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 13,
+          "features": [
+            "Sorcerous Origin Feature"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 14
+            }
+          ]
+        },
+        {
+          "level": 15,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 14,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 15
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 16,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 14,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 16
+            },
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 15,
+          "features": [
+            "Metamagic"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 17
+            },
+            {
+              "type": "CHOOSE_OPTION",
+              "id": "metamagic-4",
+              "label": "Choose a fourth Metamagic option",
+              "options": [
+                {
+                  "id": "careful-spell",
+                  "name": "Careful Spell",
+                  "description": "When you cast a spell that forces other creatures to make a saving throw, you can protect some of those creatures from the spell's full force. To do so, you spend 1 sorcery point and choose a number of those creatures up to your Charisma modifier (minimum of one creature). A chosen creature automatically succeeds on its saving throw against the spell."
+                },
+                {
+                  "id": "distant-spell",
+                  "name": "Distant Spell",
+                  "description": "When you cast a spell that has a range of 5 feet or greater, you can spend 1 sorcery point to double the range of the spell.\n\nWhen you cast a spell that has a range of touch, you can spend 1 sorcery point to make the range of the spell 30 feet."
+                },
+                {
+                  "id": "empowered-spell",
+                  "name": "Empowered Spell",
+                  "description": "When you roll damage for a spell, you can spend 1 sorcery point to reroll a number of the damage dice up to your Charisma modifier (minimum of one). You must use the new rolls.\n\nYou can use Empowered Spell even if you have already used a different Metamagic option during the casting of the spell."
+                },
+                {
+                  "id": "extended-spell",
+                  "name": "Extended Spell",
+                  "description": "When you cast a spell that has a duration of 1 minute or longer, you can spend 1 sorcery point to double its duration, to a maximum duration of 24 hours."
+                },
+                {
+                  "id": "heightened-spell",
+                  "name": "Heightened Spell",
+                  "description": "When you cast a spell that forces a creature to make a saving throw to resist its effects, you can spend 3 sorcery points to give one target of the spell disadvantage on its first saving throw made against the spell."
+                },
+                {
+                  "id": "quickened-spell",
+                  "name": "Quickened Spell",
+                  "description": "When you cast a spell that has a casting time of 1 action, you can spend 2 sorcery points to change the casting time to 1 bonus action for this casting."
+                },
+                {
+                  "id": "subtle-spell",
+                  "name": "Subtle Spell",
+                  "description": "When you cast a spell, you can spend 1 sorcery point to cast it without any somatic or verbal components."
+                },
+                {
+                  "id": "twinned-spell",
+                  "name": "Twinned Spell",
+                  "description": "When you cast a spell that targets only one creature and doesn't have a range of self, you can spend a number of sorcery points equal to the spell's level to target a second creature in range with the same spell (1 sorcery point if the spell is a cantrip).\n\nTo be eligible, a spell must be incapable of targeting more than one creature at the spell's current level. For example, magic missile and scorching ray aren't eligible, but ray of frost is."
+                }
+              ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "sorcerer",
+              "count": 1,
+              "cantrip": false,
+              "classes": [
+                "sorcerer"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 18,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 1,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 15,
+          "features": [
+            "Sorcerous Origin Feature"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 18
+            }
+          ]
+        },
+        {
+          "level": 19,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 2,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 15,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 19
+            },
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 2,
+            "7": 2,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 6,
+          "spellsKnown": 15,
+          "features": [
+            "Sorcerous Restoration"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "UPDATE_FEATURE_USES",
+              "featureName": "Font of Magic",
+              "usesMax": 20
+            }
+          ]
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Spellcasting",
+          "description": "An event in your past, or in the life of a parent or ancestor, left an indelible mark on you, infusing you with arcane magic. This font of magic, whatever its origin, fuels your spells."
+        },
+        {
+          "name": "Sorcerous Origin",
+          "description": "Choose a sorcerous origin, which describes the source of your innate magical power, such as Draconic Bloodline.\n\nYour choice grants you features when you choose it at 1st level and again at 6th, 14th, and 18th level."
+        },
+        {
+          "name": "Font of Magic",
+          "description": "At 2nd level, you tap into a deep wellspring of magic within yourself. This wellspring is represented by sorcery points, which allow you to create a variety of magical effects.\n\nSorcery Points\n\nYou have 2 sorcery points, and you gain more as you reach higher levels, as shown in the Sorcery Points column of the Sorcerer table. You can never have more sorcery points than shown on the table for your level. You regain all spent sorcery points when you finish a long rest.\n\nYou can transform unexpended sorcery points into one spell slot as a bonus action on your turn. The Creating Spell Slots table shows the cost of creating a spell slot of a given level. You can create spell slots no higher in level than 5th.\n\nAny spell slot you create with this feature vanishes when you finish a long rest.\n\nAs a bonus action on your turn, you can expend one spell slot and gain a number of sorcery points equal to the slot's level..\n\nYour sorcery point maximum equals your sorcerer level.",
+          "usesMax": 2,
+          "recharge": "long"
+        },
+        {
+          "name": "Metamagic",
+          "description": "At 3rd level, you gain the ability to twist your spells to suit your needs. You gain two of the following Metamagic options of your choice. You gain another one at 10th and 17th level.\n\nYou can use only one Metamagic option on a spell when you cast it, unless otherwise noted."
+        },
+        {
+          "name": "Sorcerous Restoration",
+          "description": "At 20th level, you regain 4 expended sorcery points whenever you finish a short rest."
+        }
+      ],
+      "subclasses": [
+        {
+          "id": "draconic-bloodline",
+          "name": "Draconic Bloodline",
+          "description": "Your innate magic comes from draconic magic that was mingled with your blood or that of your ancestors. Most often, sorcerers with this origin trace their descent back to a mighty sorcerer of ancient times who made a bargain with a dragon, or who might even have claimed a dragon parent.",
+          "levels": [
+            {
+              "level": 1,
+              "features": [
+                {
+                  "name": "Dragon Ancestor",
+                  "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                },
+                {
+                  "name": "Draconic Resilience",
+                  "description": "As magic flows through your body, it causes physical traits of your dragon ancestors to emerge. At 1st level, your hit point maximum increases by 1 and increases by 1 again whenever you gain a level in this class.\n\nAdditionally, parts of your skin are covered by a thin sheen of dragon-like scales. When you aren't wearing armor, your AC equals 13 + your Dexterity modifier."
+                }
+              ],
+              "levelUpEvents": [
+                {
+                  "type": "CHOOSE_OPTION",
+                  "id": "dragon-ancestor",
+                  "label": "Choose your dragon ancestor",
+                  "options": [
+                    {
+                      "id": "black",
+                      "name": "Black",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "blue",
+                      "name": "Blue",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "brass",
+                      "name": "Brass",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "bronze",
+                      "name": "Bronze",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "copper",
+                      "name": "Copper",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "gold",
+                      "name": "Gold",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "green",
+                      "name": "Green",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "red",
+                      "name": "Red",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "silver",
+                      "name": "Silver",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    },
+                    {
+                      "id": "white",
+                      "name": "White",
+                      "description": "At 1st level, you choose one type of dragon as your ancestor. The damage type associated with each dragon is used by features you gain later.\n\nYou can speak, read, and write Draconic. Additionally, whenever you make a Charisma check when interacting with dragons, your proficiency bonus is doubled if it applies to the check."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "level": 6,
+              "features": [
+                {
+                  "name": "Elemental Affinity",
+                  "description": "Starting at 6th level, when you cast a spell that deals damage of the type associated with your draconic ancestry, you can add your Charisma modifier to one damage roll of that spell. At the same time, you can spend 1 sorcery point to gain resistance to that damage type for 1 hour."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 14,
+              "features": [
+                {
+                  "name": "Dragon Wings",
+                  "description": "At 14th level, you gain the ability to sprout a pair of dragon wings from your back, gaining a flying speed equal to your current speed. You can create these wings as a bonus action on your turn. They last until you dismiss them as a bonus action on your turn.\n\nYou can't manifest your wings while wearing armor unless the armor is made to accommodate them, and clothing not made to accommodate your wings might be destroyed when you manifest them."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 18,
+              "features": [
+                {
+                  "name": "Draconic Presence",
+                  "description": "Beginning at 18th level, you can channel the dread presence of your dragon ancestor, causing those around you to become awestruck or frightened. As an action, you can spend 5 sorcery points to draw on this power and exude an aura of awe or fear (your choice) to a distance of 60 feet. For 1 minute or until you lose your concentration (as if you were casting a concentration spell), each hostile creature that starts its turn in this aura must succeed on a Wisdom saving throw or be charmed (if you chose awe) or frightened (if you chose fear) until the aura ends. A creature that succeeds on this saving throw is immune to your aura for 24 hours."
+                }
+              ],
+              "levelUpEvents": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

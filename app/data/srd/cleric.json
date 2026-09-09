@@ -1,0 +1,626 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "author": "Wizards of the Coast",
+  "description": "System Reference Document 5.1 \u2014 Cleric class. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).",
+  "classes": [
+    {
+      "id": "cleric",
+      "name": "Cleric",
+      "hitDie": "d8",
+      "primaryAbility": [
+        "wis"
+      ],
+      "spellcastingAbility": "wis",
+      "isFullCaster": true,
+      "savingThrowProficiencies": [
+        "wis",
+        "cha"
+      ],
+      "armorProficiencies": [
+        "light",
+        "medium",
+        "shields"
+      ],
+      "weaponProficiencies": [
+        "simple"
+      ],
+      "toolProficiencies": [],
+      "skillChoices": {
+        "count": 2,
+        "from": [
+          "history",
+          "insight",
+          "medicine",
+          "persuasion",
+          "religion"
+        ]
+      },
+      "multiclassing": {
+        "prerequisites": {
+          "wis": 13
+        },
+        "armorProficiencies": [
+          "light",
+          "medium",
+          "shields"
+        ]
+      },
+      "levels": [
+        {
+          "level": 1,
+          "spellSlots": {
+            "1": 2
+          },
+          "cantripsKnown": 3,
+          "features": [
+            "Spellcasting",
+            "Divine Domain"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "cleric",
+              "count": 3,
+              "cantrip": true,
+              "classes": [
+                "cleric"
+              ]
+            },
+            {
+              "type": "CHOOSE_SUBCLASS",
+              "label": "Divine Domain"
+            }
+          ]
+        },
+        {
+          "level": 2,
+          "spellSlots": {
+            "1": 3
+          },
+          "cantripsKnown": 3,
+          "features": [
+            "Channel Divinity (1/rest)",
+            "Channel Divinity: Turn Undead",
+            "Divine Domain Feature"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 3,
+          "spellSlots": {
+            "1": 4,
+            "2": 2
+          },
+          "cantripsKnown": 3,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 4,
+          "spellSlots": {
+            "1": 4,
+            "2": 3
+          },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "cleric",
+              "count": 1,
+              "cantrip": true,
+              "classes": [
+                "cleric"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 5,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 2
+          },
+          "cantripsKnown": 4,
+          "features": [
+            "Destroy Undead (CR 1/2)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 6,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3
+          },
+          "cantripsKnown": 4,
+          "features": [
+            "Channel Divinity (2/rest)",
+            "Divine Domain Feature"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 7,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 1
+          },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 8,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 2
+          },
+          "cantripsKnown": 4,
+          "features": [
+            "Destroy Undead (CR 1)",
+            "Divine Domain Feature"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 9,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 1
+          },
+          "cantripsKnown": 4,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 10,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Divine Intervention"
+          ],
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "cleric",
+              "count": 1,
+              "cantrip": true,
+              "classes": [
+                "cleric"
+              ]
+            }
+          ]
+        },
+        {
+          "level": 11,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Destroy Undead (CR 2)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 12,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 13,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 14,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Destroy Undead (CR 3)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 15,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": []
+        },
+        {
+          "level": 16,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 17,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 2,
+            "6": 1,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Destroy Undead (CR 4)",
+            "Divine Domain Feature"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 18,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 1,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Channel Divinity (3/rest)"
+          ],
+          "levelUpEvents": []
+        },
+        {
+          "level": 19,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 2,
+            "7": 1,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 5,
+          "features": [],
+          "levelUpEvents": [
+            {
+              "type": "ABILITY_SCORE_IMPROVEMENT",
+              "points": 2
+            }
+          ]
+        },
+        {
+          "level": 20,
+          "spellSlots": {
+            "1": 4,
+            "2": 3,
+            "3": 3,
+            "4": 3,
+            "5": 3,
+            "6": 2,
+            "7": 2,
+            "8": 1,
+            "9": 1
+          },
+          "cantripsKnown": 5,
+          "features": [
+            "Divine Intervention Improvement"
+          ],
+          "levelUpEvents": []
+        }
+      ],
+      "featureDefinitions": [
+        {
+          "name": "Spellcasting",
+          "description": "As a conduit for divine power, you can cast cleric spells. You prepare a number of cleric spells equal to your Wisdom modifier + your cleric level (minimum of one spell), choosing from the cleric spell list. The spells must be of a level for which you have spell slots. You can change your list of prepared spells when you finish a long rest. Wisdom is your spellcasting ability for your cleric spells, and you can use a holy symbol as a spellcasting focus."
+        },
+        {
+          "name": "Divine Domain",
+          "description": "Choose one domain related to your deity. Only the Life domain is detailed in the SRD. Your domain grants you domain spells and other features when you choose it at 1st level. It also grants you additional ways to use Channel Divinity when you gain that feature at 2nd level, and additional benefits at 6th, 8th, and 17th levels."
+        },
+        {
+          "name": "Channel Divinity (1/rest)",
+          "description": "You gain the ability to channel divine energy directly from your deity, using that energy to fuel magical effects. You start with two such effects: Turn Undead and an effect determined by your domain. When you use your Channel Divinity, you choose which effect to create. You must then finish a short or long rest to use your Channel Divinity again. Some Channel Divinity effects require saving throws; when you use such an effect from this class, the DC equals your cleric spell save DC.",
+          "usesMax": 1,
+          "recharge": "short"
+        },
+        {
+          "name": "Channel Divinity: Turn Undead",
+          "description": "As an action, you present your holy symbol and speak a prayer censuring the undead. Each undead that can see or hear you within 30 feet of you must make a Wisdom saving throw. If the creature fails its saving throw, it is turned for 1 minute or until it takes any damage.\n\nA turned creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If there's nowhere to move, the creature can use the Dodge action."
+        },
+        {
+          "name": "Channel Divinity (2/rest)",
+          "description": "You can use your Channel Divinity twice between rests. When you finish a short or long rest, you regain your expended uses.",
+          "usesMax": 2,
+          "recharge": "short",
+          "replaces": "Channel Divinity (1/rest)"
+        },
+        {
+          "name": "Channel Divinity (3/rest)",
+          "description": "You can use your Channel Divinity three times between rests. When you finish a short or long rest, you regain your expended uses.",
+          "usesMax": 3,
+          "recharge": "short",
+          "replaces": "Channel Divinity (2/rest)"
+        },
+        {
+          "name": "Destroy Undead (CR 1/2)",
+          "description": "When an undead fails its saving throw against your Turn Undead feature, the creature is instantly destroyed if its challenge rating is 1/2 or lower."
+        },
+        {
+          "name": "Destroy Undead (CR 1)",
+          "description": "Your Turn Undead now instantly destroys undead of challenge rating 1 or lower.",
+          "replaces": "Destroy Undead (CR 1/2)"
+        },
+        {
+          "name": "Destroy Undead (CR 2)",
+          "description": "Your Turn Undead now instantly destroys undead of challenge rating 2 or lower.",
+          "replaces": "Destroy Undead (CR 1)"
+        },
+        {
+          "name": "Destroy Undead (CR 3)",
+          "description": "Your Turn Undead now instantly destroys undead of challenge rating 3 or lower.",
+          "replaces": "Destroy Undead (CR 2)"
+        },
+        {
+          "name": "Destroy Undead (CR 4)",
+          "description": "Your Turn Undead now instantly destroys undead of challenge rating 4 or lower.",
+          "replaces": "Destroy Undead (CR 3)"
+        },
+        {
+          "name": "Divine Intervention",
+          "description": "You can call on your deity to intervene on your behalf when your need is great. Imploring your deity's aid requires you to use your action. Describe the assistance you seek, and roll percentile dice. If you roll a number equal to or lower than your cleric level, your deity intervenes. The GM chooses the nature of the intervention; the effect of any cleric spell or cleric domain spell would be appropriate. If your deity intervenes, you can't use this feature again for 7 days. Otherwise, you can use it again after you finish a long rest.",
+          "usesMax": 1,
+          "recharge": "long"
+        },
+        {
+          "name": "Divine Intervention Improvement",
+          "description": "Your call for intervention succeeds automatically, no roll required.",
+          "usesMax": 1,
+          "recharge": "long",
+          "replaces": "Divine Intervention"
+        }
+      ],
+      "subclasses": [
+        {
+          "id": "life-domain",
+          "name": "Life Domain",
+          "description": "The Life domain focuses on the vibrant positive energy \u2014 one of the fundamental forces of the universe \u2014 that sustains all life. The gods of life promote vitality and health through healing the sick and wounded, caring for those in need, and driving away the forces of death and undeath. Almost any non-evil deity can claim influence over this domain, particularly agricultural deities, sun gods, gods of healing or endurance, and gods of home and community.",
+          "levels": [
+            {
+              "level": 1,
+              "features": [
+                {
+                  "name": "Bonus Proficiency",
+                  "description": "When you choose this domain at 1st level, you gain proficiency with heavy armor."
+                },
+                {
+                  "name": "Disciple of Life",
+                  "description": "Also starting at 1st level, your healing spells are more effective. Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional hit points equal to 2 + the spell's level."
+                }
+              ],
+              "levelUpEvents": [
+                {
+                  "type": "GAIN_PROFICIENCY",
+                  "proficiency": "heavy"
+                },
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "cleric",
+                  "spellIds": [
+                    "bless",
+                    "cure-wounds"
+                  ],
+                  "alwaysPrepared": true
+                }
+              ]
+            },
+            {
+              "level": 2,
+              "features": [
+                {
+                  "name": "Channel Divinity: Preserve Life",
+                  "description": "Starting at 2nd level, you can use your Channel Divinity to heal the badly injured. As an action, you present your holy symbol and evoke healing energy that can restore a number of hit points equal to five times your cleric level. Choose any creatures within 30 feet of you, and divide those hit points among them. This feature can restore a creature to no more than half of its hit point maximum. You can't use this feature on an undead or a construct."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 3,
+              "features": [],
+              "levelUpEvents": [
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "cleric",
+                  "spellIds": [
+                    "lesser-restoration",
+                    "spiritual-weapon"
+                  ],
+                  "alwaysPrepared": true
+                }
+              ]
+            },
+            {
+              "level": 5,
+              "features": [],
+              "levelUpEvents": [
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "cleric",
+                  "spellIds": [
+                    "beacon-of-hope",
+                    "revivify"
+                  ],
+                  "alwaysPrepared": true
+                }
+              ]
+            },
+            {
+              "level": 6,
+              "features": [
+                {
+                  "name": "Blessed Healer",
+                  "description": "Beginning at 6th level, the healing spells you cast on others heal you as well. When you cast a spell of 1st level or higher that restores hit points to a creature other than you, you regain hit points equal to 2 + the spell's level."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 7,
+              "features": [],
+              "levelUpEvents": [
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "cleric",
+                  "spellIds": [
+                    "death-ward",
+                    "guardian-of-faith"
+                  ],
+                  "alwaysPrepared": true
+                }
+              ]
+            },
+            {
+              "level": 8,
+              "features": [
+                {
+                  "name": "Divine Strike",
+                  "description": "At 8th level, you gain the ability to infuse your weapon strikes with divine energy. Once on each of your turns when you hit a creature with a weapon attack, you can cause the attack to deal an extra 1d8 radiant damage to the target. When you reach 14th level, the extra damage increases to 2d8."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 9,
+              "features": [],
+              "levelUpEvents": [
+                {
+                  "type": "GRANT_SPELLS",
+                  "addTo": "cleric",
+                  "spellIds": [
+                    "mass-cure-wounds",
+                    "raise-dead"
+                  ],
+                  "alwaysPrepared": true
+                }
+              ]
+            },
+            {
+              "level": 14,
+              "features": [
+                {
+                  "name": "Divine Strike (2d8)",
+                  "description": "The extra radiant damage dealt by your Divine Strike increases to 2d8."
+                }
+              ],
+              "levelUpEvents": []
+            },
+            {
+              "level": 17,
+              "features": [
+                {
+                  "name": "Supreme Healing",
+                  "description": "Starting at 17th level, when you would normally roll one or more dice to restore hit points with a spell, you instead use the highest number possible for each die. For example, instead of restoring 2d6 hit points to a creature, you restore 12."
+                }
+              ],
+              "levelUpEvents": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

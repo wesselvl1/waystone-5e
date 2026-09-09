@@ -1,0 +1,272 @@
+import type { AbilityKey, SkillKey, SpellcastingOrigin, SpellSlotLevel } from './character'
+
+// ─── Automatic events (applied without player input) ──────────────────────────
+
+export interface AddHpEvent {
+  type: 'ADD_HP'
+  roll: number          // Actual rolled value
+  average: number       // Floor(die/2)+1 for "take average" option
+  max: number           // Maximum possible value of the hit die
+  conBonus: number
+  hpFlatBonus: number   // Flat bonus per level from feats (e.g. Tough)
+}
+
+export interface UpdateSpellSlotsEvent {
+  type: 'UPDATE_SPELL_SLOTS'
+  slots: Partial<Record<SpellSlotLevel, number>>
+}
+
+export interface UpdateWarlockSlotsEvent {
+  type: 'UPDATE_WARLOCK_SLOTS'
+  slotLevel: SpellSlotLevel   // All pact magic slots are the same level
+  max: number                 // Absolute max (not a delta)
+}
+
+export interface AddFeatureEvent {
+  type: 'ADD_FEATURE'
+  feature: {
+    id: string
+    name: string
+    source: string
+    description: string
+    usesMax?: number
+    recharge?: 'short' | 'long' | 'dawn'
+    replaces?: string    // Name of an existing feature to remove when this one is added
+  }
+}
+
+export interface GainProficiencyEvent {
+  type: 'GAIN_PROFICIENCY'
+  proficiency: string
+  category: 'armor' | 'weapon' | 'tool' | 'language' | 'skill' | 'save'
+  skill?: SkillKey
+  save?: AbilityKey
+}
+
+/**
+ * Records which ability a spellcasting source uses. Emitted per class on every level-up,
+ * so a multiclass caster ends up with an entry each rather than sharing one ability.
+ */
+export interface SetSpellcastingAbilityEvent {
+  type: 'SET_SPELLCASTING_ABILITY'
+  /** classId today; a race or background source later. */
+  sourceId: string
+  ability: AbilityKey
+}
+
+export interface UpdateHitDieEvent {
+  type: 'UPDATE_HIT_DIE'
+  /** Which class's pool gains a die. */
+  classId: string
+  die: string
+}
+
+/** Spells granted outright by a class or subclass (e.g. cleric domain spells). No player choice. */
+export interface GrantSpellsEvent {
+  type: 'GRANT_SPELLS'
+  addTo: string         // classId of the class spell list to add the spells to
+  spells: Array<{ spellId: string; name: string; level: number }>
+  alwaysPrepared: boolean   // Domain spells are always prepared and don't count against the prepared limit
+  /** Guard that was satisfied to produce this event, kept for traceability. */
+  whenOption?: { choiceId: string; optionId: string }
+  /** Source metadata for a non-class grant. */
+  ability?: AbilityKey
+  origin?: SpellcastingOrigin
+  label?: string
+  uses?: { max: number; recharge: 'short' | 'long' | 'dawn' }
+  castAtLevel?: number
+}
+
+/** Sets or widens the creature forms a character may assume. Absolute, not a delta:
+ * a later level replaces the limits rather than adding to them, which is what lets a
+ * subclass override the class progression. */
+export interface SetWildShapeLimitsEvent {
+  type: 'SET_WILD_SHAPE_LIMITS'
+  maxCR: number
+  allowSwim: boolean
+  allowFly: boolean
+  types?: string[]
+}
+
+export interface UpdateFeatureUsesEvent {
+  type: 'UPDATE_FEATURE_USES'
+  featureName: string
+  usesMax: number | null   // null = unlimited (remove the cap)
+}
+
+// ─── Choice events (require player input) ─────────────────────────────────────
+
+export interface ChooseSpellEvent {
+  type: 'CHOOSE_SPELL'
+  addTo: string         // classId of the class spell list to add chosen spells to
+  count: number
+  cantrip: boolean
+  fromList?: string[]   // Spell ids if restricted; empty = any from class list
+  replace?: boolean     // Whether player can also swap an existing spell
+  classes?: string[]    // Restrict to spells from these class lists
+  schools?: string[]    // Restrict to spells from these schools of magic
+  /** Source metadata when addTo names a race or background rather than a class. */
+  ability?: AbilityKey
+  origin?: SpellcastingOrigin
+  label?: string
+}
+
+export interface ChangeSpellEvent {
+  type: 'CHANGE_SPELL'
+  addTo: string         // classId of the class spell list to swap spells in
+  amount: number        // Number of spells the player may swap out
+  classes?: string[]    // Restrict replacements to spells from these class lists
+  schools?: string[]    // Restrict replacements to spells from these schools of magic
+}
+
+export interface ChooseExpertiseEvent {
+  type: 'CHOOSE_EXPERTISE'
+  label: string
+  options: SkillKey[]
+  count: number
+}
+
+export interface ChooseFeatEvent {
+  type: 'CHOOSE_FEAT'
+}
+
+export interface AbilityScoreImprovementEvent {
+  type: 'ABILITY_SCORE_IMPROVEMENT'
+  points: number        // Usually 2 (can go +2 one / +1+1)
+}
+
+export interface ChooseSubclassEvent {
+  type: 'CHOOSE_SUBCLASS'
+  label: string         // e.g. "Martial Archetype", "Roguish Archetype"
+}
+
+export interface ChooseSkillEvent {
+  type: 'CHOOSE_SKILL'
+  count: number
+  from: SkillKey[]
+}
+
+export interface ChooseOptionEvent {
+  type: 'CHOOSE_OPTION'
+  id: string           // unique id for this choice (e.g. "totem-spirit")
+  label: string        // display label (e.g. "Choose a Totem Spirit")
+  options: Array<{ id: string; name: string; description: string }>
+}
+
+/** Presented when ≥1 optional features are available at this level from any loaded rulepack. */
+export interface OfferOptionalFeaturesEvent {
+  type: 'OFFER_OPTIONAL_FEATURES'
+  features: Array<{
+    id: string
+    name: string
+    description: string
+    classId: string
+    level: number
+    replaces?: string
+    usesMax?: number
+    recharge?: 'short' | 'long' | 'dawn'
+    sourceName: string   // Rulepack name the feature comes from
+  }>
+}
+
+// ─── Resolved event (carries result of a choice) ──────────────────────────────
+
+export interface ResolvedChoiceSpell {
+  type: 'RESOLVED_CHOOSE_SPELL'
+  spellIds: string[]
+  removedSpellIds: string[]
+  classId?: string              // Which source's spell list these spells belong to
+  /** Set when the source is a race or background with its own ability. */
+  ability?: AbilityKey
+  origin?: SpellcastingOrigin
+  label?: string
+}
+
+export interface ResolvedChoiceFeat {
+  type: 'RESOLVED_CHOOSE_FEAT'
+  featId: string
+  /** Ability score bonuses chosen by the player for feats with abilityScoreChoice. */
+  abilityBonus?: Partial<Record<AbilityKey, number>>
+}
+
+export interface ResolvedASI {
+  type: 'RESOLVED_ASI'
+  bonuses: Partial<Record<AbilityKey, number>>
+}
+
+export interface ResolvedSubclass {
+  type: 'RESOLVED_SUBCLASS'
+  subclassId: string
+  classId: string
+}
+
+export interface ResolvedOption {
+  type: 'RESOLVED_OPTION'
+  choiceId: string     // matches ChooseOptionEvent.id
+  optionId: string
+}
+
+/** Carries the player's selections from an OFFER_OPTIONAL_FEATURES choice. */
+export interface ResolvedOptionalFeatures {
+  type: 'RESOLVED_OPTIONAL_FEATURES'
+  /** The full feature objects the player chose to take (self-contained; no rulepack lookup needed). */
+  taken: Array<{
+    id: string
+    name: string
+    description: string
+    classId: string
+    level: number
+    replaces?: string
+    usesMax?: number
+    recharge?: 'short' | 'long' | 'dawn'
+    sourceName: string
+  }>
+}
+
+// ─── Union types ───────────────────────────────────────────────────────────────
+
+export type AutomaticLevelUpEvent =
+  | AddHpEvent
+  | UpdateSpellSlotsEvent
+  | UpdateWarlockSlotsEvent
+  | AddFeatureEvent
+  | GainProficiencyEvent
+  | UpdateHitDieEvent
+  | UpdateFeatureUsesEvent
+  | GrantSpellsEvent
+  | SetWildShapeLimitsEvent
+  | SetSpellcastingAbilityEvent
+
+export type ChoiceLevelUpEvent =
+  | ChooseSpellEvent
+  | ChangeSpellEvent
+  | ChooseExpertiseEvent
+  | ChooseFeatEvent
+  | AbilityScoreImprovementEvent
+  | ChooseSubclassEvent
+  | ChooseSkillEvent
+  | ChooseOptionEvent
+  | OfferOptionalFeaturesEvent
+
+export type LevelUpEvent = AutomaticLevelUpEvent | ChoiceLevelUpEvent
+
+/** Skills picked for a CHOOSE_EXPERTISE: proficiency doubled, not newly granted. */
+export interface ResolvedExpertise {
+  type: 'RESOLVED_EXPERTISE'
+  skills: SkillKey[]
+}
+
+/** Skills picked for a CHOOSE_SKILL, e.g. the single skill a multiclass bard gains. */
+export interface ResolvedSkill {
+  type: 'RESOLVED_SKILL'
+  skills: SkillKey[]
+}
+
+export type ResolvedChoice =  | ResolvedChoiceSpell
+  | ResolvedChoiceFeat
+  | ResolvedASI
+  | ResolvedSubclass
+  | ResolvedOption
+  | ResolvedOptionalFeatures
+  | ResolvedSkill
+  | ResolvedExpertise
