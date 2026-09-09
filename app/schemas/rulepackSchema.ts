@@ -154,6 +154,7 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     id: z.string(),
     label: z.string(),
     options: z.array(ChooseOptionDefSchema).min(1),
+    group: z.string().optional(),
   }),
 ])
 

@@ -151,6 +151,8 @@ export interface ChooseOptionEvent {
   id: string           // unique id for this choice (e.g. "totem-spirit")
   label: string        // display label (e.g. "Choose a Totem Spirit")
   options: Array<{ id: string; name: string; description: string }>
+  /** Shared pool this choice draws from, when it has one (e.g. "metamagic"). */
+  group?: string
 }
 
 /** Presented when ≥1 optional features are available at this level from any loaded rulepack. */
