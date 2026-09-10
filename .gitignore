@@ -6,6 +6,10 @@
 .cache
 dist
 
+# Packed non-SRD rulepacks (scripts/pack-rulepacks.mjs). Kept out of dist/, which is
+# Nuxt's link to the deployed .output/public.
+/out
+
 # Node dependencies
 node_modules
 
