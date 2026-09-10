@@ -5,6 +5,7 @@ import { multiclassOptions, describeMulticlassPrerequisites, effectiveScores, pr
 import { maxSpellLevelForClass, clampSpellSlots, spellSaveDCFor, spellAttackBonusFor, expandedSpellIdsFor } from '~/services/spellcasting'
 import { abilityMod, proficiencyBonus } from '~/composables/useCharacterStats'
 import { isChoiceSatisfied, type AbilityPicks } from '~/services/abilityScoreChoice'
+import { filterBySearch } from '~/services/searchFilter'
 import {
   resolveLevelUpEvents,
   resolveOptionChoice,
@@ -556,6 +557,53 @@ watch(currentChoice, (choice) => {
 
 const availableSubclasses = computed(() => rulepackStore.getSubclassesForClass(targetClassId.value))
 
+// ── Search ────────────────────────────────────────────────────────────────────
+// Every long pick-list in the wizard gets a filter box: the feat and spell lists run
+// to hundreds of entries with a few sourcebooks loaded, and a warlock picking from
+// two dozen invocations was scrolling blind. Each list keeps its own query, and all
+// of them reset when the wizard moves on so a filter never carries into the next
+// question.
+const featSearch = ref('')
+const spellSearch = ref('')
+const subclassSearch = ref('')
+const optionSearch = ref('')
+const optionalFeatureSearch = ref('')
+const multiclassSearch = ref('')
+
+const filteredFeats = computed(() => filterBySearch(allFeats.value, featSearch.value,
+  f => [f.name, f.sourceName, f.description, f.prerequisite]))
+
+const filteredSpells = computed(() => filterBySearch(availableSpells.value, spellSearch.value,
+  s => [s.name, s.school, s.castingTime, s.sourceName, s.level === 0 ? 'cantrip' : `level ${s.level}`]))
+
+const filteredSubclasses = computed(() => filterBySearch(availableSubclasses.value, subclassSearch.value,
+  sub => [sub.name, sub.description]))
+
+const filteredOptions = computed(() => filterBySearch(availableOptions.value, optionSearch.value,
+  o => [o.name, o.description]))
+
+/** The optional features on offer live on the event rather than in a store getter. */
+const offeredOptionalFeatures = computed(() =>
+  (currentChoice.value?.type === 'OFFER_OPTIONAL_FEATURES'
+    ? (currentChoice.value as OfferOptionalFeaturesEvent).features
+    : []))
+
+const filteredOptionalFeatures = computed(() =>
+  filterBySearch(offeredOptionalFeatures.value, optionalFeatureSearch.value,
+    f => [f.name, f.description, f.sourceName, f.replaces]))
+
+const filteredMulticlassChoices = computed(() => filterBySearch(multiclassChoices.value, multiclassSearch.value,
+  o => [o.classDef.name, ...o.classDef.primaryAbility]))
+
+/** A query answered one question is meaningless in the next. */
+watch(currentChoiceIdx, () => {
+  featSearch.value = ''
+  spellSearch.value = ''
+  subclassSearch.value = ''
+  optionSearch.value = ''
+  optionalFeatureSearch.value = ''
+})
+
 function confirmSubclass() {
   if (!selectedSubclassId.value) return
   const subclassId = selectedSubclassId.value
@@ -706,8 +754,15 @@ watch(isFirstCharacterLevel, (val) => {
             <p class="text-xs text-slate-500">
               Multiclassing grants a reduced set of proficiencies and never saving throws.
             </p>
+            <SearchBox
+              v-if="multiclassChoices.length > 6"
+              v-model="multiclassSearch"
+              placeholder="Search classes…"
+              :matches="filteredMulticlassChoices.length"
+              :total="multiclassChoices.length"
+            />
             <button
-              v-for="opt in multiclassChoices"
+              v-for="opt in filteredMulticlassChoices"
               :key="opt.classDef.id"
               class="card w-full text-left transition-colors"
               :class="opt.eligibility.eligible
@@ -782,9 +837,17 @@ watch(isFirstCharacterLevel, (val) => {
           </template>
 
           <template v-else>
+            <SearchBox
+              v-if="allFeats.length > 6"
+              v-model="featSearch"
+              class="mb-2"
+              placeholder="Search feats…"
+              :matches="filteredFeats.length"
+              :total="allFeats.length"
+            />
             <div class="space-y-2 max-h-72 overflow-y-auto">
               <button
-                v-for="feat in allFeats"
+                v-for="feat in filteredFeats"
                 :key="feat.id"
                 class="card w-full text-left transition-colors hover:border-primary-500/50"
                 :class="selectedFeatId === feat.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -795,6 +858,7 @@ watch(isFirstCharacterLevel, (val) => {
                 <p class="text-xs text-slate-400 mt-0.5">{{ feat.description.slice(0, 100) }}…</p>
                 <p v-if="feat.prerequisite" class="text-xs mt-0.5" :class="checkFeatPrerequisite(character!, feat as FeatDefinition) ? 'text-slate-500' : 'text-red-400 font-medium'">Req: {{ feat.prerequisite }}</p>
               </button>
+              <p v-if="filteredFeats.length === 0" class="text-slate-500 text-sm text-center py-4">Nothing matches “{{ featSearch }}”.</p>
             </div>
             <!-- Ability score choice for selected feat -->
             <AbilityScoreChoicePicker
@@ -821,10 +885,18 @@ watch(isFirstCharacterLevel, (val) => {
         <!-- Choose Spell -->
         <template v-else-if="currentChoice.type === 'CHOOSE_SPELL'">
           <h2 class="font-semibold text-white text-lg">Choose {{ currentChoice.count }} {{ currentChoice.cantrip ? 'Cantrip' : 'Spell' }}{{ currentChoice.count > 1 ? 's' : '' }}</h2>
-          <p class="text-sm text-slate-400 mb-3">{{ spellSelections.length }}/{{ currentChoice.count }} selected</p>
+          <p class="text-sm text-slate-400 mb-2">{{ spellSelections.length }}/{{ currentChoice.count }} selected</p>
+          <SearchBox
+            v-if="availableSpells.length > 6"
+            v-model="spellSearch"
+            class="mb-2"
+            placeholder="Search by name, school or casting time…"
+            :matches="filteredSpells.length"
+            :total="availableSpells.length"
+          />
           <div class="space-y-1.5 max-h-80 overflow-y-auto">
             <button
-              v-for="spell in availableSpells"
+              v-for="spell in filteredSpells"
               :key="spell.id"
               class="card w-full text-left text-sm py-2 hover:border-primary-500/50 transition-colors"
               :class="spellSelections.includes(spell.id) ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -833,6 +905,7 @@ watch(isFirstCharacterLevel, (val) => {
               <span class="font-medium text-white">{{ spell.name }}</span>
               <span class="text-slate-500 ml-2 text-xs">{{ spell.school }} · {{ spell.castingTime }} · {{ spell.sourceName }}</span>
             </button>
+            <p v-if="filteredSpells.length === 0" class="text-slate-500 text-sm text-center py-4">Nothing matches “{{ spellSearch }}”.</p>
           </div>
           <div class="flex gap-2 mt-2">
             <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
@@ -843,9 +916,17 @@ watch(isFirstCharacterLevel, (val) => {
         <!-- Choose Feat -->
         <template v-else-if="currentChoice.type === 'CHOOSE_FEAT'">
           <h2 class="font-semibold text-white text-lg">Choose a Feat</h2>
+          <SearchBox
+            v-if="allFeats.length > 6"
+            v-model="featSearch"
+            class="my-2"
+            placeholder="Search feats…"
+            :matches="filteredFeats.length"
+            :total="allFeats.length"
+          />
           <div class="space-y-2 max-h-72 overflow-y-auto">
             <button
-              v-for="feat in allFeats"
+              v-for="feat in filteredFeats"
               :key="feat.id"
               class="card w-full text-left transition-colors hover:border-primary-500/50"
               :class="selectedFeatId === feat.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -856,6 +937,7 @@ watch(isFirstCharacterLevel, (val) => {
               <p class="text-xs text-slate-400 mt-0.5">{{ feat.description.slice(0, 120) }}…</p>
               <p v-if="feat.prerequisite" class="text-xs mt-0.5" :class="checkFeatPrerequisite(character!, feat as FeatDefinition) ? 'text-slate-500' : 'text-red-400 font-medium'">Prerequisite: {{ feat.prerequisite }}</p>
             </button>
+            <p v-if="filteredFeats.length === 0" class="text-slate-500 text-sm text-center py-4">Nothing matches “{{ featSearch }}”.</p>
           </div>
           <!-- Ability score choice for selected feat -->
           <AbilityScoreChoicePicker
@@ -878,9 +960,17 @@ watch(isFirstCharacterLevel, (val) => {
         <!-- Choose Subclass -->
         <template v-else-if="currentChoice.type === 'CHOOSE_SUBCLASS'">
           <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ChooseSubclassEvent).label }}</h2>
-          <div v-if="availableSubclasses.length > 0" class="space-y-2 max-h-[28rem] overflow-y-auto">
+          <SearchBox
+            v-if="availableSubclasses.length > 6"
+            v-model="subclassSearch"
+            class="my-2"
+            placeholder="Search subclasses…"
+            :matches="filteredSubclasses.length"
+            :total="availableSubclasses.length"
+          />
+          <div v-if="filteredSubclasses.length > 0" class="space-y-2 max-h-[28rem] overflow-y-auto">
             <button
-              v-for="sub in availableSubclasses"
+              v-for="sub in filteredSubclasses"
               :key="sub.id"
               class="card w-full text-left hover:border-primary-500/50 transition-colors"
               :class="selectedSubclassId === sub.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -897,7 +987,8 @@ watch(isFirstCharacterLevel, (val) => {
             </button>
           </div>
           <p v-else class="text-slate-500 text-sm text-center py-4">
-            No subclasses available in the loaded rulepacks.
+            <template v-if="availableSubclasses.length === 0">No subclasses available in the loaded rulepacks.</template>
+            <template v-else>Nothing matches “{{ subclassSearch }}”.</template>
           </p>
           <div class="flex gap-2 mt-2">
             <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
@@ -912,9 +1003,17 @@ watch(isFirstCharacterLevel, (val) => {
         <!-- Choose Option (e.g. Totem Spirit) -->
         <template v-else-if="currentChoice.type === 'CHOOSE_OPTION'">
           <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ChooseOptionEvent).label }}</h2>
+          <SearchBox
+            v-if="availableOptions.length > 6"
+            v-model="optionSearch"
+            class="mt-2"
+            placeholder="Search options…"
+            :matches="filteredOptions.length"
+            :total="availableOptions.length"
+          />
           <div class="space-y-2 mt-3">
             <button
-              v-for="opt in availableOptions"
+              v-for="opt in filteredOptions"
               :key="opt.id"
               class="card w-full text-left hover:border-primary-500/50 transition-colors"
               :class="selectedOptionId === opt.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -923,6 +1022,9 @@ watch(isFirstCharacterLevel, (val) => {
               <p class="font-semibold text-white">{{ opt.name }}</p>
               <p class="text-xs text-slate-400 mt-1 leading-relaxed">{{ opt.description }}</p>
             </button>
+            <p v-if="availableOptions.length && filteredOptions.length === 0" class="text-slate-500 text-sm text-center py-4">
+              Nothing matches “{{ optionSearch }}”.
+            </p>
           </div>
           <div class="flex gap-2 mt-2">
             <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
@@ -1034,10 +1136,18 @@ watch(isFirstCharacterLevel, (val) => {
         <!-- Optional Features -->
         <template v-else-if="currentChoice.type === 'OFFER_OPTIONAL_FEATURES'">
           <h2 class="font-semibold text-white text-lg">Optional Class Features</h2>
-          <p class="text-sm text-slate-400 mb-3">These optional features are available from your loaded rulepacks. Toggle any you'd like to take.</p>
+          <p class="text-sm text-slate-400 mb-2">These optional features are available from your loaded rulepacks. Toggle any you'd like to take.</p>
+          <SearchBox
+            v-if="offeredOptionalFeatures.length > 6"
+            v-model="optionalFeatureSearch"
+            class="mb-2"
+            placeholder="Search optional features…"
+            :matches="filteredOptionalFeatures.length"
+            :total="offeredOptionalFeatures.length"
+          />
           <div class="space-y-2 max-h-[28rem] overflow-y-auto">
             <div
-              v-for="feat in (currentChoice as OfferOptionalFeaturesEvent).features"
+              v-for="feat in filteredOptionalFeatures"
               :key="feat.id"
               class="card cursor-pointer hover:border-surface-500 transition-colors"
               :class="optionalFeatureToggles[feat.id] ? 'border-primary-500 bg-primary-900/20' : ''"
