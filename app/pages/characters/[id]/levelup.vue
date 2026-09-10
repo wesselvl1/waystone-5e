@@ -683,6 +683,7 @@ const featSearch = ref('')
 const spellSearch = ref('')
 const subclassSearch = ref('')
 const optionSearch = ref('')
+const replacementSearch = ref('')
 const optionalFeatureSearch = ref('')
 const multiclassSearch = ref('')
 
@@ -697,6 +698,10 @@ const filteredSubclasses = computed(() => filterBySearch(availableSubclasses.val
 
 const filteredOptions = computed(() => filterBySearch(availableOptions.value, optionSearch.value,
   o => [o.name, o.description]))
+
+/** The trade's own list is as long as the pool it draws from, so it gets a box too. */
+const filteredReplacementOptions = computed(() =>
+  filterBySearch(replacementOptions.value, replacementSearch.value, o => [o.name, o.description]))
 
 /** The optional features on offer live on the event rather than in a store getter. */
 const offeredOptionalFeatures = computed(() =>
@@ -717,6 +722,7 @@ watch(currentChoiceIdx, () => {
   spellSearch.value = ''
   subclassSearch.value = ''
   optionSearch.value = ''
+  replacementSearch.value = ''
   optionalFeatureSearch.value = ''
 })
 
@@ -1168,9 +1174,17 @@ watch(isFirstCharacterLevel, (val) => {
 
           <template v-if="replaceFromChoiceId">
             <p class="section-header mt-4">Take instead</p>
+            <SearchBox
+              v-if="replacementOptions.length > 6"
+              v-model="replacementSearch"
+              class="mb-2"
+              placeholder="Search options…"
+              :matches="filteredReplacementOptions.length"
+              :total="replacementOptions.length"
+            />
             <div class="space-y-2">
               <button
-                v-for="opt in replacementOptions"
+                v-for="opt in filteredReplacementOptions"
                 :key="opt.id"
                 class="card w-full text-left hover:border-primary-500/50 transition-colors"
                 :class="replaceToOptionId === opt.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -1179,6 +1193,9 @@ watch(isFirstCharacterLevel, (val) => {
                 <p class="font-semibold text-white">{{ opt.name }}</p>
                 <p class="text-xs text-slate-400 mt-1 leading-relaxed">{{ opt.description }}</p>
               </button>
+              <p v-if="replacementOptions.length && filteredReplacementOptions.length === 0" class="text-slate-500 text-sm text-center py-4">
+                Nothing matches “{{ replacementSearch }}”.
+              </p>
             </div>
           </template>
 
