@@ -56,6 +56,10 @@ const ChooseOptionDefSchema = z.object({
   description: z.string(),
   // Set when an option opens later than the pool that offers it.
   minLevel: z.number().int().min(1).max(20).optional(),
+  // Prerequisites other than level: another choice's answer (Pact of the Blade) or a
+  // spell the option modifies (eldritch blast).
+  requiresOption: z.object({ choiceId: z.string(), optionId: z.string() }).optional(),
+  requiresSpell: z.string().optional(),
 })
 
 const CreatureTypeSchema = z.enum([
@@ -227,6 +231,11 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     label: z.string(),
     options: z.array(ChooseOptionDefSchema).min(1),
     group: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('REPLACE_OPTION'),
+    group: z.string(),
+    label: z.string().optional(),
   }),
 ])
 

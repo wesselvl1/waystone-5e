@@ -1,4 +1,4 @@
-import type { Character, AbilityKey, SpellcastingOrigin, SpellSlotLevel } from '~/types/character'
+import type { Character, AbilityKey, Feature, SpellcastingOrigin, SpellSlotLevel } from '~/types/character'
 import type {
   Rulepack,
   OptionalClassFeature,
@@ -21,6 +21,8 @@ import type {
   SetSpellcastingAbilityEvent,
   ChooseExpertiseEvent,
   ChooseOptionEvent,
+  PoolOption,
+  ReplaceOptionEvent,
   ChooseSpellEvent,
   ChooseSpellcastingAbilityEvent,
   GrantSpellcastingEvent,
@@ -196,8 +198,65 @@ function allOptionChoices(rulepack: Rulepack): ChooseOptionDefEvent[] {
 }
 
 /**
- * Translates a CHOOSE_OPTION definition, dropping options the character has already taken
- * from the same pool.
+ * Whether an option's prerequisites are met.
+ *
+ * An option can be gated on three things, and the SRD's Eldritch Invocations use all
+ * three: a level (Thirsting Blade at 5th), another choice's answer (Pact of the Blade),
+ * and a spell the option modifies (Agonizing Blast needs eldritch blast). Without this
+ * every prompt offered the whole pool, so a 2nd-level warlock could take Lifedrinker.
+ *
+ * `level` is the level in the class that opened the pool, since a class's gates are
+ * written against its own table, not the character's total.
+ *
+ * Everything is read off the character, so a caller mid-level-up — where the answer to a
+ * gate is not stored yet — passes a character projected to include this run's picks.
+ */
+export function optionAvailable(
+  option: PoolOption,
+  character: Character,
+  level: number,
+): boolean {
+  if (option.minLevel && level < option.minLevel) return false
+  if (option.requiresOption) {
+    const { choiceId, optionId } = option.requiresOption
+    if (character.chosenOptions?.[choiceId] !== optionId) return false
+  }
+  if (option.requiresSpell) {
+    if (!(character.spells ?? []).some(sp => sp.spellId === option.requiresSpell)) return false
+  }
+  return true
+}
+
+/** Total level across every class, the yardstick for a race's or feat's own pools. */
+function totalLevel(character: Character): number {
+  return character.classes.reduce((sum, c) => sum + c.level, 0)
+}
+
+/** The choice ids that draw from one shared pool, in the order the pack declares them. */
+function choiceIdsInGroup(rulepack: Rulepack, group: string): string[] {
+  return allOptionChoices(rulepack).filter(d => d.group === group).map(d => d.id)
+}
+
+/**
+ * Every option the pool offers, deduplicated by id.
+ *
+ * Each pick in a group repeats the whole list, so any one of them would do — except that
+ * a pack is free to widen the list on a later pick, and a replacement offer has to know
+ * about everything the pool can hold.
+ */
+function optionsInGroup(rulepack: Rulepack, group: string): PoolOption[] {
+  const byId = new Map<string, PoolOption>()
+  for (const def of allOptionChoices(rulepack)) {
+    if (def.group !== group) continue
+    for (const option of def.options) if (!byId.has(option.id)) byId.set(option.id, option)
+  }
+  return [...byId.values()]
+}
+
+/**
+ * Translates a CHOOSE_OPTION definition, dropping options the character cannot take —
+ * whether because a prerequisite is unmet or because they already took it from the same
+ * pool.
  *
  * Metamagic, Eldritch Invocations and Fighting Style are each picked more than once from
  * one list, and the SRD forbids taking an option twice. Each pick is a separate choice with
@@ -205,36 +264,128 @@ function allOptionChoices(rulepack: Rulepack): ChooseOptionDefEvent[] {
  * so nothing tied them together and every prompt offered the whole list again.
  *
  * `chosenOptions` is keyed by choice id, so the pack's own definitions are what say which
- * ids belong to the group. Returns undefined when the group is spent, rather than offering
+ * ids belong to the group. Returns undefined when nothing is left to offer, rather than
  * an empty list.
+ *
+ * `level` defaults to the character's total level, which is the right yardstick for a
+ * race's or a feat's own pool; a class pool passes the level in that class.
  */
 export function resolveOptionChoice(
   eventDef: ChooseOptionDefEvent,
   character: Character,
   rulepack: Rulepack,
+  level: number = totalLevel(character),
 ): ChooseOptionEvent | undefined {
-  const base: ChooseOptionEvent = {
-    type: 'CHOOSE_OPTION',
-    id: eventDef.id,
-    label: eventDef.label,
-    options: eventDef.options,
-    group: eventDef.group,
-  }
-  if (!eventDef.group) return base
-
-  const inGroup = allOptionChoices(rulepack)
-    .filter(d => d.group === eventDef.group)
-    .map(d => d.id)
+  const siblings = eventDef.group ? choiceIdsInGroup(rulepack, eventDef.group) : []
   const taken = new Set(
-    inGroup
+    siblings
       .filter(id => id !== eventDef.id)
       .map(id => character.chosenOptions?.[id])
       .filter((id): id is string => !!id),
   )
-  if (taken.size === 0) return base
+  const options = eventDef.options.filter(o =>
+    !taken.has(o.id) && optionAvailable(o, character, level))
+  if (options.length === 0) return undefined
+  return {
+    type: 'CHOOSE_OPTION',
+    id: eventDef.id,
+    label: eventDef.label,
+    options,
+    group: eventDef.group,
+  }
+}
 
-  const options = eventDef.options.filter(o => !taken.has(o.id))
-  return options.length > 0 ? { ...base, options } : undefined
+/** Stable feature id for a pool pick, so a later swap overwrites it rather than piling up. */
+function poolFeatureId(choiceId: string): string {
+  return `option-${choiceId}`
+}
+
+/**
+ * The feature a pool pick is worth on its own, or undefined when the choice is not a
+ * class-level pool pick.
+ *
+ * A pick from a shared pool was recorded in `chosenOptions` and nowhere else, so the sheet
+ * — which renders `features` — showed a warlock "Eldritch Invocations" without ever saying
+ * which. Each pick therefore gets its own feature, which is also what a replacement
+ * rewrites. Single choices like a Totem Spirit are left out: those already show up by
+ * renaming the feature that raised them.
+ */
+function poolPickFeature(
+  rulepack: Rulepack,
+  choiceId: string,
+  optionId: string,
+): Feature | undefined {
+  for (const cls of rulepack.classes) {
+    for (const level of cls.levels) {
+      for (const def of level.levelUpEvents ?? []) {
+        if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId || !def.group) continue
+        const option = def.options.find(o => o.id === optionId)
+        if (!option) return undefined
+        return {
+          id: poolFeatureId(choiceId),
+          name: option.name,
+          source: cls.name,
+          description: option.description,
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+/**
+ * Adds the features for pool picks a character made before those picks were recorded as
+ * features, so an existing warlock's invocations appear on the sheet without re-levelling.
+ * Returns the character unchanged when there is nothing to add, so the caller can skip
+ * the save.
+ */
+export function backfillPoolPickFeatures(character: Character, rulepack: Rulepack): Character {
+  const missing: Feature[] = []
+  for (const [choiceId, optionId] of Object.entries(character.chosenOptions ?? {})) {
+    const feature = poolPickFeature(rulepack, choiceId, optionId)
+    if (!feature) continue
+    if (character.features.some(f => f.id === feature.id)) continue
+    missing.push(feature)
+  }
+  if (missing.length === 0) return character
+  return { ...character, features: [...character.features, ...missing] }
+}
+
+/**
+ * Translates a REPLACE_OPTION definition into the offer to retrain one pick.
+ *
+ * Returns undefined unless the trade is actually possible: nothing known from the pool
+ * yet (a warlock's first invocations are gained, not traded), or nothing left that the
+ * character qualifies for. An option already known is not offered as its own replacement.
+ */
+export function resolveOptionReplacement(
+  eventDef: Extract<LevelUpEventDef, { type: 'REPLACE_OPTION' }>,
+  character: Character,
+  rulepack: Rulepack,
+  level: number = totalLevel(character),
+): ReplaceOptionEvent | undefined {
+  const pool = optionsInGroup(rulepack, eventDef.group)
+  const byId = new Map(pool.map(o => [o.id, o]))
+
+  const current: ReplaceOptionEvent['current'] = []
+  for (const choiceId of choiceIdsInGroup(rulepack, eventDef.group)) {
+    const optionId = character.chosenOptions?.[choiceId]
+    const option = optionId ? byId.get(optionId) : undefined
+    if (option) current.push({ choiceId, option })
+  }
+  if (current.length === 0) return undefined
+
+  const known = new Set(current.map(c => c.option.id))
+  const options = pool.filter(o => !known.has(o.id) && optionAvailable(o, character, level))
+  if (options.length === 0) return undefined
+
+  return {
+    type: 'REPLACE_OPTION',
+    group: eventDef.group,
+    label: eventDef.label ?? 'Replace a choice',
+    current,
+    options,
+  }
 }
 
 /**
@@ -643,7 +794,12 @@ export function resolveLevelUpEvents(
         }
         break
       case 'CHOOSE_OPTION': {
-        const choice = resolveOptionChoice(eventDef, character, rulepack)
+        const choice = resolveOptionChoice(eventDef, character, rulepack, newLevel)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'REPLACE_OPTION': {
+        const choice = resolveOptionReplacement(eventDef, character, rulepack, newLevel)
         if (choice) events.push(choice)
         break
       }
@@ -661,7 +817,12 @@ export function resolveLevelUpEvents(
   for (const eventDef of subclassLevelEvents) {
     switch (eventDef.type) {
       case 'CHOOSE_OPTION': {
-        const choice = resolveOptionChoice(eventDef, character, rulepack)
+        const choice = resolveOptionChoice(eventDef, character, rulepack, newLevel)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'REPLACE_OPTION': {
+        const choice = resolveOptionReplacement(eventDef, character, rulepack, newLevel)
         if (choice) events.push(choice)
         break
       }
@@ -966,7 +1127,7 @@ export function resolveUnlockedChoices(
 }
 
 export function isChoiceEvent(event: LevelUpEvent): event is ChoiceLevelUpEvent {
-  return ['CHOOSE_SPELL', 'CHOOSE_SPELLCASTING_ABILITY', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
+  return ['CHOOSE_SPELL', 'CHOOSE_SPELLCASTING_ABILITY', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'REPLACE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
 }
 
 export function getChoiceEvents(events: LevelUpEvent[]): ChoiceLevelUpEvent[] {
@@ -1354,6 +1515,11 @@ export function applyResolvedChoices(
           [choice.choiceId]: choice.optionId,
         }
 
+        // A pick from a shared pool gets its own feature, so the sheet names it.
+        const poolFeature = poolPickFeature(rulepack, choice.choiceId, choice.optionId)
+        if (poolFeature && !updated.features.some(f => f.id === poolFeature.id))
+          updated.features.push(poolFeature)
+
         // Apply grants guarded by this option that sit on the level being gained.
         // resolveLevelUpEvents could not emit them: the option was still unanswered when
         // it ran, the same ordering problem RESOLVED_SUBCLASS has.
@@ -1439,11 +1605,27 @@ export function applyResolvedChoices(
         }
         if (optionName) {
           // Update the feature whose id contains the choiceId (e.g. "totem-spirit" in the feature id)
-          const feat = updated.features.find(f => f.id.includes(choice.choiceId))
+          const feat = updated.features.find(f =>
+            f.id !== poolFeatureId(choice.choiceId) && f.id.includes(choice.choiceId))
           if (feat) {
             feat.name = `${feat.name} (${optionName})`
             feat.description = optionDescription ?? feat.description
           }
+        }
+        break
+      }
+      case 'RESOLVED_OPTION_REPLACEMENT': {
+        // Overwrite the traded pick in place: the pool keeps one answer per choice id, so
+        // the number of picks a character holds cannot drift.
+        updated.chosenOptions = {
+          ...updated.chosenOptions,
+          [choice.choiceId]: choice.optionId,
+        }
+        const swapped = poolPickFeature(rulepack, choice.choiceId, choice.optionId)
+        if (swapped) {
+          const at = updated.features.findIndex(f => f.id === swapped.id)
+          if (at >= 0) updated.features[at] = { ...updated.features[at]!, ...swapped }
+          else updated.features.push(swapped)
         }
         break
       }
