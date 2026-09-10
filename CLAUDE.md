@@ -48,7 +48,7 @@ Game content is data, not code. A **rulepack** (`app/types/rulepack.ts`) holds r
 
 The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass`, `getAllCreatures`, `getCreature`, `getCreaturesMatching` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
 
-Because ids are the merge key, a custom pack is expected to **prefix its entry ids with a source abbreviation** (`mpmm-satyr`) and reuse a bare SRD id only to override deliberately. So two books' versions of the same race are two entries, not a conflict — `getAllRaces` returns both, each tagged with a `sourceName`, and the creation picker labels them. Don't "fix" that by de-duplicating a list by name; the source label is the disambiguator.
+Because ids are the merge key, a custom pack is expected to **prefix its entry ids with a source abbreviation** (`mpmm-satyr`) and reuse a bare SRD id only to override deliberately. So two books' versions of the same race are two entries, not a conflict — the `getAll*` list getters return both, each tagged with a `sourceName` (`WithSource<T>`), and every picker labels them. Don't "fix" that by de-duplicating a list by name; the source label is the disambiguator. Those getters also sort — by name, or level-then-name for spells — so merging a pack in never reshuffles a list. `composedPack()` deliberately stays on the raw arrays: `sourceName` is for display, not for the level-up pipeline.
 
 ### SRD seeding
 

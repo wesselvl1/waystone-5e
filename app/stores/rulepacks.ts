@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia'
 import { db } from '~/db'
-import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter } from '~/types/rulepack'
+import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, Background, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
 import { mergeById, distributeSubclasses, distributeSubraces } from '~/services/rulepackMerge'
+
+/** A rulepack entry carrying the name of the pack that defines it, for display. */
+export type WithSource<T> = T & { sourceName: string }
 
 /**
  * Apply a parsed rulepack fragment onto an existing fully-hydrated Rulepack.
@@ -157,27 +160,35 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
   }
 
   /**
-   * Every race across all loaded packs, alphabetical, each tagged with the name of the
-   * pack it came from. Two packs' takes on the same race are both listed — pack ids are
-   * namespaced (`mpmm-satyr`), so a second book's Satyr is a separate entry rather than
-   * an override, and `sourceName` is what tells the two apart in the picker.
+   * Everything of one kind across all loaded packs, each entry tagged with the name of
+   * the pack it came from. Two packs' takes on the same content are both listed — pack
+   * ids are namespaced (`mpmm-satyr`), so a second book's Satyr is a separate entry
+   * rather than an override, and `sourceName` is what tells the two apart in a picker.
    */
-  function getAllRaces(): Array<Race & { sourceName: string }> {
-    return rulepacks.value
-      .flatMap(p => p.races.map(race => ({ ...race, sourceName: p.name })))
-      .sort((a, b) => a.name.localeCompare(b.name))
+  function withSource<T>(pick: (pack: Rulepack) => T[]): Array<WithSource<T>> {
+    return rulepacks.value.flatMap(p => pick(p).map(entry => ({ ...entry, sourceName: p.name })))
   }
 
-  function getAllClasses(): ClassDefinition[] {
-    return rulepacks.value.flatMap(p => p.classes)
+  /** Sorted the way the pickers list them, so merging a pack in never reshuffles. */
+  function byName(a: { name: string }, b: { name: string }) {
+    return a.name.localeCompare(b.name)
   }
 
-  function getAllSpells(): SpellDefinition[] {
-    return rulepacks.value.flatMap(p => p.spells)
+  function getAllRaces(): Array<WithSource<Race>> {
+    return withSource(p => p.races).sort(byName)
   }
 
-  function getAllFeats(): FeatDefinition[] {
-    return rulepacks.value.flatMap(p => p.feats)
+  function getAllClasses(): Array<WithSource<ClassDefinition>> {
+    return withSource(p => p.classes).sort(byName)
+  }
+
+  /** By level first: the level-up picker shows several levels at once. */
+  function getAllSpells(): Array<WithSource<SpellDefinition>> {
+    return withSource(p => p.spells).sort((a, b) => a.level - b.level || byName(a, b))
+  }
+
+  function getAllFeats(): Array<WithSource<FeatDefinition>> {
+    return withSource(p => p.feats).sort(byName)
   }
 
   /**
@@ -221,8 +232,8 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
   }
 
 
-  function getAllBackgrounds() {
-    return rulepacks.value.flatMap(p => p.backgrounds)
+  function getAllBackgrounds(): Array<WithSource<Background>> {
+    return withSource(p => p.backgrounds).sort(byName)
   }
 
   function getSubclassesForClass(classId: string): SubclassDefinition[] {
@@ -260,9 +271,9 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
       version: '0',
       races,
       classes,
-      backgrounds: getAllBackgrounds(),
-      feats: getAllFeats(),
-      spells: getAllSpells(),
+      backgrounds: rulepacks.value.flatMap(p => p.backgrounds),
+      feats: rulepacks.value.flatMap(p => p.feats),
+      spells: rulepacks.value.flatMap(p => p.spells),
       creatures: getAllCreatures(),
       optionalFeatures: rulepacks.value.flatMap(p => p.optionalFeatures),
     }
@@ -275,8 +286,8 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
   function getOptionalFeaturesForClass(
     classId: string,
     level: number,
-  ): Array<OptionalClassFeature & { sourceName: string }> {
-    const results: Array<OptionalClassFeature & { sourceName: string }> = []
+  ): Array<WithSource<OptionalClassFeature>> {
+    const results: Array<WithSource<OptionalClassFeature>> = []
     for (const pack of rulepacks.value) {
       for (const feat of pack.optionalFeatures) {
         if (feat.classId === classId && feat.level === level) {

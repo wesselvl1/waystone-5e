@@ -201,6 +201,8 @@ const maxLearnableSpellLevel = computed(() => {
   return maxSpellLevelForClass(targetClassId.value, classes, mergedPack())
 })
 
+const allFeats = computed(() => rulepackStore.getAllFeats())
+
 const availableSpells = computed(() => {
   const choiceEvent = currentChoice.value as ChooseSpellEvent | null
   if (!choiceEvent) return []
@@ -602,13 +604,14 @@ watch(isFirstCharacterLevel, (val) => {
           <template v-else>
             <div class="space-y-2 max-h-72 overflow-y-auto">
               <button
-                v-for="feat in rulepackStore.getAllFeats()"
+                v-for="feat in allFeats"
                 :key="feat.id"
                 class="card w-full text-left transition-colors hover:border-primary-500/50"
                 :class="selectedFeatId === feat.id ? 'border-primary-500 bg-primary-900/20' : ''"
                 @click="selectedFeatId = feat.id; featAsiChoice = {}"
               >
                 <p class="text-sm font-semibold text-white">{{ feat.name }}</p>
+                <p class="text-[10px] text-slate-500">{{ feat.sourceName }}</p>
                 <p class="text-xs text-slate-400 mt-0.5">{{ feat.description.slice(0, 100) }}…</p>
                 <p v-if="feat.prerequisite" class="text-xs mt-0.5" :class="checkFeatPrerequisite(character!, feat as FeatDefinition) ? 'text-slate-500' : 'text-red-400 font-medium'">Req: {{ feat.prerequisite }}</p>
               </button>
@@ -670,7 +673,7 @@ watch(isFirstCharacterLevel, (val) => {
               @click="toggleSpell(spell.id)"
             >
               <span class="font-medium text-white">{{ spell.name }}</span>
-              <span class="text-slate-500 ml-2 text-xs">{{ spell.school }} · {{ spell.castingTime }}</span>
+              <span class="text-slate-500 ml-2 text-xs">{{ spell.school }} · {{ spell.castingTime }} · {{ spell.sourceName }}</span>
             </button>
           </div>
           <div class="flex gap-2 mt-2">
@@ -684,13 +687,14 @@ watch(isFirstCharacterLevel, (val) => {
           <h2 class="font-semibold text-white text-lg">Choose a Feat</h2>
           <div class="space-y-2 max-h-72 overflow-y-auto">
             <button
-              v-for="feat in rulepackStore.getAllFeats()"
+              v-for="feat in allFeats"
               :key="feat.id"
               class="card w-full text-left transition-colors hover:border-primary-500/50"
               :class="selectedFeatId === feat.id ? 'border-primary-500 bg-primary-900/20' : ''"
               @click="selectedFeatId = feat.id; featAsiChoice = {}"
             >
               <p class="text-sm font-semibold text-white">{{ feat.name }}</p>
+              <p class="text-[10px] text-slate-500">{{ feat.sourceName }}</p>
               <p class="text-xs text-slate-400 mt-0.5">{{ feat.description.slice(0, 120) }}…</p>
               <p v-if="feat.prerequisite" class="text-xs mt-0.5" :class="checkFeatPrerequisite(character!, feat as FeatDefinition) ? 'text-slate-500' : 'text-red-400 font-medium'">Prerequisite: {{ feat.prerequisite }}</p>
             </button>
