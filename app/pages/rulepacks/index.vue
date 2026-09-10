@@ -2,6 +2,7 @@
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { importFromFile, importFromUrl } from '~/services/rulepackImport'
 import type { Rulepack } from '~/types/rulepack'
+import type { RulepackFragment } from '~/schemas/rulepackSchema'
 
 const rulepackStore = useRulepacksStore()
 
@@ -14,14 +15,21 @@ const confirmedUrl = ref('')
 const importing = ref(false)
 const error = ref('')
 
+/**
+ * An import yields one fragment per JSON file — a zip of a whole book holds several, and
+ * they arrive in merge order (patches last), so add them in sequence.
+ */
+async function addAll(fragments: RulepackFragment[]) {
+  for (const fragment of fragments) await rulepackStore.add(fragment)
+}
+
 async function handleFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   importing.value = true
   error.value = ''
   try {
-    const pack = await importFromFile(file)
-    await rulepackStore.add(pack)
+    await addAll(await importFromFile(file))
   }
   catch (err: unknown) {
     error.value = (err as Error).message
@@ -45,8 +53,7 @@ async function confirmUrlImport() {
   importing.value = true
   error.value = ''
   try {
-    const pack = await importFromUrl(confirmedUrl.value)
-    await rulepackStore.add(pack)
+    await addAll(await importFromUrl(confirmedUrl.value))
   }
   catch (err: unknown) {
     error.value = (err as Error).message
@@ -98,7 +105,7 @@ async function removePack(id: string, name: string) {
           </svg>
           File
         </button>
-        <input ref="fileInput" type="file" accept=".json" class="hidden" @change="handleFile" />
+        <input ref="fileInput" type="file" accept=".json,.zip" class="hidden" @change="handleFile" />
         <button class="btn-ghost text-xs" @click="openUrlModal">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
@@ -121,7 +128,7 @@ async function removePack(id: string, name: string) {
         </div>
         <div>
           <p class="text-slate-300 font-medium">No rulepacks loaded</p>
-          <p class="text-slate-500 text-sm mt-1">Import a JSON rulepack file or paste a URL.</p>
+          <p class="text-slate-500 text-sm mt-1">Import a rulepack — a JSON file, a zip of several — or paste a URL.</p>
         </div>
       </div>
 

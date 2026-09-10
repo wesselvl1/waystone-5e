@@ -12,7 +12,12 @@ pnpm build            # Node-server build
 pnpm preview
 pnpm test             # vitest run
 pnpm test:watch
+pnpm pack:rulepacks   # zip every non-SRD app/data/ fragment into out/rulepacks.zip
 ```
+
+`pack:rulepacks` writes to `out/` (gitignored), *not* `dist/` — after a build `dist/` is
+Nuxt's link to `.output/public`, the directory the deploy workflow uploads, so a zip of
+non-SRD book content written there would ride along into a public deploy.
 
 Single test file / single test:
 
@@ -90,7 +95,7 @@ Dexie cannot structured-clone Vue reactive proxies. Anything going into IndexedD
 
 ### Validation boundary
 
-All external JSON (character import, rulepack import from file or URL) goes through Zod in `app/services/characterIO.ts` / `rulepackImport.ts`. `importFromUrl` restricts to http/https and uses `credentials: 'omit'`; the *caller* is responsible for showing the URL to the user for confirmation before fetching (documented anti-SSRF contract in that file). `CharacterSchema` must stay in sync with `app/types/character.ts` by hand — they are separate declarations.
+All external JSON (character import, rulepack import from file or URL) goes through Zod in `app/services/characterIO.ts` / `rulepackImport.ts`. Both rulepack entry points return an *array* of fragments: they sniff the leading bytes and unpack a zip through `app/services/zip.ts` (a dependency-free reader over `DecompressionStream`), so one file can carry a whole book. Zip entries are re-ordered so patch fragments merge last, mirroring `SRD_FRAGMENT_ORDER`, and a single invalid fragment fails the whole import rather than merging half a book. `importFromUrl` restricts to http/https and uses `credentials: 'omit'`; the *caller* is responsible for showing the URL to the user for confirmation before fetching (documented anti-SSRF contract in that file). `CharacterSchema` must stay in sync with `app/types/character.ts` by hand — they are separate declarations.
 
 ## Notes
 
