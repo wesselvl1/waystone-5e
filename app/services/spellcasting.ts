@@ -1,5 +1,5 @@
 import type { AbilityKey, Character, ClassEntry, SpellSlotLevel, SpellSlots } from '~/types/character'
-import type { ClassDefinition, Rulepack } from '~/types/rulepack'
+import type { CasterProgression, ClassDefinition, LevelUpEventDef, Rulepack, SubclassDefinition } from '~/types/rulepack'
 import {
   spellLimitBonusTotal, preparedSpellCount, knownSpellCount,
 } from '~/utils/spellLimits'
@@ -17,15 +17,63 @@ function isSharedSlotCaster(def: ClassDefinition | undefined): boolean {
   return !!def?.spellcastingAbility && !def.pactMagic
 }
 
+function subclassOf(entry: ClassEntry, rulepack: Rulepack): SubclassDefinition | undefined {
+  if (!entry.subclassId) return undefined
+  return rulepack.classes
+    .flatMap(c => c.subclasses ?? [])
+    .find(sub => sub.id === entry.subclassId)
+}
+
 /**
- * Caster level contributed by one class: full casters count fully, half casters
- * contribute half rounded down, and pact magic contributes nothing.
+ * How one class entry casts, and where its own slot table lives.
+ *
+ * Usually the class says: `spellcastingAbility` plus the full/half flags. But a subclass
+ * can supply spellcasting to a class that has none — an Eldritch Knight fighter, an
+ * Arcane Trickster rogue — and then the ability, the progression and the printed table
+ * all come from the subclass instead. Returns undefined for a non-caster, and for a pact
+ * caster, whose slots are absolute and tracked on the character.
+ */
+function castingFor(entry: ClassEntry, rulepack: Rulepack): {
+  ability: AbilityKey
+  progression: CasterProgression
+  slotsAt: (level: number) => SlotTable | undefined
+} | undefined {
+  const def = classDef(entry.classId, rulepack)
+  if (isSharedSlotCaster(def)) {
+    return {
+      ability: def!.spellcastingAbility!,
+      // The explicit field wins; the booleans are what SRD data still says.
+      progression: def!.casterProgression ?? (def!.isHalfCaster ? 'half' : 'full'),
+      slotsAt: level => def!.levels.find(l => l.level === level)?.spellSlots,
+    }
+  }
+  if (def?.pactMagic) return undefined
+
+  const sub = subclassOf(entry, rulepack)
+  if (!sub?.spellcasting) return undefined
+  return {
+    ability: sub.spellcasting.ability,
+    progression: sub.spellcasting.progression,
+    slotsAt: level => sub.levels.find(l => l.level === level)?.spellSlots,
+  }
+}
+
+/**
+ * Caster level contributed by one class.
+ *
+ * Full casters count fully; half and third casters contribute half or a third rounded
+ * DOWN, per the SRD's multiclassing rule; pact magic nothing. The artificer is the one
+ * exception — Tasha's has it round UP, which is why an artificer 1 already casts.
  */
 export function casterLevelFor(entry: ClassEntry, rulepack: Rulepack): number {
-  const def = classDef(entry.classId, rulepack)
-  if (!isSharedSlotCaster(def)) return 0
-  if (def!.isHalfCaster) return Math.floor(entry.level / 2)
-  return entry.level
+  const casting = castingFor(entry, rulepack)
+  if (!casting) return 0
+  switch (casting.progression) {
+    case 'artificer': return Math.ceil(entry.level / 2)
+    case 'third': return Math.floor(entry.level / 3)
+    case 'half': return Math.floor(entry.level / 2)
+    default: return entry.level
+  }
 }
 
 /**
@@ -34,7 +82,11 @@ export function casterLevelFor(entry: ClassEntry, rulepack: Rulepack): number {
  * class table corrects this automatically.
  */
 function multiclassTable(rulepack: Rulepack): Map<number, SlotTable> {
-  const full = rulepack.classes.find(c => c.isFullCaster && c.levels.some(l => l.spellSlots))
+  // Either spelling counts. casterProgression is the preferred one, so a pack that uses
+  // only it would otherwise yield an empty table here and no slots at all for a
+  // multiclass caster, while castingFor read that same pack correctly.
+  const isFull = (c: ClassDefinition) => (c.casterProgression ?? (c.isFullCaster ? 'full' : undefined)) === 'full'
+  const full = rulepack.classes.find(c => isFull(c) && c.levels.some(l => l.spellSlots))
   const table = new Map<number, SlotTable>()
   for (const lvl of full?.levels ?? []) {
     if (lvl.spellSlots) table.set(lvl.level, lvl.spellSlots)
@@ -51,19 +103,139 @@ function multiclassTable(rulepack: Rulepack): Map<number, SlotTable> {
  * characters with more than one spellcasting class, per the SRD.
  */
 export function baseSpellSlots(classes: ClassEntry[], rulepack: Rulepack): SlotTable {
-  const casters = classes.filter(c => isSharedSlotCaster(classDef(c.classId, rulepack)))
+  const casters = classes.filter(c => castingFor(c, rulepack))
   if (casters.length === 0) return {}
 
   if (casters.length === 1) {
     const only = casters[0]!
-    const def = classDef(only.classId, rulepack)
-    return def?.levels.find(l => l.level === only.level)?.spellSlots ?? {}
+    return castingFor(only, rulepack)!.slotsAt(only.level) ?? {}
   }
 
   const casterLevel = casters.reduce((sum, c) => sum + casterLevelFor(c, rulepack), 0)
   if (casterLevel <= 0) return {}
   const table = multiclassTable(rulepack)
   return table.get(Math.min(casterLevel, 20)) ?? {}
+}
+
+/** `addTo: 'all'` means every spellcasting list the character has, or later gains. */
+const ALL_LISTS = 'all'
+
+type ExpandDef = Extract<LevelUpEventDef, { type: 'EXPAND_SPELL_LIST' }>
+
+/** What deriving the expansions needs off a character: its sources and its answers. */
+type ExpansionContext = Pick<
+  Character,
+  'classes' | 'race' | 'subrace' | 'background' | 'chosenOptions'
+>
+
+/**
+ * Every EXPAND_SPELL_LIST rule in force for a character, with the source that carries it.
+ *
+ * Walked fresh rather than stored, which is the whole point. A background is chosen
+ * before any class exists, so there is no list to write the spells onto at the time —
+ * and the Ravnica wording ("added to the spell list of your spellcasting class… if you
+ * are a multiclass character with multiple spell lists, these spells are added to all of
+ * them") has to keep holding for a class taken ten levels later.
+ *
+ * Race, subrace and background events are keyed by TOTAL character level; a class's and
+ * its subclass's by that class's level.
+ */
+function activeExpansions(
+  character: ExpansionContext,
+  rulepack: Rulepack,
+): Array<{ def: ExpandDef; sourceName?: string }> {
+  const out: Array<{ def: ExpandDef; sourceName?: string }> = []
+  const total = character.classes.reduce((sum, c) => sum + c.level, 0)
+  const collect = (
+    levels: Array<{ level: number; levelUpEvents?: LevelUpEventDef[] }> | undefined,
+    upTo: number,
+    sourceName?: string,
+  ) => {
+    for (const entry of levels ?? []) {
+      if (entry.level > upTo) continue
+      for (const def of entry.levelUpEvents ?? []) {
+        if (def.type !== 'EXPAND_SPELL_LIST') continue
+        // A guarded rule waits on its choice: one CHOOSE_OPTION drives four alternative
+        // expansions for a Genie warlock, and only the chosen genie's is in force.
+        if (def.whenOption
+          && character.chosenOptions?.[def.whenOption.choiceId] !== def.whenOption.optionId) {
+          continue
+        }
+        // Part of a list can arrive later than the rest: the Genie adds wish only from
+        // 9th level, off the same pact-magic rule that grants the rest at 1st.
+        if (def.minLevel && total < def.minLevel) continue
+        out.push({ def, sourceName })
+      }
+    }
+  }
+
+  const totalLevel = total
+
+  const race = rulepack.races.find(r => r.id === character.race)
+  const subrace = race?.subraces?.find(sr => sr.id === character.subrace)
+  const background = rulepack.backgrounds.find(b => b.id === character.background)
+  collect(race?.levelUpEvents, totalLevel, race?.name)
+  collect(subrace?.levelUpEvents, totalLevel, subrace?.name)
+  collect(background?.levelUpEvents, totalLevel, background?.name)
+
+  for (const entry of character.classes) {
+    const def = classDef(entry.classId, rulepack)
+    collect(def?.levels, entry.level, def?.name)
+    const sub = subclassOf(entry, rulepack)
+    collect(sub?.levels, entry.level, sub?.name)
+  }
+
+  return out
+}
+
+/**
+ * Spell ids a list may draw from beyond its own class list.
+ *
+ * `listId` is a spellcasting source id — usually a classId. A rule targeting `'all'`
+ * applies to every list, which is how a guild background reaches a class the character
+ * did not have when they picked it.
+ */
+export function expandedSpellIdsFor(
+  listId: string,
+  character: ExpansionContext,
+  rulepack: Rulepack,
+): Set<string> {
+  const ids = new Set<string>()
+  for (const { def } of activeExpansions(character, rulepack)) {
+    if (def.addTo !== listId && def.addTo !== ALL_LISTS) continue
+    for (const id of def.spellIds ?? []) ids.add(id)
+    if (def.classes?.length) {
+      for (const spell of rulepack.spells) {
+        if (spell.classes.some(c => def.classes!.includes(c))) ids.add(spell.id)
+      }
+    }
+  }
+  return ids
+}
+
+/**
+ * The expansions in force, grouped for display: one entry per rule, so the sheet can
+ * say *why* a list is wider than its class list.
+ */
+export function spellListExpansions(
+  listId: string,
+  character: ExpansionContext,
+  rulepack: Rulepack,
+): Array<{ label: string; spellIds: string[] }> {
+  const out: Array<{ label: string; spellIds: string[] }> = []
+  for (const { def, sourceName } of activeExpansions(character, rulepack)) {
+    if (def.addTo !== listId && def.addTo !== ALL_LISTS) continue
+    const ids = new Set(def.spellIds ?? [])
+    if (def.classes?.length) {
+      for (const spell of rulepack.spells) {
+        if (spell.classes.some(c => def.classes!.includes(c))) ids.add(spell.id)
+      }
+    }
+    if (ids.size > 0) {
+      out.push({ label: def.label ?? sourceName ?? 'Expanded list', spellIds: [...ids] })
+    }
+  }
+  return out
 }
 
 /** Effective maximum for one slot level: the derived base plus any manual bonus. */
@@ -98,9 +270,11 @@ export function maxSpellLevelForClass(
   rulepack: Rulepack,
 ): number {
   const entry = classes.find(c => c.classId === classId)
-  const def = classDef(classId, rulepack)
-  if (!entry || !def?.spellcastingAbility) return 0
-  const own = def.levels.find(l => l.level === entry.level)?.spellSlots
+  if (!entry) return 0
+  const casting = castingFor(entry, rulepack)
+  const own = casting?.slotsAt(entry.level)
+    // A pact caster is excluded from castingFor, but its own table still caps it.
+    ?? classDef(classId, rulepack)?.levels.find(l => l.level === entry.level)?.spellSlots
   if (!own) return 0
   const levels = Object.keys(own)
     .map(Number)
@@ -191,11 +365,17 @@ export function knownSpellLimit(
   if (!entry) return null
 
   const def = rulepack.classes.find(c => c.id === sourceId)
-  if (def?.spellPreparation?.kind !== 'known') return null
+  // When the spellcasting comes from the subclass, so does the Spells Known column: a
+  // fighter's own table names no number, but an Eldritch Knight's does.
+  const sub = subclassOf(entry, rulepack)
+  const known = def?.spellPreparation?.kind === 'known'
+    ? def.levels.find(l => l.level === entry.level)?.spellsKnown
+    : sub?.spellcasting?.preparation?.kind === 'known'
+      ? sub.levels.find(l => l.level === entry.level)?.spellsKnown
+      : undefined
 
-  const base = def.levels.find(l => l.level === entry.level)?.spellsKnown
-  if (base === undefined) return null
-  return Math.max(0, base + spellLimitBonusTotal(character, sourceId))
+  if (known === undefined) return null
+  return Math.max(0, known + spellLimitBonusTotal(character, sourceId))
 }
 
 /** Whichever limit a spell list actually has, with what it currently holds. */

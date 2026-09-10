@@ -2,6 +2,17 @@ import { z } from 'zod'
 
 const AbilityKeySchema = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha'])
 
+// 'increased' defers to the ability a feat's own increase went to, which the pack
+// cannot name: it depends on how the player answers the feat.
+const SpellAbilityRefSchema = z.union([AbilityKeySchema, z.literal('increased')])
+
+// Free casts of a granted or chosen spell, on the same terms wherever they appear.
+const SpellUsesSchema = z.object({
+  max: z.number().int().min(1),
+  recharge: z.enum(['short', 'long', 'dawn']),
+}).optional()
+const SpellCostSchema = z.object({ resource: z.string(), amount: z.number().int().min(1) }).optional()
+
 const SkillKeySchema = z.enum([
   'acrobatics', 'animalHandling', 'arcana', 'athletics',
   'deception', 'history', 'insight', 'intimidation',
@@ -9,6 +20,18 @@ const SkillKeySchema = z.enum([
   'performance', 'persuasion', 'religion', 'sleightOfHand',
   'stealth', 'survival',
 ])
+
+/**
+ * Each distribution hands one bonus to each of that many distinct abilities, so a
+ * distribution longer than `from` could never be spent.
+ */
+const AbilityScoreChoiceSchema = z.object({
+  from: z.array(AbilityKeySchema).min(1),
+  distributions: z.array(z.array(z.number().int().min(1)).min(1)).min(1),
+}).refine(
+  c => c.distributions.every(d => d.length <= c.from.length),
+  { message: 'a distribution asks for more abilities than `from` offers' },
+)
 
 const RaceTraitSchema = z.object({
   name: z.string(),
@@ -31,6 +54,8 @@ const ChooseOptionDefSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
+  // Set when an option opens later than the pool that offers it.
+  minLevel: z.number().int().min(1).max(20).optional(),
 })
 
 const CreatureTypeSchema = z.enum([
@@ -100,8 +125,56 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     cantrip: z.boolean().optional(),
     classes: z.array(z.string()).optional(),
     schools: z.array(z.string()).optional(),
+    // Caps spell level for a source that has no class level of its own to cap by.
+    maxLevel: z.number().int().min(0).max(9).optional(),
+    // Asked only once this option is picked; queued by the wizard's second stage.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
     // Set when addTo names a race or background: the source has its own ability.
-    ability: AbilityKeySchema.optional(),
+    ability: SpellAbilityRefSchema.optional(),
+    origin: z.enum(['class', 'race', 'background', 'feat']).optional(),
+    label: z.string().optional(),
+    // The pick is the player's; the limit on casting it free is the source's.
+    uses: SpellUsesSchema,
+    cost: SpellCostSchema,
+    castAtLevel: z.number().int().min(1).optional(),
+  }),
+  z.object({
+    // A standing rule, never applied to a character: it widens what a list may draw
+    // from, and is re-derived so a class taken later still gets it. `addTo: 'all'` is
+    // what a Ravnica guild background needs — every list, including future ones.
+    type: z.literal('EXPAND_SPELL_LIST'),
+    addTo: z.string(),
+    spellIds: z.array(z.string()).optional(),
+    classes: z.array(z.string()).optional(),
+    // Gates the rule on an answered CHOOSE_OPTION, as GRANT_SPELLS does.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+    // In force only from this character level, for a list that grows later than it starts.
+    minLevel: z.number().int().min(1).max(20).optional(),
+    label: z.string().optional(),
+  }).refine(
+    d => (d.spellIds?.length ?? 0) > 0 || (d.classes?.length ?? 0) > 0,
+    { message: 'EXPAND_SPELL_LIST needs spellIds or classes; an expansion of nothing is a no-op' },
+  ),
+  z.object({
+    // The source makes the character a caster where they were not one (Eldritch Knight).
+    type: z.literal('GRANT_SPELLCASTING'),
+    addTo: z.string(),
+    ability: AbilityKeySchema,
+    list: z.string().optional(),
+    origin: z.enum(['class', 'race', 'background', 'feat']).optional(),
+    label: z.string().optional(),
+  }),
+  z.object({
+    // "Int, Wis or Cha (your choice)" — the player picks, rather than the source saying.
+    type: z.literal('CHOOSE_SPELLCASTING_ABILITY'),
+    addTo: z.string(),
+    from: z.array(AbilityKeySchema).min(1),
     origin: z.enum(['class', 'race', 'background', 'feat']).optional(),
     label: z.string().optional(),
   }),
@@ -129,13 +202,12 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     }).optional(),
     // Source metadata, for grants that are not a class: a race or background uses its
     // own spellcasting ability and may hand out a limited number of free casts.
-    ability: AbilityKeySchema.optional(),
+    ability: SpellAbilityRefSchema.optional(),
     origin: z.enum(['class', 'race', 'background', 'feat']).optional(),
     label: z.string().optional(),
-    uses: z.object({
-      max: z.number().int().min(1),
-      recharge: z.enum(['short', 'long', 'dawn']),
-    }).optional(),
+    uses: SpellUsesSchema,
+    // Cast by spending a class resource (2 Ki) rather than a rest-limited free cast.
+    cost: SpellCostSchema,
     castAtLevel: z.number().int().min(1).optional(),
   }),
   z.object({
@@ -191,6 +263,11 @@ const SubraceSchema = z.object({
   id: z.string(),
   name: z.string(),
   abilityScoreBonuses: z.partialRecord(AbilityKeySchema, z.number()),
+  // A subrace distributes bonuses just as a race can. Omitting this silently dropped
+  // every one the packs declare, since the schema strips what it does not name.
+  abilityScoreChoice: AbilityScoreChoiceSchema.optional(),
+  // Set when the subrace restates the whole ability line instead of adding to the race's.
+  replacesRaceAbilityBonuses: z.literal(true).optional(),
   traits: z.array(RaceTraitSchema),
   speedOverrides: RaceSpeedsSchema.partial().optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
@@ -204,11 +281,7 @@ const RaceSchema = z.object({
   abilityScoreBonuses: z.partialRecord(AbilityKeySchema, z.number()),
   traits: z.array(RaceTraitSchema),
   languages: z.array(z.string()),
-  abilityScoreChoice: z.object({
-    count: z.number().int().min(1),
-    from: z.array(AbilityKeySchema),
-    bonus: z.number().int(),
-  }).optional(),
+  abilityScoreChoice: AbilityScoreChoiceSchema.optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
   subraces: z.array(SubraceSchema).optional(),
 })
@@ -232,6 +305,10 @@ const SubclassFeatureSchema = z.object({
 const SubclassLevelSchema = z.object({
   level: z.number().int().min(1).max(20),
   features: z.array(SubclassFeatureSchema),
+  // Present only on a subclass that supplies its class's spellcasting.
+  spellSlots: z.partialRecord(SpellSlotLevelSchema, z.number()).optional(),
+  cantripsKnown: z.number().int().optional(),
+  spellsKnown: z.number().int().optional(),
   levelUpEvents: z.array(LevelUpEventDefSchema).optional().default([]),
 })
 
@@ -239,6 +316,16 @@ const SubclassDefinitionSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
+  /** Set when the subclass is what makes the character a spellcaster at all. */
+  spellcasting: z.object({
+    ability: AbilityKeySchema,
+    progression: z.enum(['full', 'half', 'third', 'artificer']),
+    list: z.string().optional(),
+    preparation: z.object({
+      kind: z.enum(['known', 'prepared']),
+      levelDivisor: z.number().int().min(1).optional(),
+    }).optional(),
+  }).optional(),
   levels: z.array(SubclassLevelSchema),
 })
 
@@ -265,6 +352,8 @@ const ClassDefinitionSchema = z.object({
   }),
   multiclassing: MulticlassingRulesSchema.optional(),
   spellcastingAbility: AbilityKeySchema.optional(),
+  // Preferred over the booleans, which cannot express the artificer's round-up rule.
+  casterProgression: z.enum(['full', 'half', 'third', 'artificer']).optional(),
   isFullCaster: z.boolean().optional(),
   isHalfCaster: z.boolean().optional(),
   /** Warlock-style pact magic: slots are absolute and live in character.warlockSlots. */
@@ -304,13 +393,11 @@ const FeatDefinitionSchema = z.object({
   prerequisite: z.string().optional(),
   prerequisiteCheck: FeatPrerequisiteSchema.optional(),
   abilityScoreBonus: z.partialRecord(AbilityKeySchema, z.number()).optional(),
-  abilityScoreChoice: z.object({
-    count: z.number().int().min(1),
-    from: z.array(AbilityKeySchema).min(1),
-    bonus: z.number().int().min(1),
-  }).optional(),
+  abilityScoreChoice: AbilityScoreChoiceSchema.optional(),
   grantedSpells: z.array(z.string()).optional(),
   hpBonusPerLevel: z.number().int().min(1).optional(),
+  // Fired when the feat is taken. No level wrapper: a feat has no levels of its own.
+  levelUpEvents: z.array(LevelUpEventDefSchema).optional(),
 })
 
 const SpellDefinitionSchema = z.object({

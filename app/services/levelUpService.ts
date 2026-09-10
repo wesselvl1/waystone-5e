@@ -1,5 +1,12 @@
 import type { Character, AbilityKey, SpellcastingOrigin, SpellSlotLevel } from '~/types/character'
-import type { Rulepack, OptionalClassFeature, FeatDefinition, FeatPrerequisite, LevelUpEventDef } from '~/types/rulepack'
+import type {
+  Rulepack,
+  OptionalClassFeature,
+  FeatDefinition,
+  FeatPrerequisite,
+  LevelUpEventDef,
+  SpellAbilityRef,
+} from '~/types/rulepack'
 import { addHitDieForClass, multiclassProficiencies } from '~/services/multiclass'
 import type {
   LevelUpEvent,
@@ -14,6 +21,10 @@ import type {
   SetSpellcastingAbilityEvent,
   ChooseExpertiseEvent,
   ChooseOptionEvent,
+  ChooseSpellEvent,
+  ChooseSpellcastingAbilityEvent,
+  GrantSpellcastingEvent,
+  ExpandSpellListEvent,
   UpdateFeatureUsesEvent,
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
@@ -25,24 +36,38 @@ function rollDie(sides: number): number {
 }
 
 /**
- * Returns true if the character satisfies all machine-checkable prerequisites for the given feat.
- * Always returns true for feats without a prerequisiteCheck.
+ * Whether a character satisfies every machine-checkable prerequisite of a feat. True for
+ * a feat that declares none.
+ *
+ * Tolerant of a partial character on purpose. This runs from the feat picker inside a
+ * `v-for` over every loaded feat, so a field a stored record happens to be missing threw
+ * out of the render and left the list blank — losing the whole step over one absent
+ * array. A missing field now reads as "not satisfied", which greys one feat out and is
+ * recoverable. Prerequisites from a pack are read the same way: Zod guards the import
+ * boundary, but a pack assembled in code never passes through it.
  */
 export function checkFeatPrerequisite(character: Character, feat: FeatDefinition): boolean {
   const check: FeatPrerequisite | undefined = feat.prerequisiteCheck
   if (!check) return true
+
   if (check.minAbilityScore) {
+    const scores = character.abilityScores ?? {}
     for (const [ability, min] of Object.entries(check.minAbilityScore)) {
-      if ((character.abilityScores[ability as AbilityKey] ?? 0) < (min ?? 0)) return false
+      if ((scores[ability as AbilityKey] ?? 0) < (min ?? 0)) return false
     }
   }
+
   if (check.spellcasting && !character.spellcastingAbility) return false
-  if (check.proficiency) {
-    const hasAny = check.proficiency.some(p =>
-      character.otherProficiencies.some(op => op.toLowerCase() === p.toLowerCase()),
+
+  // An empty list is no requirement at all. Read as a list of alternatives it was one
+  // nothing could satisfy, which hid the feat for good.
+  if (Array.isArray(check.proficiency) && check.proficiency.length > 0) {
+    const held = new Set(
+      (character.otherProficiencies ?? []).map(p => String(p).toLowerCase()),
     )
-    if (!hasAny) return false
+    if (!check.proficiency.some(p => held.has(String(p).toLowerCase()))) return false
   }
+
   return true
 }
 
@@ -71,6 +96,7 @@ interface GrantSource {
   origin?: SpellcastingOrigin
   label?: string
   uses?: { max: number; recharge: 'short' | 'long' | 'dawn' }
+  cost?: { resource: string; amount: number }
   castAtLevel?: number
 }
 
@@ -87,19 +113,9 @@ function grantSpellsTo(
   alwaysPrepared: boolean,
   source: GrantSource = {},
 ): void {
-  if (source.ability) {
-    const existing = character.classSpellcasting?.[addTo]
-    character.classSpellcasting = {
-      ...character.classSpellcasting,
-      [addTo]: {
-        ...existing,
-        ability: source.ability,
-        origin: source.origin ?? 'class',
-        ...(source.label ? { label: source.label } : {}),
-        spells: existing?.spells ?? [],
-      },
-    }
-  }
+  // Through registerSpellcasting rather than writing the entry here: it is the one
+  // place that leaves an ability the player chose alone, which a grant must not undo.
+  if (source.ability) registerSpellcasting(character, addTo, source.ability, source)
 
   for (const spell of spells) {
     const existing = character.spells.find(s => s.spellId === spell.spellId)
@@ -120,8 +136,37 @@ function grantSpellsTo(
       classId: addTo,
       // A free cast arrives with its uses full
       ...(source.uses ? { uses: { ...source.uses, remaining: source.uses.max } } : {}),
+      // A resource-metered cast has no pool of its own: the feature it names holds it
+      ...(source.cost ? { cost: { ...source.cost } } : {}),
       ...(source.castAtLevel ? { castAtLevel: source.castAtLevel } : {}),
     })
+  }
+}
+
+/**
+ * Record a spellcasting source on a character, in place.
+ *
+ * An ability the player chose wins over one the source states, so replaying this on a
+ * later level-up — or on the level where the subclass is picked — cannot overwrite it.
+ * Slots are never touched: they stay derived from the class or subclass table.
+ */
+function registerSpellcasting(
+  character: Character,
+  addTo: string,
+  ability: AbilityKey,
+  source: { origin?: SpellcastingOrigin; label?: string } = {},
+): void {
+  const existing = character.classSpellcasting?.[addTo]
+  const label = source.label ?? existing?.label
+  character.classSpellcasting = {
+    ...character.classSpellcasting,
+    [addTo]: {
+      ...existing,
+      ability: existing?.abilityChosen ? existing.ability : ability,
+      origin: source.origin ?? existing?.origin ?? 'class',
+      ...(label ? { label } : {}),
+      spells: existing?.spells ?? [],
+    },
   }
 }
 
@@ -190,6 +235,208 @@ export function resolveOptionChoice(
 
   const options = eventDef.options.filter(o => !taken.has(o.id))
   return options.length > 0 ? { ...base, options } : undefined
+}
+
+/**
+ * Translate a CHOOSE_SPELLCASTING_ABILITY definition, skipping it once the player has
+ * answered for that source.
+ *
+ * The guard matters because a source's events fire per level: a Monsters of the
+ * Multiverse race grants a cantrip at 1st and a levelled spell at 3rd and 5th, and
+ * asking again at each would silently reset a DC the player had already set.
+ */
+function resolveSpellcastingAbilityChoice(
+  eventDef: Extract<LevelUpEventDef, { type: 'CHOOSE_SPELLCASTING_ABILITY' }>,
+  character: Character,
+  fallbackLabel?: string,
+): ChooseSpellcastingAbilityEvent | undefined {
+  if (character.classSpellcasting?.[eventDef.addTo]?.abilityChosen) return undefined
+  const label = eventDef.label ?? fallbackLabel
+  return {
+    type: 'CHOOSE_SPELLCASTING_ABILITY',
+    addTo: eventDef.addTo,
+    // Copy: eventDef belongs to the reactive rulepack store, and a Vue proxy stored on
+    // the character makes the next structuredClone throw.
+    from: [...eventDef.from],
+    ...(eventDef.origin ? { origin: eventDef.origin } : {}),
+    ...(label ? { label } : {}),
+  }
+}
+
+/**
+ * Translate a GRANT_SPELLCASTING definition. Automatic — there is nothing to ask; when
+ * the ability is the player's to pick the pack pairs this with
+ * CHOOSE_SPELLCASTING_ABILITY, which is applied after and wins.
+ */
+function grantSpellcastingEvent(
+  eventDef: Extract<LevelUpEventDef, { type: 'GRANT_SPELLCASTING' }>,
+  fallbackLabel?: string,
+): GrantSpellcastingEvent {
+  const label = eventDef.label ?? fallbackLabel
+  return {
+    type: 'GRANT_SPELLCASTING',
+    addTo: eventDef.addTo,
+    ability: eventDef.ability,
+    ...(eventDef.list ? { list: eventDef.list } : {}),
+    ...(eventDef.origin ? { origin: eventDef.origin } : {}),
+    ...(label ? { label } : {}),
+  }
+}
+
+/**
+ * Translate a GRANT_SPELLS definition, or nothing when it waits on an option or names no
+ * spell this pack knows.
+ *
+ * Shared by all four paths — class level, subclass level, race/background, feat. They
+ * used to be four near-identical literals and had drifted: the class and subclass ones
+ * carried neither `ability`, `uses`, `cost` nor `label`, so a Way of Shadow monk's 2-Ki
+ * spells arrived with no cost and no DC behind them.
+ */
+/**
+ * Resolve a spell's ability reference against the feat that granted it.
+ *
+ * `'increased'` is Tasha's "the ability increased by this feat", which is only known
+ * once the player has answered the feat, so it arrives here rather than in the pack. A
+ * feat whose increase has not been answered yet leaves the ability unset, which falls
+ * back to the class's own — better than picking one on the player's behalf.
+ */
+function resolveAbilityRef(
+  ref: SpellAbilityRef | undefined,
+  increased: AbilityKey | undefined,
+): AbilityKey | undefined {
+  if (ref === 'increased') return increased
+  return ref
+}
+
+/**
+ * The ability a feat's own increase went to.
+ *
+ * The player's answer wins; a feat with a fixed single increase (rather than a choice)
+ * supplies it directly.
+ */
+export function featIncreasedAbility(
+  feat: Pick<FeatDefinition, 'abilityScoreBonus'>,
+  chosen?: Partial<Record<AbilityKey, number>>,
+): AbilityKey | undefined {
+  const picked = Object.keys(chosen ?? {}).filter(k => (chosen?.[k as AbilityKey] ?? 0) > 0)
+  if (picked.length === 1) return picked[0] as AbilityKey
+  const fixed = Object.keys(feat.abilityScoreBonus ?? {})
+  return fixed.length === 1 ? (fixed[0] as AbilityKey) : undefined
+}
+
+function grantSpellsEvent(
+  eventDef: Extract<LevelUpEventDef, { type: 'GRANT_SPELLS' }>,
+  character: Character,
+  rulepack: Rulepack,
+  defaults: {
+    origin?: SpellcastingOrigin
+    label?: string
+    /** Answer to the feat's own increase, for `ability: 'increased'`. */
+    increasedAbility?: AbilityKey
+  } = {},
+): GrantSpellsEvent | undefined {
+  if (eventDef.whenOption
+    && character.chosenOptions?.[eventDef.whenOption.choiceId] !== eventDef.whenOption.optionId) {
+    return undefined
+  }
+  const spells = resolveGrantedSpells(eventDef.spellIds, rulepack)
+  if (spells.length === 0) return undefined
+  const label = eventDef.label ?? defaults.label
+  const origin = eventDef.origin ?? defaults.origin
+  return {
+    type: 'GRANT_SPELLS',
+    addTo: eventDef.addTo,
+    spells,
+    alwaysPrepared: eventDef.alwaysPrepared ?? false,
+    ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
+    ...((a => (a ? { ability: a } : {}))(resolveAbilityRef(eventDef.ability, defaults.increasedAbility))),
+    ...(origin ? { origin } : {}),
+    ...(label ? { label } : {}),
+    ...(eventDef.uses ? { uses: eventDef.uses } : {}),
+    ...(eventDef.cost ? { cost: eventDef.cost } : {}),
+    ...(eventDef.castAtLevel ? { castAtLevel: eventDef.castAtLevel } : {}),
+  }
+}
+
+/**
+ * Translate a CHOOSE_SPELL definition, or nothing when it waits on an option.
+ *
+ * Exported for the same reason resolveOptionChoice is: the wizard injects a subclass
+ * level's choices once the subclass is known, and hand-building them there dropped the
+ * guard along with every field a grant carries.
+ *
+ * A guarded choice cannot be replayed the way a guarded grant is: a question has to be
+ * asked, not applied. So it is simply not emitted here, and the wizard queues it in a
+ * second stage once the option is answered (see `resolveUnlockedChoices`).
+ */
+export function chooseSpellEvent(
+  eventDef: Extract<LevelUpEventDef, { type: 'CHOOSE_SPELL' }>,
+  character: Character,
+  defaults: {
+    addTo?: string
+    origin?: SpellcastingOrigin
+    label?: string
+    /** Answer to the feat's own increase, for `ability: 'increased'`. */
+    increasedAbility?: AbilityKey
+  } = {},
+): ChooseSpellEvent | undefined {
+  if (eventDef.whenOption
+    && character.chosenOptions?.[eventDef.whenOption.choiceId] !== eventDef.whenOption.optionId) {
+    return undefined
+  }
+  return {
+    type: 'CHOOSE_SPELL',
+    addTo: eventDef.addTo || defaults.addTo || '',
+    count: eventDef.count,
+    cantrip: eventDef.cantrip ?? false,
+    fromList: eventDef.fromList,
+    classes: eventDef.classes,
+    schools: eventDef.schools,
+    maxLevel: eventDef.maxLevel,
+    ability: resolveAbilityRef(eventDef.ability, defaults.increasedAbility),
+    origin: eventDef.origin ?? defaults.origin,
+    label: eventDef.label ?? defaults.label,
+    ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
+    ...(eventDef.uses ? { uses: eventDef.uses } : {}),
+    ...(eventDef.cost ? { cost: eventDef.cost } : {}),
+    ...(eventDef.castAtLevel ? { castAtLevel: eventDef.castAtLevel } : {}),
+  }
+}
+
+/**
+ * Translate an EXPAND_SPELL_LIST definition. Informational only — the rule itself is
+ * re-derived from the character's sources, so nothing is written when this is applied.
+ */
+function expandSpellListEvent(
+  eventDef: Extract<LevelUpEventDef, { type: 'EXPAND_SPELL_LIST' }>,
+  character: Character,
+  fallbackLabel?: string,
+): ExpandSpellListEvent | undefined {
+  // Reported only once it is actually in force, on the same test activeExpansions
+  // applies: the Genie's wish is declared at 1st level and arrives at 9th, and
+  // announcing it on the level-up screen at 1st would promise a spell the list does
+  // not yet have.
+  if (eventDef.minLevel) {
+    const total = character.classes.reduce((sum, c) => sum + c.level, 0)
+    if (total < eventDef.minLevel) return undefined
+  }
+  // A guarded rule is only reported once its option is answered. Unlike GRANT_SPELLS
+  // there is nothing to replay at the level the option is chosen: the rule is derived,
+  // so it takes effect the moment the answer is recorded.
+  if (eventDef.whenOption
+    && character.chosenOptions?.[eventDef.whenOption.choiceId] !== eventDef.whenOption.optionId) {
+    return undefined
+  }
+  const label = eventDef.label ?? fallbackLabel
+  return {
+    type: 'EXPAND_SPELL_LIST',
+    addTo: eventDef.addTo,
+    spellIds: [...(eventDef.spellIds ?? [])],
+    ...(eventDef.classes ? { classes: [...eventDef.classes] } : {}),
+    ...(eventDef.minLevel ? { minLevel: eventDef.minLevel } : {}),
+    ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
+    ...(label ? { label } : {}),
+  }
 }
 
 export function resolveLevelUpEvents(
@@ -334,35 +581,33 @@ export function resolveLevelUpEvents(
           category: 'skill',
         } satisfies GainProficiencyEvent)
         break
-      case 'CHOOSE_SPELL':
-        events.push({
-          type: 'CHOOSE_SPELL',
-          addTo: eventDef.addTo,
-          count: eventDef.count,
-          cantrip: eventDef.cantrip ?? false,
-          fromList: eventDef.fromList,
-          classes: eventDef.classes,
-          schools: eventDef.schools,
-        })
+      case 'CHOOSE_SPELL': {
+        const choice = chooseSpellEvent(eventDef, character)
+        if (choice) events.push(choice)
         break
+      }
+      case 'CHOOSE_SPELLCASTING_ABILITY': {
+        const choice = resolveSpellcastingAbilityChoice(eventDef, character, classDef.name)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'GRANT_SPELLCASTING':
+        events.push(grantSpellcastingEvent(eventDef, classDef.name))
+        break
+      case 'EXPAND_SPELL_LIST': {
+        const expand = expandSpellListEvent(eventDef, character, subclassDef?.name ?? classDef.name)
+        if (expand) events.push(expand)
+        break
+      }
       case 'GRANT_SPELLS': {
         // A guarded grant only fires once the option it depends on has been picked. At
         // the level the option is chosen the answer is not known yet, so the grant is
-        // skipped here and applied by RESOLVED_OPTION instead.
-        if (eventDef.whenOption
-          && character.chosenOptions?.[eventDef.whenOption.choiceId] !== eventDef.whenOption.optionId) {
-          break
-        }
-        const granted = resolveGrantedSpells(eventDef.spellIds, rulepack)
-        if (granted.length > 0) {
-          events.push({
-            type: 'GRANT_SPELLS',
-            addTo: eventDef.addTo,
-            spells: granted,
-            alwaysPrepared: eventDef.alwaysPrepared ?? false,
-            ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
-          } satisfies GrantSpellsEvent)
-        }
+        // skipped and applied by RESOLVED_OPTION or RESOLVED_SUBCLASS instead.
+        const grant = grantSpellsEvent(eventDef, character, rulepack, {
+          origin: 'class',
+          label: subclassDef?.name ?? classDef.name,
+        })
+        if (grant) events.push(grant)
         break
       }
       case 'SET_WILD_SHAPE_LIMITS':
@@ -420,35 +665,33 @@ export function resolveLevelUpEvents(
         if (choice) events.push(choice)
         break
       }
-      case 'CHOOSE_SPELL':
-        events.push({
-          type: 'CHOOSE_SPELL',
-          addTo: eventDef.addTo,
-          count: eventDef.count,
-          cantrip: eventDef.cantrip ?? false,
-          fromList: eventDef.fromList,
-          classes: eventDef.classes,
-          schools: eventDef.schools,
-        })
+      case 'CHOOSE_SPELL': {
+        const choice = chooseSpellEvent(eventDef, character)
+        if (choice) events.push(choice)
         break
+      }
+      case 'CHOOSE_SPELLCASTING_ABILITY': {
+        const choice = resolveSpellcastingAbilityChoice(eventDef, character, classDef.name)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'GRANT_SPELLCASTING':
+        events.push(grantSpellcastingEvent(eventDef, classDef.name))
+        break
+      case 'EXPAND_SPELL_LIST': {
+        const expand = expandSpellListEvent(eventDef, character, subclassDef?.name ?? classDef.name)
+        if (expand) events.push(expand)
+        break
+      }
       case 'GRANT_SPELLS': {
         // A guarded grant only fires once the option it depends on has been picked. At
         // the level the option is chosen the answer is not known yet, so the grant is
-        // skipped here and applied by RESOLVED_OPTION instead.
-        if (eventDef.whenOption
-          && character.chosenOptions?.[eventDef.whenOption.choiceId] !== eventDef.whenOption.optionId) {
-          break
-        }
-        const granted = resolveGrantedSpells(eventDef.spellIds, rulepack)
-        if (granted.length > 0) {
-          events.push({
-            type: 'GRANT_SPELLS',
-            addTo: eventDef.addTo,
-            spells: granted,
-            alwaysPrepared: eventDef.alwaysPrepared ?? false,
-            ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
-          } satisfies GrantSpellsEvent)
-        }
+        // skipped and applied by RESOLVED_OPTION or RESOLVED_SUBCLASS instead.
+        const grant = grantSpellsEvent(eventDef, character, rulepack, {
+          origin: 'class',
+          label: subclassDef?.name ?? classDef.name,
+        })
+        if (grant) events.push(grant)
         break
       }
       case 'GAIN_PROFICIENCY':
@@ -491,36 +734,28 @@ export function resolveLevelUpEvents(
     for (const eventDef of atLevel?.levelUpEvents ?? []) {
       switch (eventDef.type) {
         case 'GRANT_SPELLS': {
-          const granted = resolveGrantedSpells(eventDef.spellIds, rulepack)
-          if (granted.length > 0) {
-            events.push({
-              type: 'GRANT_SPELLS',
-              addTo: eventDef.addTo,
-              spells: granted,
-              alwaysPrepared: eventDef.alwaysPrepared ?? false,
-              ...(eventDef.ability ? { ability: eventDef.ability } : {}),
-              ...(eventDef.origin ? { origin: eventDef.origin } : {}),
-              ...(eventDef.label ? { label: eventDef.label } : {}),
-              ...(eventDef.uses ? { uses: eventDef.uses } : {}),
-              ...(eventDef.castAtLevel ? { castAtLevel: eventDef.castAtLevel } : {}),
-            } satisfies GrantSpellsEvent)
-          }
+          const grant = grantSpellsEvent(eventDef, character, rulepack, { label: source?.name })
+          if (grant) events.push(grant)
           break
         }
-        case 'CHOOSE_SPELL':
-          events.push({
-            type: 'CHOOSE_SPELL',
-            addTo: eventDef.addTo,
-            count: eventDef.count,
-            cantrip: eventDef.cantrip ?? false,
-            fromList: eventDef.fromList,
-            classes: eventDef.classes,
-            schools: eventDef.schools,
-            ability: eventDef.ability,
-            origin: eventDef.origin,
-            label: eventDef.label,
-          })
+        case 'CHOOSE_SPELL': {
+          const choice = chooseSpellEvent(eventDef, character)
+          if (choice) events.push(choice)
           break
+        }
+        case 'CHOOSE_SPELLCASTING_ABILITY': {
+          const choice = resolveSpellcastingAbilityChoice(eventDef, character, source?.name)
+          if (choice) events.push(choice)
+          break
+        }
+        case 'GRANT_SPELLCASTING':
+          events.push(grantSpellcastingEvent(eventDef, source?.name))
+          break
+        case 'EXPAND_SPELL_LIST': {
+          const expand = expandSpellListEvent(eventDef, character, source?.name)
+          if (expand) events.push(expand)
+          break
+        }
         case 'CHOOSE_OPTION': {
           // Skip a choice already answered, so it is not asked again on a later level
           if (character.chosenOptions?.[eventDef.id] === undefined) {
@@ -548,8 +783,190 @@ export function resolveLevelUpEvents(
   return events
 }
 
+/**
+ * Translate a feat's `levelUpEvents` into runtime events.
+ *
+ * Unlike a class level, a feat fires everything the moment it is taken, so there is no
+ * level to resolve against. `addTo` defaults to the feat's own id and `origin` to
+ * `'feat'`, which is what registers the feat as its own spellcasting source rather than
+ * letting it borrow whichever class happened to come first.
+ *
+ * Event types that presuppose a class — CHOOSE_SUBCLASS, UPDATE_HIT_DIE, spell slots,
+ * a nested CHOOSE_FEAT — are ignored rather than half-applied.
+ */
+export function resolveFeatEvents(
+  character: Character,
+  feat: FeatDefinition,
+  rulepack: Rulepack,
+  /**
+   * How the player answered the feat's own ability increase, for spells that cast with
+   * "the ability increased by this feat". Omitted while the answer is still pending.
+   */
+  increasedAbility?: AbilityKey,
+): LevelUpEvent[] {
+  const events: LevelUpEvent[] = []
+
+  for (const eventDef of feat.levelUpEvents ?? []) {
+    switch (eventDef.type) {
+      case 'GRANT_SPELLS': {
+        // A guarded grant waits for its option, which the wizard queues right after the
+        // feat itself. RESOLVED_OPTION applies it once the answer is in.
+        const grant = grantSpellsEvent(
+          { ...eventDef, addTo: eventDef.addTo || feat.id },
+          character,
+          rulepack,
+          { origin: 'feat', label: feat.name, increasedAbility },
+        )
+        if (grant) events.push(grant)
+        break
+      }
+      case 'CHOOSE_SPELL': {
+        const choice = chooseSpellEvent(
+          {
+            ...eventDef,
+            // A feat grants its spell level outright. Left unset the picker would fall
+            // back to the class cap, which is 0 for a non-caster taking Magic Initiate.
+            maxLevel: eventDef.maxLevel ?? (eventDef.cantrip ? 0 : 1),
+          },
+          character,
+          { addTo: feat.id, origin: 'feat', label: feat.name, increasedAbility },
+        )
+        if (choice) events.push(choice)
+        break
+      }
+      case 'CHOOSE_SPELLCASTING_ABILITY': {
+        const choice = resolveSpellcastingAbilityChoice(
+          { ...eventDef, addTo: eventDef.addTo || feat.id, origin: eventDef.origin ?? 'feat' },
+          character,
+          feat.name,
+        )
+        if (choice) events.push(choice)
+        break
+      }
+      case 'GRANT_SPELLCASTING':
+        events.push(grantSpellcastingEvent(
+          { ...eventDef, addTo: eventDef.addTo || feat.id, origin: eventDef.origin ?? 'feat' },
+          feat.name,
+        ))
+        break
+      case 'EXPAND_SPELL_LIST': {
+        const expand = expandSpellListEvent(eventDef, character, feat.name)
+        if (expand) events.push(expand)
+        break
+      }
+      case 'GAIN_PROFICIENCY':
+        events.push({
+          type: 'GAIN_PROFICIENCY',
+          proficiency: eventDef.proficiency,
+          // The definition carries no category, and nothing reads it — every def-driven
+          // translation in this file says 'skill' for the same reason.
+          category: 'skill',
+        } satisfies GainProficiencyEvent)
+        break
+      case 'CHOOSE_EXPERTISE':
+        events.push({
+          type: 'CHOOSE_EXPERTISE',
+          label: eventDef.label,
+          options: eventDef.options,
+          count: eventDef.count,
+        } satisfies ChooseExpertiseEvent)
+        break
+      case 'CHOOSE_OPTION': {
+        // Skip a choice already answered, so retaking a repeatable feat does not re-ask
+        if (character.chosenOptions?.[eventDef.id] === undefined) {
+          const choice = resolveOptionChoice(eventDef, character, rulepack)
+          if (choice) events.push(choice)
+        }
+        break
+      }
+      case 'UPDATE_FEATURE_USES':
+        events.push({
+          type: 'UPDATE_FEATURE_USES',
+          featureName: eventDef.featureName,
+          usesMax: eventDef.usesMax,
+        } satisfies UpdateFeatureUsesEvent)
+        break
+      case 'ABILITY_SCORE_IMPROVEMENT':
+        events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
+        break
+    }
+  }
+
+  return events
+}
+
+/**
+ * The choices a just-answered option unlocks — the second stage of the level-up run.
+ *
+ * A guarded GRANT_SPELLS can be replayed once the answer is in, because applying it is
+ * just a write. A guarded CHOOSE_SPELL cannot: it is a *question*, and by the time the
+ * option is answered the wizard has already built its list of questions. So the wizard
+ * calls this when an option is confirmed and appends whatever it returns.
+ *
+ * `subclassId` and `feats` are passed in rather than read off the character because
+ * during a level-up neither is committed yet: the subclass and the feat live in the
+ * run's resolved choices until it is applied.
+ */
+export function resolveUnlockedChoices(
+  character: Character,
+  option: { choiceId: string; optionId: string },
+  classId: string,
+  newLevel: number,
+  rulepack: Rulepack,
+  opts: { subclassId?: string; feats?: FeatDefinition[] } = {},
+): ChoiceLevelUpEvent[] {
+  const answered: Character = {
+    ...character,
+    chosenOptions: { ...character.chosenOptions, [option.choiceId]: option.optionId },
+  }
+
+  const matches = (def: LevelUpEventDef) =>
+    def.type === 'CHOOSE_SPELL'
+    && def.whenOption?.choiceId === option.choiceId
+    && def.whenOption?.optionId === option.optionId
+
+  const out: ChoiceLevelUpEvent[] = []
+  const take = (
+    defs: LevelUpEventDef[] | undefined,
+    defaults: { addTo?: string; origin?: SpellcastingOrigin; label?: string },
+  ) => {
+    for (const def of defs ?? []) {
+      if (!matches(def)) continue
+      const choice = chooseSpellEvent(def as Extract<LevelUpEventDef, { type: 'CHOOSE_SPELL' }>, answered, defaults)
+      if (choice) out.push(choice)
+    }
+  }
+
+  const classDef = rulepack.classes.find(c => c.id === classId)
+  take(classDef?.levels.find(l => l.level === newLevel)?.levelUpEvents, { addTo: classId })
+
+  const subclassId = opts.subclassId
+    ?? character.classes.find(c => c.classId === classId)?.subclassId
+  const subclass = subclassId
+    ? rulepack.classes.flatMap(c => c.subclasses ?? []).find(sub => sub.id === subclassId)
+    : undefined
+  take(subclass?.levels.find(l => l.level === newLevel)?.levelUpEvents, { addTo: classId })
+
+  // Race, subrace and background fire on TOTAL level, as everywhere else
+  const totalLevel = character.classes.reduce(
+    (sum, c) => sum + (c.classId === classId ? 0 : c.level), 0) + newLevel
+  const race = rulepack.races.find(r => r.id === character.race)
+  const subrace = race?.subraces?.find(sr => sr.id === character.subrace)
+  const background = rulepack.backgrounds.find(b => b.id === character.background)
+  for (const source of [race, subrace, background]) {
+    const atLevel = source?.levelUpEvents?.find(e => e.level === totalLevel)
+    take(atLevel?.levelUpEvents, { label: source?.name })
+  }
+
+  for (const feat of opts.feats ?? []) {
+    take(feat.levelUpEvents, { addTo: feat.id, origin: 'feat', label: feat.name })
+  }
+
+  return out
+}
+
 export function isChoiceEvent(event: LevelUpEvent): event is ChoiceLevelUpEvent {
-  return ['CHOOSE_SPELL', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
+  return ['CHOOSE_SPELL', 'CHOOSE_SPELLCASTING_ABILITY', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
 }
 
 export function getChoiceEvents(events: LevelUpEvent[]): ChoiceLevelUpEvent[] {
@@ -602,12 +1019,21 @@ export function applyAutomaticEvents(
         }
         break
       }
+      case 'GRANT_SPELLCASTING':
+        registerSpellcasting(updated, event.addTo, event.ability, event)
+        break
+      case 'EXPAND_SPELL_LIST':
+        // Deliberately nothing. The rule lives on the source and is re-derived by
+        // expandedSpellIdsFor, so writing a snapshot here would go stale the moment the
+        // character multiclassed — which is exactly when a guild background must apply.
+        break
       case 'GRANT_SPELLS': {
         grantSpellsTo(updated, event.addTo, event.spells, event.alwaysPrepared, {
           ability: event.ability,
           origin: event.origin,
           label: event.label,
           uses: event.uses,
+          cost: event.cost,
           castAtLevel: event.castAtLevel,
         })
         break
@@ -693,6 +1119,14 @@ export function applyResolvedChoices(
         }
         break
       }
+      case 'RESOLVED_SPELLCASTING_ABILITY': {
+        // `abilityChosen` marks this as the player's answer rather than the source's,
+        // which is what stops it being asked again and lets the sheet offer to change it.
+        registerSpellcasting(updated, choice.sourceId, choice.ability, choice)
+        updated.classSpellcasting[choice.sourceId]!.ability = choice.ability
+        updated.classSpellcasting[choice.sourceId]!.abilityChosen = true
+        break
+      }
       case 'RESOLVED_CHOOSE_FEAT': {
         const feat = rulepack.feats.find(f => f.id === choice.featId)
         if (feat) {
@@ -739,24 +1173,62 @@ export function applyResolvedChoices(
             updated.hp.current += hpGain
             updated.hpBonusPerLevel = (updated.hpBonusPerLevel ?? 0) + feat.hpBonusPerLevel
           }
+          // The feat's own levelUpEvents. Its automatic half is applied here rather than
+          // by applyAutomaticEvents, which runs before the feat is even known — the same
+          // reason RESOLVED_OPTION applies its deferred grants inline. The choices it
+          // raises are collected by the wizard and arrive as later entries in `choices`.
+          const increased = featIncreasedAbility(feat, choice.abilityBonus)
+          for (const event of getAutomaticEvents(resolveFeatEvents(updated, feat, rulepack, increased))) {
+            switch (event.type) {
+              case 'GRANT_SPELLS':
+                grantSpellsTo(updated, event.addTo, event.spells, event.alwaysPrepared, {
+                  ability: event.ability,
+                  origin: event.origin,
+                  label: event.label,
+                  uses: event.uses,
+                  // Was missing while every other call site forwarded it, so a feat
+                  // granting a resource-metered spell stored no price and the sheet
+                  // offered no way to spend for it.
+                  cost: event.cost,
+                  castAtLevel: event.castAtLevel,
+                })
+                break
+              // A feat can be what makes a character a caster at all. resolveFeatEvents
+              // emits this and feat events never reach applyAutomaticEvents, so without
+              // a case here the feat granted spells with no source behind them.
+              case 'GRANT_SPELLCASTING':
+                registerSpellcasting(updated, event.addTo, event.ability, event)
+                break
+              case 'GAIN_PROFICIENCY':
+                if (!updated.otherProficiencies.includes(event.proficiency)) {
+                  updated.otherProficiencies.push(event.proficiency)
+                }
+                break
+              case 'UPDATE_FEATURE_USES': {
+                const target = updated.features.find(f => f.name === event.featureName)
+                if (target) {
+                  if (event.usesMax === null) {
+                    delete target.usesMax
+                    delete target.usesRemaining
+                  }
+                  else {
+                    target.usesMax = event.usesMax
+                    target.usesRemaining = event.usesMax
+                  }
+                }
+                break
+              }
+            }
+          }
         }
         break
       }
       case 'RESOLVED_CHOOSE_SPELL': {
         // A cantrip chosen from a race or background registers that source, so its DC
-        // is its own rather than borrowed from whichever class came first.
+        // is its own rather than borrowed from whichever class came first. Same writer
+        // as every other path, so it cannot overwrite an ability the player chose.
         if (choice.ability && choice.classId) {
-          const existing = updated.classSpellcasting?.[choice.classId]
-          updated.classSpellcasting = {
-            ...updated.classSpellcasting,
-            [choice.classId]: {
-              ...existing,
-              ability: choice.ability,
-              origin: choice.origin ?? 'class',
-              ...(choice.label ? { label: choice.label } : {}),
-              spells: existing?.spells ?? [],
-            },
-          }
+          registerSpellcasting(updated, choice.classId, choice.ability, choice)
         }
         const spellsToRemove = new Set(choice.removedSpellIds)
         updated.spells = updated.spells.filter(s => !spellsToRemove.has(s.spellId))
@@ -770,6 +1242,10 @@ export function applyResolvedChoices(
               level: spellDef.level,
               prepared: spellDef.level === 0,
               classId: choice.classId,
+              // A free cast arrives with its uses full, as a granted one does.
+              ...(choice.uses ? { uses: { ...choice.uses, remaining: choice.uses.max } } : {}),
+              ...(choice.cost ? { cost: { ...choice.cost } } : {}),
+              ...(choice.castAtLevel ? { castAtLevel: choice.castAtLevel } : {}),
             })
           }
         }
@@ -804,33 +1280,47 @@ export function applyResolvedChoices(
             // The subclass was unchosen when resolveLevelUpEvents ran, so its own
             // level events were never emitted. Apply the automatic ones here.
             for (const evt of subclassLevel?.levelUpEvents ?? []) {
+              // A guarded grant belongs to RESOLVED_OPTION, which follows this in the
+              // same run. Circle of the Land never exposed this — a druid picks the
+              // Circle at 2nd and its guarded grants start at 3rd — but Divine Soul
+              // declares both on the level the subclass itself is chosen, and replaying
+              // them here handed out every affinity's spell at once.
+              if ('whenOption' in evt && evt.whenOption
+                && updated.chosenOptions?.[evt.whenOption.choiceId] !== evt.whenOption.optionId) {
+                continue
+              }
               if (evt.type === 'GRANT_SPELLS') {
-                for (const spellId of evt.spellIds) {
-                  const spellDef = rulepack.spells.find(sp => sp.id === spellId)
-                  if (!spellDef) continue
-                  const existing = updated.spells.find(sp => sp.spellId === spellId)
-                  if (existing) {
-                    if (evt.alwaysPrepared) {
-                      existing.alwaysPrepared = true
-                      existing.prepared = true
-                    }
-                    continue
-                  }
-                  updated.spells.push({
-                    id: crypto.randomUUID(),
-                    spellId,
-                    name: spellDef.name,
-                    level: spellDef.level,
-                    prepared: (evt.alwaysPrepared ?? false) || spellDef.level === 0,
-                    alwaysPrepared: evt.alwaysPrepared || undefined,
-                    classId: evt.addTo,
-                  })
-                }
+                // Through grantSpellsTo rather than building entries by hand: the hand
+                // -rolled version silently dropped `uses`, `cost` and the source's
+                // ability/label, which a Way of Shadow monk needs — it grants its
+                // 2-Ki spells on the very level the subclass is chosen.
+                grantSpellsTo(
+                  updated,
+                  evt.addTo,
+                  resolveGrantedSpells(evt.spellIds, rulepack),
+                  evt.alwaysPrepared ?? false,
+                  {
+                    ability: resolveAbilityRef(evt.ability, undefined),
+                    origin: evt.origin,
+                    label: evt.label ?? subclassDef.name,
+                    uses: evt.uses,
+                    cost: evt.cost,
+                    castAtLevel: evt.castAtLevel,
+                  },
+                )
               }
               else if (evt.type === 'GAIN_PROFICIENCY') {
                 if (!updated.otherProficiencies.includes(evt.proficiency)) {
                   updated.otherProficiencies.push(evt.proficiency)
                 }
+              }
+              else if (evt.type === 'GRANT_SPELLCASTING') {
+                // An Eldritch Knight starts casting at the very level it is chosen, so
+                // without this the fighter would gain slots with no DC behind them.
+                registerSpellcasting(updated, evt.addTo, evt.ability, {
+                  origin: evt.origin,
+                  label: evt.label ?? subclassDef.name,
+                })
               }
             }
           }
@@ -888,6 +1378,50 @@ export function applyResolvedChoices(
             )
           }
         }
+
+        // The same for a feat's guarded grants. A feat is applied by
+        // RESOLVED_CHOOSE_FEAT, which runs before the option it raises is answered — so
+        // without this a Scion of the Outer Planes would end up with no cantrip at all.
+        // The feat is already on `features` by now, since it is resolved earlier in this
+        // same list.
+        for (const feature of updated.features) {
+          if (feature.source !== 'Feat') continue
+          const feat = rulepack.feats.find(f => f.id === feature.id)
+          if (!feat) continue
+          for (const evt of feat.levelUpEvents ?? []) {
+            // Name the pick on the feat's own feature, since the lookup below only walks
+            // subclasses: "Scion of the Outer Planes (Good Outer Plane)".
+            if (evt.type === 'CHOOSE_OPTION' && evt.id === choice.choiceId) {
+              const opt = evt.options.find(o => o.id === choice.optionId)
+              if (opt) {
+                feature.name = `${feat.name} (${opt.name})`
+                if (opt.description) feature.description = opt.description
+              }
+              continue
+            }
+            if (evt.type !== 'GRANT_SPELLS' || !evt.whenOption) continue
+            if (evt.whenOption.choiceId !== choice.choiceId) continue
+            if (evt.whenOption.optionId !== choice.optionId) continue
+            grantSpellsTo(
+              updated,
+              evt.addTo || feat.id,
+              resolveGrantedSpells(evt.spellIds, rulepack),
+              evt.alwaysPrepared ?? false,
+              {
+                ability: resolveAbilityRef(
+                  evt.ability,
+                  updated.classSpellcasting?.[feat.id]?.ability,
+                ),
+                origin: evt.origin ?? 'feat',
+                label: evt.label ?? feat.name,
+                uses: evt.uses,
+                cost: evt.cost,
+                castAtLevel: evt.castAtLevel,
+              },
+            )
+          }
+        }
+
         // Find the option definition from the rulepack across all subclass level events
         let optionName: string | undefined
         let optionDescription: string | undefined

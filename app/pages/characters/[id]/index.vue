@@ -2,6 +2,7 @@
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { exportCharacter } from '~/services/characterIO'
+import { backfillRacialBonuses } from '~/services/characterMigration'
 import type { Character } from '~/types/character'
 import type { ClassDefinition } from '~/types/rulepack'
 
@@ -19,8 +20,23 @@ onMounted(async () => {
   character.value = (await characterStore.getById(id)) ?? null
   if (!character.value) { router.replace('/'); return }
   character.value = repairFeatures(character.value)
+  character.value = await backfillRacialIncreases(character.value)
   loading.value = false
 })
+
+/**
+ * Adds the racial ability increases to a character created before they were stored.
+ * Runs here rather than in the store because it needs the race out of a loaded pack,
+ * and only saves when something actually changed.
+ */
+async function backfillRacialIncreases(char: Character): Promise<Character> {
+  const race = rulepackStore.getRace(char.race)
+  const subrace = race?.subraces?.find(s => s.id === char.subrace)
+  const filled = backfillRacialBonuses(char, race, subrace)
+  if (filled === char) return char
+  await characterStore.save(filled)
+  return filled
+}
 
 /**
  * Back-fills missing descriptions, usesMax, and recharge on class features

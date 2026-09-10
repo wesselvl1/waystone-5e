@@ -13,10 +13,19 @@
  *
  * Ids default to `<abbrev>.<kebab-name>`, e.g. tce.fey-wanderer.
  *
- * COVERAGE: this index is assembled from recall and is best-effort — treat a missing or
- * misnamed entry as expected, not surprising. Check each book's contents page against
- * its folder before relying on it being complete. Adding a name here and re-running the
- * scaffold is a one-line change; nothing already filled in is overwritten.
+ * COVERAGE: every name here has been checked against 5etools' own per-source listings,
+ * so a name that no longer scaffolds is a real gap rather than a typo. It is still only
+ * as complete as what was listed in the first place — several books add content this
+ * index does not mention, and a book's own contents page is the thing to check against.
+ * Adding a name and re-running the scaffold is a one-line change; nothing already filled
+ * in is overwritten.
+ *
+ * Two kinds of entry deliberately survive not matching:
+ *   - content a book really adds that 5etools files under another shape, such as TCE's
+ *     Blessed Strikes, which it records as a feature on each cleric domain rather than
+ *     as an optional class feature;
+ *   - content reprinted from an earlier book, which is listed under both — a reader may
+ *     load either pack, and both books do contain it.
  *
  * Only classes that already exist (in the SRD pack or an earlier book) can be patched by
  * a subclass, so `classId` values use SRD class ids: barbarian, bard, cleric, druid,
@@ -73,13 +82,41 @@ export const BOOKS = [
     backgrounds: [
       'Charlatan', 'Criminal', 'Entertainer', 'Folk Hero', 'Guild Artisan', 'Hermit',
       'Noble', 'Outlander', 'Sage', 'Sailor', 'Soldier', 'Urchin',
+      // Each variant swaps a background's feature for another and is printed as its own
+      // option. "Custom Background" is deliberately absent: that is the rule for
+      // building one, not a background.
+      'Variant Criminal (Spy)', 'Variant Entertainer (Gladiator)',
+      'Variant Guild Artisan (Guild Merchant)', 'Variant Noble (Knight)',
+      'Variant Noble (Retainers)', 'Variant Sailor (Pirate)',
     ],
     subraces: [
+      ['Variant Human', { raceId: 'human' }],
       ['Mountain Dwarf', { raceId: 'dwarf' }],
       ['Wood Elf', { raceId: 'elf' }],
       ['Dark Elf (Drow)', { raceId: 'elf' }],
       ['Stout Halfling', { raceId: 'halfling' }],
       ['Forest Gnome', { raceId: 'gnome' }],
+    ],
+    // The PHB spells the SRD leaves out. Several are referenced by the expanded spell
+    // lists of PHB and later-book subclasses, so a GRANT_SPELLS event has nothing to
+    // point at until they exist as entries.
+    spells: [
+      'Arcane Gate', 'Armor of Agathys', 'Arms of Hadar', 'Aura of Life', 'Aura of Purity',
+      'Aura of Vitality', 'Banishing Smite', 'Beast Sense', "Bigby's Hand", 'Blade Ward',
+      'Blinding Smite', 'Chromatic Orb', 'Circle of Power', 'Cloud of Daggers',
+      'Compelled Duel', 'Conjure Barrage', 'Conjure Volley', 'Cordon of Arrows',
+      'Crown of Madness', "Crusader's Mantle", 'Destructive Wave', 'Dissonant Whispers',
+      "Drawmij's Instant Summons", 'Elemental Weapon', 'Ensnaring Strike',
+      "Evard's Black Tentacles", 'Feign Death', 'Friends', 'Grasping Vine',
+      'Hail of Thorns', 'Hex', 'Hunger of Hadar', "Leomund's Secret Chest",
+      "Leomund's Tiny Hut", 'Lightning Arrow', "Melf's Acid Arrow",
+      "Mordenkainen's Faithful Hound", "Mordenkainen's Magnificent Mansion",
+      "Mordenkainen's Private Sanctum", "Mordenkainen's Sword", "Nystul's Magic Aura",
+      "Otiluke's Freezing Sphere", "Otiluke's Resilient Sphere",
+      "Otto's Irresistible Dance", 'Phantasmal Force', 'Power Word Heal',
+      "Rary's Telepathic Bond", 'Ray of Sickness', 'Searing Smite', 'Staggering Smite',
+      'Swift Quiver', "Tasha's Hideous Laughter", 'Telepathy', "Tenser's Floating Disk",
+      'Thorn Whip', 'Thunderous Smite', 'Tsunami', 'Witch Bolt', 'Wrathful Smite',
     ],
   },
 
@@ -97,7 +134,7 @@ export const BOOKS = [
     ],
     spells: [
       'Abi-Dalzim’s Horrid Wilting', 'Absorb Elements', 'Aganazzar’s Scorcher',
-      'Beast Bond', 'Bones of the Earth', 'Catapult', 'Catnap', 'Control Flames',
+      'Beast Bond', 'Bones of the Earth', 'Catapult', 'Control Flames',
       'Control Winds', 'Create Bonfire', 'Dust Devil', 'Earthbind', 'Earth Tremor',
       'Elemental Bane', 'Erupting Earth', 'Flame Arrows', 'Frostbite', 'Gust',
       'Ice Knife', 'Immolation', 'Investiture of Flame', 'Investiture of Ice',
@@ -105,7 +142,7 @@ export const BOOKS = [
       'Maximilian’s Earthen Grasp', 'Melf’s Minute Meteors', 'Mold Earth',
       'Primordial Ward', 'Pyrotechnics', 'Shape Water', 'Skywrite', 'Snilloc’s Snowball Swarm',
       'Storm Sphere', 'Thunderclap', 'Tidal Wave', 'Transmute Rock', 'Vitriolic Sphere',
-      'Wall of Water', 'Warding Wind', 'Watery Sphere', 'Whirlwind', 'Wind Wall',
+      'Wall of Water', 'Warding Wind', 'Watery Sphere', 'Whirlwind',
     ],
   },
 
@@ -116,7 +153,6 @@ export const BOOKS = [
     version: '1.0',
     subclasses: [
       ['Path of the Battlerager', { classId: 'barbarian' }],
-      ['College of Swords', { classId: 'bard' }],
       ['Arcana Domain', { classId: 'cleric' }],
       ['Purple Dragon Knight (Banneret)', { classId: 'fighter' }],
       ['Way of the Long Death', { classId: 'monk' }],
@@ -130,14 +166,21 @@ export const BOOKS = [
       'City Watch', 'Clan Crafter', 'Cloistered Scholar', 'Courtier', 'Faction Agent',
       'Far Traveler', 'Inheritor', 'Knight of the Order', 'Mercenary Veteran',
       'Urban Bounty Hunter', 'Uthgardt Tribe Member', 'Waterdhavian Noble',
+      'Variant City Watch (Investigator)',
     ],
     subraces: [
       ['Gray Dwarf (Duergar)', { raceId: 'dwarf' }],
-      ['Eladrin', { raceId: 'elf' }],
-      ['Sea Elf', { raceId: 'elf' }],
-      ['Shadar-kai', { raceId: 'elf' }],
       ['Ghostwise Halfling', { raceId: 'halfling' }],
       ['Deep Gnome (Svirfneblin)', { raceId: 'gnome' }],
+      // The half-elf descents and tiefling legacies the book prints as variants
+      ['Aquatic Elf Descent Half-Elf', { raceId: 'half-elf' }],
+      ['Drow Descent Half-Elf', { raceId: 'half-elf' }],
+      ['Moon Elf or Sun Elf Descent Half-Elf', { raceId: 'half-elf' }],
+      ['Wood Elf Descent Half-Elf', { raceId: 'half-elf' }],
+      ["Devil's Tongue Tiefling", { raceId: 'tiefling' }],
+      ['Hellfire Tiefling', { raceId: 'tiefling' }],
+      ['Infernal Legacy Tiefling', { raceId: 'tiefling' }],
+      ['Winged Tiefling', { raceId: 'tiefling' }],
     ],
     spells: ['Booming Blade', 'Green-Flame Blade', 'Lightning Lure', 'Sword Burst'],
   },
@@ -163,6 +206,13 @@ export const BOOKS = [
     abbrev: 'xge',
     name: "Xanathar's Guide to Everything",
     version: '1.0',
+    // The racial feats, each gated on a race rather than an ability score
+    feats: [
+      'Bountiful Luck', 'Dragon Fear', 'Dragon Hide', 'Drow High Magic',
+      'Dwarven Fortitude', 'Elven Accuracy', 'Fade Away', 'Fey Teleportation',
+      'Flames of Phlegethos', 'Infernal Constitution', 'Orcish Fury', 'Prodigy',
+      'Second Chance', 'Squat Nimbleness', 'Wood Elf Magic',
+    ],
     subclasses: [
       ['Path of the Ancestral Guardian', { classId: 'barbarian' }],
       ['Path of the Storm Herald', { classId: 'barbarian' }],
@@ -227,6 +277,7 @@ export const BOOKS = [
     abbrev: 'mtf',
     name: "Mordenkainen's Tome of Foes",
     version: '1.0',
+    feats: ['Svirfneblin Magic'],
     races: ['Gith'],
     subraces: [
       ['Githyanki', { raceId: 'mtf.gith' }],
@@ -259,6 +310,9 @@ export const BOOKS = [
       'Gruul Anarch', 'Izzet Engineer', 'Orzhov Representative', 'Rakdos Cultist',
       'Selesnya Initiate', 'Simic Scientist',
     ],
+    // The book's one spell, and the Dimir guild list expands onto it — without an entry
+    // that EXPAND_SPELL_LIST has a name it cannot resolve.
+    spells: ['Encode Thoughts'],
   },
 
   // ── Eberron: Rising from the Last War ───────────────────────────────────────
@@ -279,9 +333,19 @@ export const BOOKS = [
       ['Longtooth', { raceId: 'erlw.shifter' }],
       ['Swiftstride', { raceId: 'erlw.shifter' }],
       ['Wildhunt', { raceId: 'erlw.shifter' }],
-      ['Envoy', { raceId: 'erlw.warforged' }],
-      ['Juggernaut', { raceId: 'erlw.warforged' }],
-      ['Skirmisher', { raceId: 'erlw.warforged' }],
+      // The dragonmarked houses, each a subrace of the race that bears the mark
+      ['Mark of Warding Dwarf', { raceId: 'dwarf' }],
+      ['Mark of Shadow Elf', { raceId: 'elf' }],
+      ['Mark of Scribing Gnome', { raceId: 'gnome' }],
+      ['Mark of Detection Half-Elf', { raceId: 'half-elf' }],
+      ['Mark of Storm Half-Elf', { raceId: 'half-elf' }],
+      ['Mark of Finding Half-Orc', { raceId: 'half-orc' }],
+      ['Mark of Healing Halfling', { raceId: 'halfling' }],
+      ['Mark of Hospitality Halfling', { raceId: 'halfling' }],
+      ['Mark of Handling Human', { raceId: 'human' }],
+      ['Mark of Making Human', { raceId: 'human' }],
+      ['Mark of Passage Human', { raceId: 'human' }],
+      ['Mark of Sentinel Human', { raceId: 'human' }],
     ],
     backgrounds: ['House Agent'],
   },
@@ -298,7 +362,14 @@ export const BOOKS = [
     ],
     races: ['Aarakocra', 'Genasi', 'Goblin', 'Hobgoblin', 'Bugbear', 'Orc', 'Tortle'],
     backgrounds: [
-      'Grinner', 'Volstrucker Agent', 'Menagerie Coast Trader', 'Sourced Academic',
+      'Grinner', 'Volstrucker Agent', 'Augen Trust (Spy)', 'Cobalt Scholar (Sage)',
+      'Luxonborn (Acolyte)', 'Myriad Operative (Criminal)', 'Revelry Pirate (Sailor)',
+    ],
+    subraces: [
+      ['Draconblood Dragonborn', { raceId: 'dragonborn' }],
+      ['Ravenite Dragonborn', { raceId: 'dragonborn' }],
+      ['Pallid Elf', { raceId: 'elf' }],
+      ['Lotusden Halfling', { raceId: 'halfling' }],
     ],
     spells: [
       'Dark Star', 'Fortune’s Favor', 'Gift of Alacrity', 'Gravity Fissure',
@@ -317,12 +388,8 @@ export const BOOKS = [
       ['College of Eloquence', { classId: 'bard' }],
       ['Oath of Glory', { classId: 'paladin' }],
     ],
-    feats: ['Anvilwrought', 'Athlete of Iroas', 'Nyxborn', 'Oracle', 'Returned'],
     races: ['Centaur', 'Leonin', 'Minotaur', 'Satyr', 'Triton'],
-    backgrounds: [
-      'Acolyte of Ephara', 'Akroan Soldier', 'Amphitheater Performer', 'Athlete of Iroas',
-      'Oracle', 'Phylactery Bearer', 'Reveler',
-    ],
+    backgrounds: ['Athlete'],
   },
 
   // ── Tasha's Cauldron of Everything ──────────────────────────────────────────
@@ -330,6 +397,7 @@ export const BOOKS = [
     abbrev: 'tce',
     name: "Tasha's Cauldron of Everything",
     version: '1.0',
+    races: ['Custom Lineage'],
     optionalFeatures: [
       ['Primal Knowledge', { classId: 'barbarian', level: 3 }],
       ['Instinctive Pounce', { classId: 'barbarian', level: 7 }],
@@ -438,18 +506,15 @@ export const BOOKS = [
     abbrev: 'scc',
     name: 'Strixhaven: A Curriculum of Chaos',
     version: '1.0',
-    feats: [
-      'Strixhaven Initiate', 'Strixhaven Mascot',
-      'Mage of Lorehold', 'Mage of Prismari', 'Mage of Quandrix', 'Mage of Silverquill',
-      'Mage of Witherbloom',
-    ],
+    races: ['Owlin'],
+    feats: ['Strixhaven Initiate', 'Strixhaven Mascot'],
     backgrounds: [
       'Lorehold Student', 'Prismari Student', 'Quandrix Student', 'Silverquill Student',
       'Witherbloom Student',
     ],
     spells: [
       'Borrowed Knowledge', 'Silvery Barbs', 'Kinetic Jaunt', 'Vortex Warp',
-      'Wither and Bloom', 'Tasha’s Caustic Brew',
+      'Wither and Bloom',
     ],
   },
 
@@ -484,6 +549,8 @@ export const BOOKS = [
     races: [
       'Astral Elf', 'Autognome', 'Giff', 'Hadozee', 'Plasmoid', 'Thri-kreen',
     ],
+    backgrounds: ['Astral Drifter', 'Wildspacer'],
+    spells: ['Air Bubble', 'Create Spelljamming Helm'],
   },
 
   // ── Dragonlance: Shadow of the Dragon Queen ─────────────────────────────────
@@ -492,7 +559,11 @@ export const BOOKS = [
     name: 'Dragonlance: Shadow of the Dragon Queen',
     version: '1.0',
     subclasses: [['Lunar Sorcery', { classId: 'sorcerer' }]],
-    feats: ['Adept of the Black Robes', 'Adept of the Red Robes', 'Adept of the White Robes', 'Divinely Favored', 'Initiate of High Sorcery', 'Squire of Solamnia', 'Knight of Solamnia', 'Mage of High Sorcery'],
+    feats: [
+      'Adept of the Black Robes', 'Adept of the Red Robes', 'Adept of the White Robes',
+      'Divinely Favored', 'Initiate of High Sorcery', 'Squire of Solamnia',
+      'Knight of the Crown', 'Knight of the Rose', 'Knight of the Sword',
+    ],
     races: ['Kender'],
     backgrounds: ['Knight of Solamnia', 'Mage of High Sorcery'],
   },
@@ -502,12 +573,12 @@ export const BOOKS = [
     abbrev: 'bgg',
     name: 'Bigby Presents: Glory of the Giants',
     version: '1.0',
-    subclasses: [
-      ['Path of the Giant', { classId: 'barbarian' }],
-      ['Circle of the Primeval', { classId: 'druid' }],
-      ['Runecarver', { classId: 'wizard' }],
+    subclasses: [['Path of the Giant', { classId: 'barbarian' }]],
+    feats: [
+      'Strike of the Giants', 'Ember of the Fire Giant', 'Guile of the Cloud Giant',
+      'Fury of the Frost Giant', 'Keenness of the Stone Giant', 'Soul of the Storm Giant',
+      'Vigor of the Hill Giant', 'Rune Shaper',
     ],
-    feats: ['Strike of the Giants', 'Ember of the Fire Giant', 'Guile of the Cloud Giant', 'Fury of the Frost Giant', 'Keenness of the Stone Giant', 'Soul of the Storm Giant', 'Vigor of the Hill Giant'],
     backgrounds: ['Giant Foundling', 'Rune Carver'],
   },
 
@@ -516,8 +587,10 @@ export const BOOKS = [
     abbrev: 'pam',
     name: 'Planescape: Adventures in the Multiverse',
     version: '1.0',
-    races: ['Glitchling'],
-    feats: ['Scion of the Outer Planes', 'Planar Philosophy'],
+    feats: [
+      'Scion of the Outer Planes', 'Agent of Order', 'Baleful Scion', 'Cohort of Chaos',
+      'Outlands Envoy', 'Planar Wanderer', 'Righteous Heritor',
+    ],
     backgrounds: ['Gate Warden', 'Planar Philosopher'],
   },
 
@@ -526,8 +599,9 @@ export const BOOKS = [
     abbrev: 'bmt',
     name: 'The Deck of Many Things: The Book of Many Things',
     version: '1.0',
-    feats: ['Cartomancer', 'Fortune’s Favor', 'Trader’s Boon'],
-    backgrounds: ['Rival', 'Ruined', 'Fatemaker'],
+    feats: ['Cartomancer'],
+    backgrounds: ['Rewarded', 'Ruined'],
+    spells: ['Antagonize', 'Spirit of Death', 'Spray of Cards'],
   },
 
   // ── Adventure-book backgrounds ──────────────────────────────────────────────
@@ -535,19 +609,28 @@ export const BOOKS = [
     abbrev: 'bgdia',
     name: 'Baldur’s Gate: Descent into Avernus',
     version: '1.0',
-    backgrounds: ['Faceless', 'Baldur’s Gate Acolyte', 'Gate Urchin'],
-  },
-  {
-    abbrev: 'idrotf',
-    name: 'Icewind Dale: Rime of the Frostmaiden',
-    version: '1.0',
-    backgrounds: ['Ten-Towns Trader', 'Ice Hunter'],
+    backgrounds: [
+      'Faceless',
+      // The book reprints each PHB background with a Baldur's Gate feature of its own
+      'Baldur’s Gate Acolyte', 'Baldur’s Gate Charlatan', 'Baldur’s Gate Criminal',
+      'Baldur’s Gate Entertainer', 'Baldur’s Gate Folk Hero',
+      'Baldur’s Gate Guild Artisan', 'Baldur’s Gate Hermit', 'Baldur’s Gate Noble',
+      'Baldur’s Gate Outlander', 'Baldur’s Gate Sage', 'Baldur’s Gate Sailor',
+      'Baldur’s Gate Soldier', 'Baldur’s Gate Urchin',
+    ],
   },
   {
     abbrev: 'ai',
     name: 'Acquisitions Incorporated',
     version: '1.0',
     races: ['Verdan'],
-    backgrounds: ['Celebrity Adventurer’s Scion', 'Failed Merchant', 'Gambler', 'Rival Intern'],
+    backgrounds: [
+      'Celebrity Adventurer’s Scion', 'Failed Merchant', 'Gambler', 'Rival Intern',
+      'Plaintiff',
+    ],
+    spells: [
+      'Distort Value', 'Fast Friends', 'Gift of Gab', 'Incite Greed',
+      "Jim's Glowing Coin", "Jim's Magic Missile", 'Motivational Speech',
+    ],
   },
 ]

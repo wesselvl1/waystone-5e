@@ -2,7 +2,15 @@
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { resolveLevelUpEvents, getChoiceEvents } from '~/services/levelUpService'
+import { raceAbilityBonuses } from '~/services/multiclass'
+import {
+  choiceSummary,
+  isChoiceSatisfied,
+  sumBonuses,
+  type AbilityPicks,
+} from '~/services/abilityScoreChoice'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
+import type { AbilityScoreChoice } from '~/types/rulepack'
 
 const router = useRouter()
 const characterStore = useCharactersStore()
@@ -52,13 +60,47 @@ const selectedClass = computed(() => rulepackStore.getClass(draft.classId))
 const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id === draft.backgroundId))
 
 // ── Effective abilities (base + race ASI + subrace ASI) ────────────────────────
-const effectiveAbilities = computed<AbilityScores>(() => {
+// Through raceAbilityBonuses so a subrace that restates the whole ability line replaces
+// the race's rather than stacking on it — a Draconblood dragonborn is INT +2 / CHA +1,
+// not that plus the dragonborn's STR +2.
+const racialBonuses = computed(() => raceAbilityBonuses(selectedRace.value, selectedSubrace.value).bonuses)
+
+/**
+ * The increases the race leaves to the player: the half-elf's +1 to two abilities, or
+ * the whole ability line for a Monsters of the Multiverse race, which fixes none of it.
+ * Nothing extra is stored — the wizard saves final scores, so the picks only have to
+ * reach `effectiveAbilities`.
+ */
+const racialChoices = computed(() => raceAbilityBonuses(selectedRace.value, selectedSubrace.value).choices)
+/** One answer per choice offered, so a race and its subrace can each ask. */
+const racialPicks = ref<AbilityPicks[]>([])
+/** Everything the player distributed, summed across the choices. */
+const distributedBonuses = computed(() => sumBonuses(racialPicks.value))
+/**
+ * Which of the two printed a given choice: the half-elf leaves +1 to two abilities
+ * open while its Wood Elf Descent subrace touches no ability at all.
+ */
+function racialChoiceSource(choice: AbilityScoreChoice) {
+  return selectedSubrace.value?.abilityScoreChoice === choice
+    ? selectedSubrace.value?.name
+    : selectedRace.value?.name
+}
+// A pick made for one race is meaningless under another, and may not even be offered.
+watch(racialChoices, choices => { racialPicks.value = choices.map(() => ({})) }, { immediate: true })
+
+/** Base plus what the race fixes, which is what the picker shows its increases against. */
+const scoresBeforeChoice = computed<AbilityScores>(() => {
   const base = { ...draft.abilities }
-  for (const [k, v] of Object.entries(selectedRace.value?.abilityScoreBonuses ?? {})) {
+  for (const [k, v] of Object.entries(racialBonuses.value)) {
     const key = k as keyof AbilityScores
     base[key] = Math.min(20, base[key] + (v ?? 0))
   }
-  for (const [k, v] of Object.entries(selectedSubrace.value?.abilityScoreBonuses ?? {})) {
+  return base
+})
+
+const effectiveAbilities = computed<AbilityScores>(() => {
+  const base = { ...scoresBeforeChoice.value }
+  for (const [k, v] of Object.entries(distributedBonuses.value)) {
     const key = k as keyof AbilityScores
     base[key] = Math.min(20, base[key] + (v ?? 0))
   }
@@ -88,6 +130,10 @@ function canProceed() {
   }
   if (step.value === 1) return !!draft.classId
   if (step.value === 2) return !!draft.backgroundId
+  // Advancing with a distributable increase half spent would silently drop it.
+  if (step.value === 3) {
+    return racialChoices.value.every((c, i) => isChoiceSatisfied(c, racialPicks.value[i] ?? {}))
+  }
   return true
 }
 
@@ -105,11 +151,27 @@ async function createCharacter() {
 
   // Check if level 1 has choice events (e.g. spell selection). If so, create the character at
   // level 0 so the level-up wizard handles level 1 — including HP roll and spell choices.
+  //
+  // The probe carries the chosen race, subrace and background: their level-up events fire
+  // on TOTAL character level, so a race that asks something at 1st level (which ability
+  // casts its spells, say) is only visible here if those ids are set. Without them a
+  // Fairy fighter would be created at level 1 and never asked.
   const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === draft.classId))
   const hasLevel1Choices = pack
     ? getChoiceEvents(resolveLevelUpEvents(
-        { abilityScores: effectiveAbilities.value, hitDice: [], classes: [{ classId: draft.classId, level: 0 }], spells: [] } as any,
-        draft.classId, 1, pack,
+        {
+          abilityScores: effectiveAbilities.value,
+          hitDice: [],
+          classes: [{ classId: draft.classId, level: 0 }],
+          spells: [],
+          race: draft.raceId,
+          subrace: draft.subraceId || undefined,
+          background: draft.backgroundId,
+          classSpellcasting: {},
+        } as any,
+        // Composed rather than the class's own pack: the race may come from a different
+        // one, and its events are invisible in a pack that does not contain it.
+        draft.classId, 1, rulepackStore.composedPack(),
       )).length > 0
     : false
 
@@ -126,7 +188,16 @@ async function createCharacter() {
     experiencePoints: 0,
     inspiration: false,
 
-    abilityScores: { ...draft.abilities },
+    // Effective, not the raw draft: the racial increases the wizard has been showing all
+    // along — the fixed ones and whatever the player distributed — have to be what is
+    // stored, since nothing downstream reapplies them.
+    abilityScores: { ...effectiveAbilities.value },
+    // Which of those scores came from the race, so a later migration can tell this
+    // character apart from one created before any of it was stored. Summed, not
+    // spread: a pick landing on an ability the race already raised would otherwise
+    // replace that bonus, under-report the grant, and leave the sheet convinced the
+    // choice was never answered.
+    appliedRacialBonuses: sumBonuses([racialBonuses.value, distributedBonuses.value]),
     abilityScoreOverrides: {},
 
     hp: hasLevel1Choices
@@ -225,6 +296,11 @@ function abilityMod(score: number) {
   const m = Math.floor((score - 10) / 2)
   return m >= 0 ? `+${m}` : `${m}`
 }
+
+/** Wildemount's goblin lowers Strength, so a bonus is not always an increase. */
+function signed(n: number | undefined) {
+  return (n ?? 0) >= 0 ? `+${n}` : `${n}`
+}
 </script>
 
 <template>
@@ -273,7 +349,13 @@ function abilityMod(score: number) {
                 :key="k"
                 class="text-[10px] text-accent-400 bg-accent-400/10 rounded px-1.5 py-0.5"
               >
-                +{{ v }} {{ k.toUpperCase() }}
+                {{ signed(v) }} {{ k.toUpperCase() }}
+              </span>
+              <span
+                v-if="race.abilityScoreChoice"
+                class="text-[10px] text-primary-300 bg-primary-400/10 rounded px-1.5 py-0.5"
+              >
+                {{ choiceSummary(race.abilityScoreChoice) }} of your choice
               </span>
             </div>
           </button>
@@ -300,7 +382,13 @@ function abilityMod(score: number) {
                   :key="k"
                   class="text-[10px] text-accent-400 bg-accent-400/10 rounded px-1.5 py-0.5"
                 >
-                  +{{ v }} {{ k.toUpperCase() }}
+                  {{ signed(v) }} {{ k.toUpperCase() }}
+                </span>
+                <span
+                  v-if="sub.abilityScoreChoice"
+                  class="text-[10px] text-primary-300 bg-primary-400/10 rounded px-1.5 py-0.5"
+                >
+                  {{ choiceSummary(sub.abilityScoreChoice) }} of your choice
                 </span>
               </div>
             </button>
@@ -438,13 +526,22 @@ function abilityMod(score: number) {
           </div>
         </div>
 
-        <div v-if="Object.keys(selectedRace?.abilityScoreBonuses ?? {}).length > 0 || Object.keys(selectedSubrace?.abilityScoreBonuses ?? {}).length > 0" class="card">
+        <div v-for="(choice, i) in racialChoices" :key="i" class="card">
+          <p class="section-header">{{ racialChoiceSource(choice) }} Ability Score Increase</p>
+          <AbilityScoreChoicePicker
+            :model-value="racialPicks[i] ?? {}"
+            :choice="choice"
+            :base-scores="scoresBeforeChoice"
+            @update:model-value="picks => racialPicks[i] = picks"
+          />
+        </div>
+
+        <!-- The same merged list the scores above use, so a subrace that replaces the
+             race's ability line does not also show the race's. -->
+        <div v-if="Object.keys(racialBonuses).length > 0" class="card">
           <p class="text-xs text-slate-400">
             <span class="text-accent-400 font-medium">Racial bonuses applied:</span>
-            {{ [
-              ...Object.entries(selectedRace?.abilityScoreBonuses ?? {}),
-              ...Object.entries(selectedSubrace?.abilityScoreBonuses ?? {}),
-            ].map(([k, v]) => `+${v} ${k.toUpperCase()}`).join(', ') }}
+            {{ Object.entries(racialBonuses).map(([k, v]) => `${signed(v)} ${k.toUpperCase()}`).join(', ') }}
           </p>
         </div>
       </template>

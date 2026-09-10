@@ -8,6 +8,9 @@
  * empty for a human to fill in from their own copy of the book; nothing here reproduces
  * book content. Everything under app/data/ except srd/ is gitignored dev-only data.
  *
+ * To fill that text in from a local 5etools corpus instead of by hand, see
+ * fill-book-prose.mjs — it writes into the same gitignored folders.
+ *
  * Re-running is safe: an entry that already exists keeps every field it has, and only
  * genuinely new ids are appended. So fill a stub in, re-run to pick up manifest
  * additions, and your work survives.

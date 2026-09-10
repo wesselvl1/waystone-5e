@@ -71,7 +71,7 @@ describe('SRD race roster', () => {
     const halfElf = rulepack.races.find(r => r.id === 'half-elf')!
     expect(halfElf.abilityScoreBonuses).toEqual({ cha: 2 })
     expect(halfElf.abilityScoreChoice).toEqual({
-      count: 2, bonus: 1, from: ['con', 'dex', 'int', 'str', 'wis'],
+      from: ['con', 'dex', 'int', 'str', 'wis'], distributions: [[1, 1]],
     })
   })
 })

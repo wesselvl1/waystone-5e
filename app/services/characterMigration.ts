@@ -1,4 +1,11 @@
-import type { Character, HitDicePool, SpellSlots } from '~/types/character'
+import {
+  isChoiceSetSatisfied,
+  sumBonuses,
+  type AbilityPicks,
+} from '~/services/abilityScoreChoice'
+import { raceAbilityBonuses } from '~/services/multiclass'
+import type { AbilityKey, Character, HitDicePool, SpellSlots } from '~/types/character'
+import type { AbilityScoreChoice, Race, Subrace } from '~/types/rulepack'
 
 /**
  * Bring a stored character up to the current shape.
@@ -16,6 +23,7 @@ export function migrateCharacterShape<T extends object>(raw: T): T {
   const src = raw as Record<string, unknown>
   const out = { ...src }
 
+  out.otherProficiencies = migrateOtherProficiencies(src.otherProficiencies)
   out.hitDice = migrateHitDice(src.hitDice, src.classes)
   out.spellSlots = migrateSpellSlots(src.spellSlots)
   out.classSpellcasting = migrateSpellcasting(
@@ -26,6 +34,23 @@ export function migrateCharacterShape<T extends object>(raw: T): T {
   )
 
   return out as T
+}
+
+/**
+ * Guarantee the proficiency list.
+ *
+ * It is typed as required and dereferenced directly wherever it is used — `.join` on
+ * the sheet's notes tab, `.push` on the GAIN_PROFICIENCY path — so a record stored
+ * before the field existed threw out of whichever render reached it first, blanking a
+ * whole tab. Defaulting it here fixes every one of those at once, which no single call
+ * site can.
+ *
+ * A non-string entry is dropped rather than carried through to be rendered as
+ * "[object Object]": the app only ever writes strings here.
+ */
+function migrateOtherProficiencies(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((p): p is string => typeof p === 'string')
 }
 
 type ClassLike = { classId?: unknown; level?: unknown }
@@ -99,4 +124,98 @@ function migrateSpellcasting(
     else out[key] = { ability, spells: [spell] }
   }
   return out
+}
+
+// ── racial ability increases ──────────────────────────────────────────────────
+// These need the character's race, which `migrateCharacterShape` has no way to reach:
+// it runs at the import boundary and inside the store, neither of which can be sure a
+// rulepack is loaded. So they take the race explicitly and are called from the sheet,
+// alongside `repairFeatures` — after the packs are in — rather than being folded above.
+
+/**
+ * Fold a race's FIXED ability increases into a character that never received them.
+ *
+ * Creation used to store the base scores while showing the player the bonused ones, so
+ * every character made before that was fixed is short its racial increases. Absence of
+ * `appliedRacialBonuses` is the only evidence of that, since the scores themselves cannot
+ * say whether a bonus is in them already.
+ *
+ * Only the fixed half is recoverable. What the player would have distributed is a decision
+ * nobody recorded, and inventing it would silently change their character, so it is left
+ * to them — `outstandingRacialChoice` is what surfaces it.
+ *
+ * Returns the character untouched when there is nothing to do, so a caller can skip the
+ * save. A race none of the loaded packs know is left unmarked rather than marked done,
+ * so opening a character before its pack loads does not strand it.
+ */
+export function backfillRacialBonuses(
+  character: Character,
+  race: Race | undefined,
+  subrace: Subrace | undefined,
+): Character {
+  if (character.appliedRacialBonuses || !race) return character
+
+  const { bonuses } = raceAbilityBonuses(race, subrace)
+  const abilityScores = { ...character.abilityScores }
+  for (const [k, v] of Object.entries(bonuses)) {
+    const key = k as AbilityKey
+    abilityScores[key] = Math.min(20, abilityScores[key] + (v ?? 0))
+  }
+  // Marked even when the race fixes nothing: the back-fill has run, and a race that
+  // leaves its whole line to the player has nothing here to find later.
+  return { ...character, abilityScores, appliedRacialBonuses: { ...bonuses } }
+}
+
+/** What `appliedRacialBonuses` holds beyond the fixed bonuses — i.e. what was distributed. */
+function distributedPart(
+  character: Character,
+  fixed: Partial<Record<AbilityKey, number>>,
+): AbilityPicks {
+  const picks: AbilityPicks = {}
+  for (const [k, v] of Object.entries(character.appliedRacialBonuses ?? {})) {
+    const key = k as AbilityKey
+    const extra = (v ?? 0) - (fixed[key] ?? 0)
+    if (extra > 0) picks[key] = extra
+  }
+  return picks
+}
+
+/**
+ * The increases a character's race leaves to the player, while they are still unspent.
+ *
+ * Derived rather than stored: whatever `appliedRacialBonuses` holds above the fixed
+ * bonuses is what was distributed, and the choices stand open until that spends one
+ * distribution from each. A character built through the wizard has already answered
+ * them, so this is empty for them.
+ *
+ * All of them or none: the answers are summed into one map, so there is no telling
+ * which pick belongs to which choice once a race and its subrace both print one.
+ */
+export function outstandingRacialChoices(
+  character: Character,
+  race: Race | undefined,
+  subrace: Subrace | undefined,
+): AbilityScoreChoice[] {
+  const { bonuses, choices } = raceAbilityBonuses(race, subrace)
+  if (choices.length === 0) return []
+  return isChoiceSetSatisfied(choices, distributedPart(character, bonuses)) ? [] : choices
+}
+
+/**
+ * The patch that spends an outstanding racial choice.
+ *
+ * Adds the picks to the scores and to the record of the grant. The record takes the pick
+ * as offered rather than what the 20 cap left room for, so a capped increase does not
+ * leave the choice looking unanswered and prompt for it again.
+ */
+export function racialChoicePatch(character: Character, picks: AbilityPicks): Partial<Character> {
+  const abilityScores = { ...character.abilityScores }
+  for (const [k, v] of Object.entries(picks)) {
+    const key = k as AbilityKey
+    abilityScores[key] = Math.min(20, abilityScores[key] + (v ?? 0))
+  }
+  return {
+    abilityScores,
+    appliedRacialBonuses: sumBonuses([character.appliedRacialBonuses, picks]),
+  }
 }

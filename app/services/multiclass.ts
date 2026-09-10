@@ -1,5 +1,11 @@
 import type { AbilityKey, AbilityScores, Character, ClassEntry, HitDicePool } from '~/types/character'
-import type { ClassDefinition, Rulepack } from '~/types/rulepack'
+import type {
+  AbilityScoreChoice,
+  ClassDefinition,
+  Race,
+  Rulepack,
+  Subrace,
+} from '~/types/rulepack'
 
 export interface UnmetRequirement {
   ability: AbilityKey
@@ -98,6 +104,39 @@ export function effectiveScores(
   character: Pick<Character, 'abilityScores' | 'abilityScoreOverrides'>,
 ): AbilityScores {
   return { ...character.abilityScores, ...character.abilityScoreOverrides }
+}
+
+/**
+ * The ability bonuses a race and subrace together grant, and the distributable ones
+ * still to be assigned.
+ *
+ * A subrace normally adds to its race — a mountain dwarf's +2 Strength on top of the
+ * dwarf's +2 Constitution. One that sets `replacesRaceAbilityBonuses` restates the whole
+ * line instead, and the race's contributes nothing: a Draconblood dragonborn is INT +2
+ * and CHA +1, not that plus the dragonborn's STR +2.
+ */
+export function raceAbilityBonuses(
+  race: Pick<Race, 'abilityScoreBonuses' | 'abilityScoreChoice'> | undefined,
+  subrace: Pick<Subrace, 'abilityScoreBonuses' | 'abilityScoreChoice' | 'replacesRaceAbilityBonuses'> | undefined,
+): { bonuses: Partial<Record<AbilityKey, number>>; choices: AbilityScoreChoice[] } {
+  const replaces = subrace?.replacesRaceAbilityBonuses === true
+  const bonuses: Partial<Record<AbilityKey, number>> = {}
+  for (const source of replaces ? [subrace] : [race, subrace]) {
+    for (const [k, v] of Object.entries(source?.abilityScoreBonuses ?? {})) {
+      const key = k as AbilityKey
+      bonuses[key] = (bonuses[key] ?? 0) + (v ?? 0)
+    }
+  }
+  // Both apply when the subrace adds to its race, because both were printed: taking
+  // the subrace's in preference lost whatever the race offered, and nothing ever asked
+  // for those points. Only a subrace that restates the whole line replaces it.
+  const choices = replaces
+    ? [subrace?.abilityScoreChoice]
+    : [race?.abilityScoreChoice, subrace?.abilityScoreChoice]
+  return {
+    bonuses,
+    choices: choices.filter((c): c is AbilityScoreChoice => c !== undefined),
+  }
 }
 
 /**
