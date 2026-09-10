@@ -9,6 +9,7 @@ import {
   sumBonuses,
   type AbilityPicks,
 } from '~/services/abilityScoreChoice'
+import { filterBySearch } from '~/services/searchFilter'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
 import type { AbilityScoreChoice } from '~/types/rulepack'
 
@@ -54,6 +55,22 @@ const pointsLeft = computed(() => 27 - pointsSpent.value)
 const allRaces = computed(() => rulepackStore.getAllRaces())
 const allClasses = computed(() => rulepackStore.getAllClasses())
 const allBackgrounds = computed(() => rulepackStore.getAllBackgrounds())
+
+// ── Search ────────────────────────────────────────────────────────────────────
+// With several sourcebooks loaded these lists run to dozens of entries, and a race
+// or background appears once per book that prints it. The source name is part of the
+// haystack so "elf mordenkainen" reaches one of two same-named entries.
+const raceSearch = ref('')
+const classSearch = ref('')
+const backgroundSearch = ref('')
+
+const filteredRaces = computed(() => filterBySearch(allRaces.value, raceSearch.value,
+  r => [r.name, r.sourceName, r.size, ...r.traits.map(t => t.name)]))
+const filteredClasses = computed(() => filterBySearch(allClasses.value, classSearch.value,
+  c => [c.name, c.sourceName, ...c.primaryAbility]))
+const filteredBackgrounds = computed(() => filterBySearch(allBackgrounds.value, backgroundSearch.value,
+  b => [b.name, b.sourceName, b.description, ...b.skillProficiencies]))
+
 const selectedRace = computed(() => rulepackStore.getRace(draft.raceId))
 const selectedSubrace = computed(() => selectedRace.value?.subraces?.find(s => s.id === draft.subraceId))
 const selectedClass = computed(() => rulepackStore.getClass(draft.classId))
@@ -332,9 +349,16 @@ function signed(n: number | undefined) {
 
       <!-- ── Step 0: Race ── -->
       <template v-if="step === 0">
+        <SearchBox
+          v-if="allRaces.length > 6"
+          v-model="raceSearch"
+          placeholder="Search races…"
+          :matches="filteredRaces.length"
+          :total="allRaces.length"
+        />
         <div class="grid grid-cols-2 gap-3">
           <button
-            v-for="race in allRaces"
+            v-for="race in filteredRaces"
             :key="race.id"
             class="card text-left transition-colors hover:border-primary-500/50"
             :class="draft.raceId === race.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -362,6 +386,9 @@ function signed(n: number | undefined) {
         </div>
         <div v-if="allRaces.length === 0" class="text-slate-500 text-sm text-center py-8">
           No races available. <NuxtLink to="/rulepacks" class="text-primary-400 underline">Import a rulepack</NuxtLink> first.
+        </div>
+        <div v-else-if="filteredRaces.length === 0" class="text-slate-500 text-sm text-center py-8">
+          No race matches “{{ raceSearch }}”.
         </div>
 
         <!-- Subrace picker -->
@@ -414,9 +441,16 @@ function signed(n: number | undefined) {
 
       <!-- ── Step 1: Class ── -->
       <template v-if="step === 1">
+        <SearchBox
+          v-if="allClasses.length > 6"
+          v-model="classSearch"
+          placeholder="Search classes…"
+          :matches="filteredClasses.length"
+          :total="allClasses.length"
+        />
         <div class="grid grid-cols-2 gap-3">
           <button
-            v-for="cls in allClasses"
+            v-for="cls in filteredClasses"
             :key="cls.id"
             class="card text-left transition-colors hover:border-primary-500/50"
             :class="draft.classId === cls.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -427,6 +461,9 @@ function signed(n: number | undefined) {
             <p class="text-xs text-slate-500 mt-0.5">Hit Die {{ cls.hitDie }}</p>
             <p class="text-xs text-slate-500">{{ cls.primaryAbility.map(a => a.toUpperCase()).join('/') }}</p>
           </button>
+        </div>
+        <div v-if="allClasses.length && filteredClasses.length === 0" class="text-slate-500 text-sm text-center py-8">
+          No class matches “{{ classSearch }}”.
         </div>
         <div v-if="selectedClass" class="card space-y-1">
           <p class="section-header">Level 1 Features</p>
@@ -441,9 +478,16 @@ function signed(n: number | undefined) {
 
       <!-- ── Step 2: Background ── -->
       <template v-if="step === 2">
+        <SearchBox
+          v-if="allBackgrounds.length > 6"
+          v-model="backgroundSearch"
+          placeholder="Search backgrounds…"
+          :matches="filteredBackgrounds.length"
+          :total="allBackgrounds.length"
+        />
         <div class="space-y-2">
           <button
-            v-for="bg in allBackgrounds"
+            v-for="bg in filteredBackgrounds"
             :key="bg.id"
             class="card w-full text-left transition-colors hover:border-primary-500/50"
             :class="draft.backgroundId === bg.id ? 'border-primary-500 bg-primary-900/20' : ''"
@@ -457,6 +501,9 @@ function signed(n: number | undefined) {
         </div>
         <div v-if="allBackgrounds.length === 0" class="text-slate-500 text-sm text-center py-8">
           No backgrounds available. Import a rulepack first.
+        </div>
+        <div v-else-if="filteredBackgrounds.length === 0" class="text-slate-500 text-sm text-center py-8">
+          No background matches “{{ backgroundSearch }}”.
         </div>
       </template>
 
