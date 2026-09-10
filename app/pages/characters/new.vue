@@ -43,6 +43,7 @@ const pointsSpent = computed(() =>
 const pointsLeft = computed(() => 27 - pointsSpent.value)
 
 // ── Lookups ───────────────────────────────────────────────────────────────────
+const allRaces = computed(() => rulepackStore.getAllRaces())
 const selectedRace = computed(() => rulepackStore.getRace(draft.raceId))
 const selectedSubrace = computed(() => selectedRace.value?.subraces?.find(s => s.id === draft.subraceId))
 const selectedClass = computed(() => rulepackStore.getClass(draft.classId))
@@ -255,13 +256,14 @@ function abilityMod(score: number) {
       <template v-if="step === 0">
         <div class="grid grid-cols-2 gap-3">
           <button
-            v-for="race in rulepackStore.getAllRaces()"
+            v-for="race in allRaces"
             :key="race.id"
             class="card text-left transition-colors hover:border-primary-500/50"
             :class="draft.raceId === race.id ? 'border-primary-500 bg-primary-900/20' : ''"
             @click="draft.raceId = race.id; draft.subraceId = ''"
           >
             <p class="font-semibold text-white text-sm">{{ race.name }}</p>
+            <p class="text-[10px] text-slate-500 truncate">{{ race.sourceName }}</p>
             <p class="text-xs text-slate-500 mt-0.5">Walk {{ race.speeds.walk }}ft<template v-if="race.speeds.fly">, Fly {{ race.speeds.fly }}ft</template><template v-if="race.speeds.swim">, Swim {{ race.speeds.swim }}ft</template><template v-if="race.speeds.climb">, Climb {{ race.speeds.climb }}ft</template> · {{ race.size }}</p>
             <div class="flex flex-wrap gap-1 mt-2">
               <span
@@ -274,7 +276,7 @@ function abilityMod(score: number) {
             </div>
           </button>
         </div>
-        <div v-if="rulepackStore.getAllRaces().length === 0" class="text-slate-500 text-sm text-center py-8">
+        <div v-if="allRaces.length === 0" class="text-slate-500 text-sm text-center py-8">
           No races available. <NuxtLink to="/rulepacks" class="text-primary-400 underline">Import a rulepack</NuxtLink> first.
         </div>
 

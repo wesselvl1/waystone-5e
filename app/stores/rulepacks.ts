@@ -156,8 +156,14 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     }
   }
 
-  function getAllRaces(): Race[] {
-    return rulepacks.value.flatMap(p => p.races)
+  /**
+   * Every race across all loaded packs, alphabetical, each tagged with the name of the
+   * pack it came from so the creation picker can say where a race is defined.
+   */
+  function getAllRaces(): Array<Race & { sourceName: string }> {
+    return rulepacks.value
+      .flatMap(p => p.races.map(race => ({ ...race, sourceName: p.name })))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
 
   function getAllClasses(): ClassDefinition[] {
