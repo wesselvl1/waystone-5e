@@ -116,6 +116,18 @@ export interface ChooseOptionDef {
    * Arcane Propulsion Armor is not on offer until 14th.
    */
   minLevel?: number
+  /**
+   * Another choice's answer this option depends on. Several Eldritch Invocations are
+   * gated on the Pact Boon rather than on level: Thirsting Blade needs Pact of the Blade,
+   * Book of Ancient Secrets needs Pact of the Tome.
+   */
+  requiresOption?: { choiceId: string; optionId: string }
+  /**
+   * A spell the character must know for this option to be on offer. Agonizing Blast,
+   * Eldritch Spear and Repelling Blast all modify eldritch blast, so they are only open
+   * to a warlock who took the cantrip.
+   */
+  requiresSpell?: string
 }
 
 export type LevelUpEventDef =
@@ -286,6 +298,18 @@ export type LevelUpEventDef =
      * Style are each picked several times from one list, and the SRD forbids repeats.
      */
     group?: string
+  }
+  | {
+    /**
+     * Offers to swap one pick already made from a shared pool for another the character
+     * qualifies for now. A warlock may trade an invocation on every warlock level, so the
+     * offer is declared on each level rather than derived — a pack that does not allow
+     * retraining simply omits it.
+     */
+    type: 'REPLACE_OPTION'
+    /** The pool to swap within, matching the `group` of the CHOOSE_OPTION picks. */
+    group: string
+    label?: string
   }
 
 export interface ClassLevel {

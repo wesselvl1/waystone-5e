@@ -220,10 +220,35 @@ export interface ChooseOptionEvent {
   type: 'CHOOSE_OPTION'
   id: string           // unique id for this choice (e.g. "totem-spirit")
   label: string        // display label (e.g. "Choose a Totem Spirit")
-  /** Same shape as the def, minLevel included: an option can open later than the pool. */
-  options: Array<{ id: string; name: string; description: string; minLevel?: number }>
+  /** Same shape as the def, prerequisites included: an option can open later than the pool. */
+  options: PoolOption[]
   /** Shared pool this choice draws from, when it has one (e.g. "metamagic"). */
   group?: string
+}
+
+/** An option as offered to the player; the def's prerequisites ride along unchanged. */
+export interface PoolOption {
+  id: string
+  name: string
+  description: string
+  minLevel?: number
+  requiresOption?: { choiceId: string; optionId: string }
+  requiresSpell?: string
+}
+
+/**
+ * Offers to trade one pick already made from a shared pool for another.
+ *
+ * `current` is what the character knows, each paired with the choice id that holds it,
+ * because the swap is recorded by overwriting that id's answer. Only raised when there
+ * is something to trade and something to trade it for.
+ */
+export interface ReplaceOptionEvent {
+  type: 'REPLACE_OPTION'
+  group: string
+  label: string
+  current: Array<{ choiceId: string; option: PoolOption }>
+  options: PoolOption[]
 }
 
 /** Presented when ≥1 optional features are available at this level from any loaded rulepack. */
@@ -295,6 +320,17 @@ export interface ResolvedOption {
   optionId: string
 }
 
+/**
+ * A pool pick traded for another. `choiceId` names the pick being overwritten, so the
+ * pool keeps one answer per choice id and the count of picks never changes.
+ */
+export interface ResolvedOptionReplacement {
+  type: 'RESOLVED_OPTION_REPLACEMENT'
+  group: string
+  choiceId: string
+  optionId: string
+}
+
 /** Carries the player's selections from an OFFER_OPTIONAL_FEATURES choice. */
 export interface ResolvedOptionalFeatures {
   type: 'RESOLVED_OPTIONAL_FEATURES'
@@ -338,6 +374,7 @@ export type ChoiceLevelUpEvent =
   | ChooseSubclassEvent
   | ChooseSkillEvent
   | ChooseOptionEvent
+  | ReplaceOptionEvent
   | OfferOptionalFeaturesEvent
 
 export type LevelUpEvent = AutomaticLevelUpEvent | ChoiceLevelUpEvent
@@ -360,6 +397,7 @@ export type ResolvedChoice =  | ResolvedChoiceSpell
   | ResolvedASI
   | ResolvedSubclass
   | ResolvedOption
+  | ResolvedOptionReplacement
   | ResolvedOptionalFeatures
   | ResolvedSkill
   | ResolvedExpertise

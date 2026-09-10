@@ -9,6 +9,8 @@ import { filterBySearch } from '~/services/searchFilter'
 import {
   resolveLevelUpEvents,
   resolveOptionChoice,
+  resolveOptionReplacement,
+  optionAvailable,
   resolveFeatEvents,
   featIncreasedAbility,
   chooseSpellEvent,
@@ -29,6 +31,8 @@ import type {
   ChooseSpellEvent,
   ChooseSubclassEvent,
   ChooseOptionEvent,
+  PoolOption,
+  ReplaceOptionEvent,
   OfferOptionalFeaturesEvent,
   ChooseSkillEvent,
   ChooseExpertiseEvent,
@@ -414,6 +418,57 @@ function confirmSkills() {
   nextChoice()
 }
 
+/** The level in the class being levelled, as it will be once this run is applied. */
+const projectedClassLevel = computed(() => projectedClasses.value
+  .find(c => c.classId === targetClassId.value)?.level ?? targetLevel.value)
+
+/**
+ * Answers and spells from this run, for the prerequisites that depend on them.
+ *
+ * The service checks a prerequisite against the stored character, which is enough for a
+ * gate answered on an earlier level. A gate answered moments ago on *this* level is not
+ * stored yet, so it has to be read out of the run.
+ */
+const pendingPicks = computed(() => {
+  const options: Record<string, string> = {}
+  const spellIds: string[] = []
+  for (const choice of resolvedChoices.value) {
+    if (choice.type === 'RESOLVED_OPTION' || choice.type === 'RESOLVED_OPTION_REPLACEMENT')
+      options[choice.choiceId] = choice.optionId
+    else if (choice.type === 'RESOLVED_CHOOSE_SPELL')
+      spellIds.push(...choice.spellIds)
+  }
+  return { options, spellIds }
+})
+
+/**
+ * The character as this run will leave them, so the resolvers can answer against picks
+ * that are not stored yet. Only what a prerequisite reads is projected — the run's
+ * option answers, its spell ids and the new class level; the stub spell entries carry
+ * nothing but `spellId`, which is the only field `optionAvailable` looks at.
+ */
+const projectedCharacter = computed<Character>(() => {
+  const stored = toRaw(character.value!)
+  const { options, spellIds } = pendingPicks.value
+  return {
+    ...stored,
+    classes: projectedClasses.value,
+    chosenOptions: { ...stored.chosenOptions, ...options },
+    spells: [
+      ...stored.spells,
+      ...spellIds.map(spellId => ({
+        id: spellId, spellId, name: spellId, level: 0, prepared: true,
+      })),
+    ],
+  }
+})
+
+/** Whether an option's prerequisites hold, counting what this run has already answered. */
+function isOptionOpen(option: PoolOption): boolean {
+  if (!character.value) return false
+  return optionAvailable(option, projectedCharacter.value, projectedClassLevel.value)
+}
+
 /**
  * The options still open for the current choice.
  *
@@ -426,23 +481,31 @@ const availableOptions = computed(() => {
   const choiceEvent = currentChoice.value as ChooseOptionEvent | null
   if (!choiceEvent || choiceEvent.type !== 'CHOOSE_OPTION') return []
 
-  // An option can open later than the pool that offers it.
-  const classLevel = projectedClasses.value
-    .find(c => c.classId === targetClassId.value)?.level ?? targetLevel.value
-  const unlocked = choiceEvent.options.filter(o => !o.minLevel || o.minLevel <= classLevel)
+  const unlocked = choiceEvent.options.filter(isOptionOpen)
   if (!choiceEvent.group) return unlocked
 
-  const groupOf = (choiceId: string) => choiceEvents.value
-    .find((e): e is ChooseOptionEvent => e.type === 'CHOOSE_OPTION' && e.id === choiceId)
-    ?.group
-  const takenThisRun = new Set(
-    resolvedChoices.value
-      .filter(c => c.type === 'RESOLVED_OPTION' && groupOf(c.choiceId) === choiceEvent.group)
-      .map(c => (c as { optionId: string }).optionId),
-  )
-  const taken = new Set([...takenThisRun, ...takenInGroup(choiceEvent.group)])
+  const taken = new Set([...takenThisRun(choiceEvent.group), ...takenInGroup(choiceEvent.group)])
   return unlocked.filter(o => !taken.has(o.id))
 })
+
+/** The group a choice id draws from, as this run's events declare it. */
+function groupOf(choiceId: string): string | undefined {
+  return choiceEvents.value
+    .find((e): e is ChooseOptionEvent => e.type === 'CHOOSE_OPTION' && e.id === choiceId)
+    ?.group
+}
+
+/**
+ * What this run has already taken from a pool, picks and replacements alike. A
+ * replacement counts: trading into an option and then picking it again would leave the
+ * character holding it twice.
+ */
+function takenThisRun(group: string): string[] {
+  return resolvedChoices.value
+    .filter(c => (c.type === 'RESOLVED_OPTION' && groupOf(c.choiceId) === group)
+      || (c.type === 'RESOLVED_OPTION_REPLACEMENT' && c.group === group))
+    .map(c => (c as { optionId: string }).optionId)
+}
 
 /**
  * What earlier level-ups already took from a shared pool.
@@ -492,6 +555,55 @@ function confirmOption() {
   selectedOptionId.value = ''
   queueUnlockedChoices(choiceEvent.id, optionId)
   nextChoice()
+}
+
+// ── Replacing a pool pick ─────────────────────────────────────────────────────
+/** The choice id holding the pick being traded away, not the option's own id. */
+const replaceFromChoiceId = ref('')
+const replaceToOptionId = ref('')
+
+/**
+ * What the traded pick can become.
+ *
+ * Re-resolved against the run rather than filtered out of the event, because this run can
+ * *open* an option as well as close one: the level that picks Pact of the Tome is the
+ * level Book of Ancient Secrets becomes tradeable. Answering against the projected
+ * character covers both directions at once — an option taken moments ago counts as known,
+ * so it is not handed out a second time.
+ */
+const replacementOptions = computed(() => {
+  const choiceEvent = currentChoice.value as ReplaceOptionEvent | null
+  if (!choiceEvent || choiceEvent.type !== 'REPLACE_OPTION' || !character.value) return []
+  const offer = resolveOptionReplacement(
+    { type: 'REPLACE_OPTION', group: choiceEvent.group },
+    projectedCharacter.value,
+    mergedPack(),
+    projectedClassLevel.value,
+  )
+  return offer?.options ?? []
+})
+
+function confirmReplacement() {
+  const choiceEvent = currentChoice.value as ReplaceOptionEvent
+  if (!replaceFromChoiceId.value || !replaceToOptionId.value) return
+  resolvedChoices.value.push({
+    type: 'RESOLVED_OPTION_REPLACEMENT',
+    group: choiceEvent.group,
+    choiceId: replaceFromChoiceId.value,
+    optionId: replaceToOptionId.value,
+  })
+  replaceFromChoiceId.value = ''
+  replaceToOptionId.value = ''
+  nextChoice()
+}
+
+/** Reads a replacement back on the summary, since it changes something already on the sheet. */
+function replacementSummary(choice: Extract<ResolvedChoice, { type: 'RESOLVED_OPTION_REPLACEMENT' }>): string {
+  const event = choiceEvents.value
+    .find((e): e is ReplaceOptionEvent => e.type === 'REPLACE_OPTION' && e.group === choice.group)
+  const from = event?.current.find(c => c.choiceId === choice.choiceId)?.option.name ?? choice.choiceId
+  const to = event?.options.find(o => o.id === choice.optionId)?.name ?? choice.optionId
+  return `Replaced ${from} with ${to}`
 }
 
 /**
@@ -553,6 +665,10 @@ watch(currentChoice, (choice) => {
   if (choice?.type === 'OFFER_OPTIONAL_FEATURES') {
     initOptionalToggles(choice as OfferOptionalFeaturesEvent)
   }
+  if (choice?.type === 'REPLACE_OPTION') {
+    replaceFromChoiceId.value = ''
+    replaceToOptionId.value = ''
+  }
 })
 
 const availableSubclasses = computed(() => rulepackStore.getSubclassesForClass(targetClassId.value))
@@ -567,6 +683,7 @@ const featSearch = ref('')
 const spellSearch = ref('')
 const subclassSearch = ref('')
 const optionSearch = ref('')
+const replacementSearch = ref('')
 const optionalFeatureSearch = ref('')
 const multiclassSearch = ref('')
 
@@ -581,6 +698,10 @@ const filteredSubclasses = computed(() => filterBySearch(availableSubclasses.val
 
 const filteredOptions = computed(() => filterBySearch(availableOptions.value, optionSearch.value,
   o => [o.name, o.description]))
+
+/** The trade's own list is as long as the pool it draws from, so it gets a box too. */
+const filteredReplacementOptions = computed(() =>
+  filterBySearch(replacementOptions.value, replacementSearch.value, o => [o.name, o.description]))
 
 /** The optional features on offer live on the event rather than in a store getter. */
 const offeredOptionalFeatures = computed(() =>
@@ -601,6 +722,7 @@ watch(currentChoiceIdx, () => {
   spellSearch.value = ''
   subclassSearch.value = ''
   optionSearch.value = ''
+  replacementSearch.value = ''
   optionalFeatureSearch.value = ''
 })
 
@@ -620,7 +742,7 @@ function confirmSubclass() {
       // Through the service, so an option already taken from the same pool is dropped here
       // too rather than only on the paths that go via resolveLevelUpEvents.
       const choice = character.value
-        ? resolveOptionChoice(eventDef, toRaw(character.value), pack)
+        ? resolveOptionChoice(eventDef, toRaw(character.value), pack, targetLevel.value)
         : undefined
       if (choice) injected.push(choice)
     }
@@ -1032,6 +1154,61 @@ watch(isFirstCharacterLevel, (val) => {
           </div>
         </template>
 
+        <!-- Trade one pick from a pool for another (e.g. an Eldritch Invocation) -->
+        <template v-else-if="currentChoice.type === 'REPLACE_OPTION'">
+          <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ReplaceOptionEvent).label }}</h2>
+          <p class="text-xs text-slate-400 mt-1">Optional — skip to keep what you have.</p>
+
+          <p class="section-header mt-4">Give up</p>
+          <div class="space-y-2">
+            <button
+              v-for="held in (currentChoice as ReplaceOptionEvent).current"
+              :key="held.choiceId"
+              class="card w-full text-left hover:border-danger-500/50 transition-colors"
+              :class="replaceFromChoiceId === held.choiceId ? 'border-danger-500 bg-danger-900/20' : ''"
+              @click="replaceFromChoiceId = held.choiceId"
+            >
+              <p class="font-semibold text-white">{{ held.option.name }}</p>
+            </button>
+          </div>
+
+          <template v-if="replaceFromChoiceId">
+            <p class="section-header mt-4">Take instead</p>
+            <SearchBox
+              v-if="replacementOptions.length > 6"
+              v-model="replacementSearch"
+              class="mb-2"
+              placeholder="Search options…"
+              :matches="filteredReplacementOptions.length"
+              :total="replacementOptions.length"
+            />
+            <div class="space-y-2">
+              <button
+                v-for="opt in filteredReplacementOptions"
+                :key="opt.id"
+                class="card w-full text-left hover:border-primary-500/50 transition-colors"
+                :class="replaceToOptionId === opt.id ? 'border-primary-500 bg-primary-900/20' : ''"
+                @click="replaceToOptionId = opt.id"
+              >
+                <p class="font-semibold text-white">{{ opt.name }}</p>
+                <p class="text-xs text-slate-400 mt-1 leading-relaxed">{{ opt.description }}</p>
+              </button>
+              <p v-if="replacementOptions.length && filteredReplacementOptions.length === 0" class="text-slate-500 text-sm text-center py-4">
+                Nothing matches “{{ replacementSearch }}”.
+              </p>
+            </div>
+          </template>
+
+          <div class="flex gap-2 mt-2">
+            <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
+            <button
+              class="btn-primary flex-1 text-sm"
+              :disabled="!replaceFromChoiceId || !replaceToOptionId"
+              @click="confirmReplacement"
+            >Confirm</button>
+          </div>
+        </template>
+
         <!-- Expertise -->
         <!-- Spellcasting ability, for a source that leaves it to the player -->
         <template v-else-if="currentChoice.type === 'CHOOSE_SPELLCASTING_ABILITY'">
@@ -1291,6 +1468,9 @@ watch(isFirstCharacterLevel, (val) => {
               </span>
               <span v-else-if="choice.type === 'RESOLVED_OPTION'">
                 {{ optionSummary(choice.choiceId, choice.optionId) }}
+              </span>
+              <span v-else-if="choice.type === 'RESOLVED_OPTION_REPLACEMENT'">
+                {{ replacementSummary(choice) }}
               </span>
               <span v-else-if="choice.type === 'RESOLVED_OPTIONAL_FEATURES' && choice.taken.length > 0">
                 Optional features: {{ choice.taken.map(f => f.name).join(', ') }}
