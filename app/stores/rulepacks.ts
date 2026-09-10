@@ -158,7 +158,9 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
 
   /**
    * Every race across all loaded packs, alphabetical, each tagged with the name of the
-   * pack it came from so the creation picker can say where a race is defined.
+   * pack it came from. Two packs' takes on the same race are both listed — pack ids are
+   * namespaced (`mpmm-satyr`), so a second book's Satyr is a separate entry rather than
+   * an override, and `sourceName` is what tells the two apart in the picker.
    */
   function getAllRaces(): Array<Race & { sourceName: string }> {
     return rulepacks.value

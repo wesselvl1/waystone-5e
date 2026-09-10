@@ -48,6 +48,8 @@ Game content is data, not code. A **rulepack** (`app/types/rulepack.ts`) holds r
 
 The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass`, `getAllCreatures`, `getCreature`, `getCreaturesMatching` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
 
+Because ids are the merge key, a custom pack is expected to **prefix its entry ids with a source abbreviation** (`mpmm-satyr`) and reuse a bare SRD id only to override deliberately. So two books' versions of the same race are two entries, not a conflict — `getAllRaces` returns both, each tagged with a `sourceName`, and the creation picker labels them. Don't "fix" that by de-duplicating a list by name; the source label is the disambiguator.
+
 ### SRD seeding
 
 `app/plugins/srd-loader.client.ts` merges the files in `app/data/srd/` on client startup. Only `SRD_FRAGMENT_ORDER` (`races`, then `subraces`) is ordered, because a patch fragment must follow the fragment defining its target; everything else is self-contained and loads alphabetically after. The loader globs the directory rather than importing each file, so adding a fragment needs no loader change. Re-seeding is gated by two things: the pack's `version` field and a `SRD_SEED_REVISION` constant tracked in `localStorage`.
