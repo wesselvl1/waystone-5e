@@ -350,6 +350,7 @@ const IDX = {
   background: index(C.background),
   spell: index(C.spell),
   subclass: index(C.subclass, e => [e.name, `${e.name} ${e.className}`]),
+  poolOption: index(C.optionalfeature),
   optionalfeature: index([
     ...C.optionalfeature,
     ...C.classFeature.filter(f => f.isClassFeatureVariant),
@@ -383,6 +384,7 @@ function anySubFeature(className, shortName, name) {
 
 const stats = new Map()
 const misses = []
+const noEntry = []
 const bump = (kind, field) => {
   const s = stats.get(kind) ?? { filled: 0, missed: 0 }
   s[field] += 1
@@ -424,6 +426,49 @@ function remainingEmpty(entry) {
   }
   walk(entry)
   return n
+}
+
+/**
+ * The descriptions on a CHOOSE_OPTION's options — the sixteen artificer infusions, the
+ * five Outer Planes — wherever they appear in an entry's events.
+ *
+ * A deep walk rather than the per-category shapes, because events hang at a different
+ * depth on every one of them: a class has them per level, a race wraps them in
+ * SourceLevelEvents, a feat holds them flat.
+ *
+ * An option the fill named itself has no book entry to find — "Bard Spells" is which
+ * class list Magic Initiate draws on, and the name is the whole of it. Those are
+ * counted separately from a miss, and are also why `_todo` ignores option text: a
+ * marker that can never clear is worse than no marker.
+ */
+function fillOptions(entry, book, name) {
+  const seen = new Set()
+  const walk = (o) => {
+    if (Array.isArray(o)) return o.forEach(walk)
+    if (!o || typeof o !== 'object' || seen.has(o)) return
+    seen.add(o)
+    if (o.type === 'CHOOSE_OPTION') {
+      for (const opt of o.options ?? []) {
+        if (!opt || !empty(opt.description)) continue
+        const found = IDX.poolOption.get(opt.name)
+        if (!found) {
+          bump('option', 'missed')
+          noEntry.push(`${book}/${name} — ${opt.name}`)
+          continue
+        }
+        // The item an infusion needs is in its prerequisite rather than its text, and
+        // is exactly what a player weighing the pick wants to see.
+        const items = (found.prerequisite ?? []).flatMap(p => p?.item ?? [])
+        const body = [
+          items.length ? `Prerequisite: ${items.map(detag).join('; ')}` : '',
+          render(found.entries),
+        ].filter(Boolean).join('\n\n')
+        fill(opt, body, 'option', `${book}/${name} — ${opt.name}`)
+      }
+    }
+    for (const v of Object.values(o)) walk(v)
+  }
+  walk(entry)
 }
 
 function fillTraits(entry, found, kind, book) {
@@ -540,6 +585,12 @@ for (const book of readdirSync(DATA)) {
     for (const [category, filler] of Object.entries(FILL)) {
       for (const entry of json[category] ?? []) filler(entry, book)
     }
+    for (const arr of Object.values(json)) {
+      if (!Array.isArray(arr)) continue
+      for (const entry of arr) {
+        if (entry && typeof entry === 'object') fillOptions(entry, book, entry.name ?? entry.id)
+      }
+    }
     // A marker that outlives the work it marks is worse than none.
     for (const arr of Object.values(json)) {
       if (!Array.isArray(arr)) continue
@@ -569,5 +620,11 @@ if (misses.length) {
   console.log('\nUnmatched (left empty):')
   for (const m of misses.slice(0, 40)) console.log(`  ${m}`)
   if (misses.length > 40) console.log(`  … and ${misses.length - 40} more`)
+}
+if (noEntry.length) {
+  console.log(`\n${noEntry.length} option(s) the book does not name separately, so there is`
+    + ' nothing to look up — the option name is the whole of it:')
+  for (const m of noEntry.slice(0, 12)) console.log(`  ${m}`)
+  if (noEntry.length > 12) console.log(`  … and ${noEntry.length - 12} more`)
 }
 if (dryRun) console.log('\n--dry-run: nothing was written.')
