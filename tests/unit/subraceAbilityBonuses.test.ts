@@ -37,7 +37,7 @@ describe('a subrace that adds to its race', () => {
   })
 
   it('keeps the race distributable bonuses', () => {
-    expect(raceAbilityBonuses(HALF_ELF, undefined).choice).toEqual(HALF_ELF.abilityScoreChoice)
+    expect(raceAbilityBonuses(HALF_ELF, undefined).choices).toEqual([HALF_ELF.abilityScoreChoice])
   })
 
   it('stacks a shared ability rather than overwriting it', () => {
@@ -63,14 +63,14 @@ describe('a subrace that replaces its race', () => {
    * of it, leaving a dragonmarked half-elf +1 to two abilities too strong.
    */
   it('replaces the race distributable bonuses too', () => {
-    const { bonuses, choice } = raceAbilityBonuses(HALF_ELF, MARK_OF_DETECTION)
+    const { bonuses, choices } = raceAbilityBonuses(HALF_ELF, MARK_OF_DETECTION)
     expect(bonuses).toEqual({ wis: 2 })
-    expect(choice).toEqual(MARK_OF_DETECTION.abilityScoreChoice)
-    expect(choice).not.toEqual(HALF_ELF.abilityScoreChoice)
+    expect(choices).toEqual([MARK_OF_DETECTION.abilityScoreChoice])
+    expect(choices).not.toContain(HALF_ELF.abilityScoreChoice)
   })
 
   it('leaves no distributable bonus when the subrace names none', () => {
-    expect(raceAbilityBonuses(HALF_ELF, DRACONBLOOD).choice).toBeUndefined()
+    expect(raceAbilityBonuses(HALF_ELF, DRACONBLOOD).choices).toEqual([])
   })
 
   it('is inert without the flag', () => {

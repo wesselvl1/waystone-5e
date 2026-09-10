@@ -73,6 +73,12 @@ export interface ExpandSpellListEvent {
   classes?: string[]
   /** Guard that was satisfied to produce this event, kept for traceability. */
   whenOption?: { choiceId: string; optionId: string }
+  /**
+   * Level the rule came into force at, when that is later than where it is declared.
+   * The event is only emitted once it is in force, so this is here to be shown rather
+   * than tested.
+   */
+  minLevel?: number
   label?: string
 }
 

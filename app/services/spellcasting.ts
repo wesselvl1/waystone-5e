@@ -82,7 +82,11 @@ export function casterLevelFor(entry: ClassEntry, rulepack: Rulepack): number {
  * class table corrects this automatically.
  */
 function multiclassTable(rulepack: Rulepack): Map<number, SlotTable> {
-  const full = rulepack.classes.find(c => c.isFullCaster && c.levels.some(l => l.spellSlots))
+  // Either spelling counts. casterProgression is the preferred one, so a pack that uses
+  // only it would otherwise yield an empty table here and no slots at all for a
+  // multiclass caster, while castingFor read that same pack correctly.
+  const isFull = (c: ClassDefinition) => (c.casterProgression ?? (c.isFullCaster ? 'full' : undefined)) === 'full'
+  const full = rulepack.classes.find(c => isFull(c) && c.levels.some(l => l.spellSlots))
   const table = new Map<number, SlotTable>()
   for (const lvl of full?.levels ?? []) {
     if (lvl.spellSlots) table.set(lvl.level, lvl.spellSlots)

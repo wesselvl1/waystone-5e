@@ -3,8 +3,14 @@ import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { resolveLevelUpEvents, getChoiceEvents } from '~/services/levelUpService'
 import { raceAbilityBonuses } from '~/services/multiclass'
-import { choiceSummary, isChoiceSatisfied, type AbilityPicks } from '~/services/abilityScoreChoice'
+import {
+  choiceSummary,
+  isChoiceSatisfied,
+  sumBonuses,
+  type AbilityPicks,
+} from '~/services/abilityScoreChoice'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
+import type { AbilityScoreChoice } from '~/types/rulepack'
 
 const router = useRouter()
 const characterStore = useCharactersStore()
@@ -62,15 +68,22 @@ const racialBonuses = computed(() => raceAbilityBonuses(selectedRace.value, sele
  * Nothing extra is stored — the wizard saves final scores, so the picks only have to
  * reach `effectiveAbilities`.
  */
-const racialChoice = computed(() => raceAbilityBonuses(selectedRace.value, selectedSubrace.value).choice)
-const racialPicks = ref<AbilityPicks>({})
-// Whichever of the two actually offers it: the half-elf leaves +1 to two abilities open
-// while its Wood Elf Descent subrace touches no ability at all.
-const racialChoiceSource = computed(() => (selectedSubrace.value?.abilityScoreChoice
-  ? selectedSubrace.value.name
-  : selectedRace.value?.name))
+const racialChoices = computed(() => raceAbilityBonuses(selectedRace.value, selectedSubrace.value).choices)
+/** One answer per choice offered, so a race and its subrace can each ask. */
+const racialPicks = ref<AbilityPicks[]>([])
+/** Everything the player distributed, summed across the choices. */
+const distributedBonuses = computed(() => sumBonuses(racialPicks.value))
+/**
+ * Which of the two printed a given choice: the half-elf leaves +1 to two abilities
+ * open while its Wood Elf Descent subrace touches no ability at all.
+ */
+function racialChoiceSource(choice: AbilityScoreChoice) {
+  return selectedSubrace.value?.abilityScoreChoice === choice
+    ? selectedSubrace.value?.name
+    : selectedRace.value?.name
+}
 // A pick made for one race is meaningless under another, and may not even be offered.
-watch(racialChoice, () => { racialPicks.value = {} })
+watch(racialChoices, choices => { racialPicks.value = choices.map(() => ({})) }, { immediate: true })
 
 /** Base plus what the race fixes, which is what the picker shows its increases against. */
 const scoresBeforeChoice = computed<AbilityScores>(() => {
@@ -84,7 +97,7 @@ const scoresBeforeChoice = computed<AbilityScores>(() => {
 
 const effectiveAbilities = computed<AbilityScores>(() => {
   const base = { ...scoresBeforeChoice.value }
-  for (const [k, v] of Object.entries(racialPicks.value)) {
+  for (const [k, v] of Object.entries(distributedBonuses.value)) {
     const key = k as keyof AbilityScores
     base[key] = Math.min(20, base[key] + (v ?? 0))
   }
@@ -115,7 +128,9 @@ function canProceed() {
   if (step.value === 1) return !!draft.classId
   if (step.value === 2) return !!draft.backgroundId
   // Advancing with a distributable increase half spent would silently drop it.
-  if (step.value === 3) return isChoiceSatisfied(racialChoice.value, racialPicks.value)
+  if (step.value === 3) {
+    return racialChoices.value.every((c, i) => isChoiceSatisfied(c, racialPicks.value[i] ?? {}))
+  }
   return true
 }
 
@@ -175,8 +190,11 @@ async function createCharacter() {
     // stored, since nothing downstream reapplies them.
     abilityScores: { ...effectiveAbilities.value },
     // Which of those scores came from the race, so a later migration can tell this
-    // character apart from one created before any of it was stored.
-    appliedRacialBonuses: { ...racialBonuses.value, ...racialPicks.value },
+    // character apart from one created before any of it was stored. Summed, not
+    // spread: a pick landing on an ability the race already raised would otherwise
+    // replace that bonus, under-report the grant, and leave the sheet convinced the
+    // choice was never answered.
+    appliedRacialBonuses: sumBonuses([racialBonuses.value, distributedBonuses.value]),
     abilityScoreOverrides: {},
 
     hp: hasLevel1Choices
@@ -502,12 +520,13 @@ function signed(n: number | undefined) {
           </div>
         </div>
 
-        <div v-if="racialChoice" class="card">
-          <p class="section-header">{{ racialChoiceSource }} Ability Score Increase</p>
+        <div v-for="(choice, i) in racialChoices" :key="i" class="card">
+          <p class="section-header">{{ racialChoiceSource(choice) }} Ability Score Increase</p>
           <AbilityScoreChoicePicker
-            v-model="racialPicks"
-            :choice="racialChoice"
+            :model-value="racialPicks[i] ?? {}"
+            :choice="choice"
             :base-scores="scoresBeforeChoice"
+            @update:model-value="picks => racialPicks[i] = picks"
           />
         </div>
 

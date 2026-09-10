@@ -10,6 +10,7 @@ import {
   resolveOptionChoice,
   resolveFeatEvents,
   featIncreasedAbility,
+  chooseSpellEvent,
   resolveUnlockedChoices,
   applyAutomaticEvents,
   applyResolvedChoices,
@@ -277,11 +278,15 @@ const availableSpells = computed(() => {
     // spell to a fighter whose class cap is 0.
     const cap = choiceEvent.maxLevel ?? maxLearnableSpellLevel.value
     if (!choiceEvent.cantrip && s.level > cap) return false
-    // An expansion widens the list, so it is checked alongside every restriction rather
-    // than after them: a guild spell is legal even though it is not on the class list.
-    if (expanded.has(s.id)) return true
+    // An expansion widens which spells count as being ON a list, which is what
+    // EXPAND_SPELL_LIST means — so it is folded into the class-list test rather than
+    // short-circuiting ahead of every restriction. Returning true up front let a guild
+    // background's spells satisfy a pick they have nothing to do with: Fey Touched asks
+    // for divination or enchantment, and would have offered whatever the guild added.
     if (choiceEvent.fromList?.length) return choiceEvent.fromList.includes(s.id)
-    if (choiceEvent.classes?.length) return s.classes.some(c => choiceEvent.classes!.includes(c))
+    if (choiceEvent.classes?.length) {
+      return s.classes.some(c => choiceEvent.classes!.includes(c)) || expanded.has(s.id)
+    }
     if (choiceEvent.schools?.length) return choiceEvent.schools.includes(s.school)
     return true
   })
@@ -569,19 +574,19 @@ function confirmSubclass() {
         : undefined
       if (choice) injected.push(choice)
     }
-    else if (eventDef.type === 'CHOOSE_SPELL')
-      injected.push({
-        type: 'CHOOSE_SPELL',
-        addTo: eventDef.addTo,
-        count: eventDef.count,
-        cantrip: eventDef.cantrip ?? false,
-        fromList: eventDef.fromList,
-        // classes/schools must survive the injection: availableSpells falls through to
-        // offering every spell in every pack when both are absent.
-        classes: eventDef.classes,
-        schools: eventDef.schools,
-        maxLevel: eventDef.maxLevel,
-      } satisfies ChooseSpellEvent)
+    else if (eventDef.type === 'CHOOSE_SPELL') {
+      // Through the service, like the CHOOSE_OPTION above. Hand-building it here
+      // dropped the whenOption guard — so a subclass shaped like Divine Soul asked
+      // every one of its guarded spell questions at once — along with the free-cast
+      // terms and the source metadata a pick has to carry to the answer.
+      const choice = character.value
+        ? chooseSpellEvent(eventDef, toRaw(character.value), {
+            addTo: eventDef.addTo || targetClassId.value,
+            label: subclassDef?.name,
+          })
+        : undefined
+      if (choice) injected.push(choice)
+    }
     else if (eventDef.type === 'ABILITY_SCORE_IMPROVEMENT')
       injected.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
   }

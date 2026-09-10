@@ -113,19 +113,9 @@ function grantSpellsTo(
   alwaysPrepared: boolean,
   source: GrantSource = {},
 ): void {
-  if (source.ability) {
-    const existing = character.classSpellcasting?.[addTo]
-    character.classSpellcasting = {
-      ...character.classSpellcasting,
-      [addTo]: {
-        ...existing,
-        ability: source.ability,
-        origin: source.origin ?? 'class',
-        ...(source.label ? { label: source.label } : {}),
-        spells: existing?.spells ?? [],
-      },
-    }
-  }
+  // Through registerSpellcasting rather than writing the entry here: it is the one
+  // place that leaves an ability the player chose alone, which a grant must not undo.
+  if (source.ability) registerSpellcasting(character, addTo, source.ability, source)
 
   for (const spell of spells) {
     const existing = character.spells.find(s => s.spellId === spell.spellId)
@@ -371,11 +361,15 @@ function grantSpellsEvent(
 /**
  * Translate a CHOOSE_SPELL definition, or nothing when it waits on an option.
  *
+ * Exported for the same reason resolveOptionChoice is: the wizard injects a subclass
+ * level's choices once the subclass is known, and hand-building them there dropped the
+ * guard along with every field a grant carries.
+ *
  * A guarded choice cannot be replayed the way a guarded grant is: a question has to be
  * asked, not applied. So it is simply not emitted here, and the wizard queues it in a
  * second stage once the option is answered (see `resolveUnlockedChoices`).
  */
-function chooseSpellEvent(
+export function chooseSpellEvent(
   eventDef: Extract<LevelUpEventDef, { type: 'CHOOSE_SPELL' }>,
   character: Character,
   defaults: {
@@ -418,6 +412,14 @@ function expandSpellListEvent(
   character: Character,
   fallbackLabel?: string,
 ): ExpandSpellListEvent | undefined {
+  // Reported only once it is actually in force, on the same test activeExpansions
+  // applies: the Genie's wish is declared at 1st level and arrives at 9th, and
+  // announcing it on the level-up screen at 1st would promise a spell the list does
+  // not yet have.
+  if (eventDef.minLevel) {
+    const total = character.classes.reduce((sum, c) => sum + c.level, 0)
+    if (total < eventDef.minLevel) return undefined
+  }
   // A guarded rule is only reported once its option is answered. Unlike GRANT_SPELLS
   // there is nothing to replay at the level the option is chosen: the rule is derived,
   // so it takes effect the moment the answer is recorded.
@@ -431,6 +433,7 @@ function expandSpellListEvent(
     addTo: eventDef.addTo,
     spellIds: [...(eventDef.spellIds ?? [])],
     ...(eventDef.classes ? { classes: [...eventDef.classes] } : {}),
+    ...(eventDef.minLevel ? { minLevel: eventDef.minLevel } : {}),
     ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
     ...(label ? { label } : {}),
   }
@@ -1183,8 +1186,18 @@ export function applyResolvedChoices(
                   origin: event.origin,
                   label: event.label,
                   uses: event.uses,
+                  // Was missing while every other call site forwarded it, so a feat
+                  // granting a resource-metered spell stored no price and the sheet
+                  // offered no way to spend for it.
+                  cost: event.cost,
                   castAtLevel: event.castAtLevel,
                 })
+                break
+              // A feat can be what makes a character a caster at all. resolveFeatEvents
+              // emits this and feat events never reach applyAutomaticEvents, so without
+              // a case here the feat granted spells with no source behind them.
+              case 'GRANT_SPELLCASTING':
+                registerSpellcasting(updated, event.addTo, event.ability, event)
                 break
               case 'GAIN_PROFICIENCY':
                 if (!updated.otherProficiencies.includes(event.proficiency)) {
@@ -1212,19 +1225,10 @@ export function applyResolvedChoices(
       }
       case 'RESOLVED_CHOOSE_SPELL': {
         // A cantrip chosen from a race or background registers that source, so its DC
-        // is its own rather than borrowed from whichever class came first.
+        // is its own rather than borrowed from whichever class came first. Same writer
+        // as every other path, so it cannot overwrite an ability the player chose.
         if (choice.ability && choice.classId) {
-          const existing = updated.classSpellcasting?.[choice.classId]
-          updated.classSpellcasting = {
-            ...updated.classSpellcasting,
-            [choice.classId]: {
-              ...existing,
-              ability: choice.ability,
-              origin: choice.origin ?? 'class',
-              ...(choice.label ? { label: choice.label } : {}),
-              spells: existing?.spells ?? [],
-            },
-          }
+          registerSpellcasting(updated, choice.classId, choice.ability, choice)
         }
         const spellsToRemove = new Set(choice.removedSpellIds)
         updated.spells = updated.spells.filter(s => !spellsToRemove.has(s.spellId))

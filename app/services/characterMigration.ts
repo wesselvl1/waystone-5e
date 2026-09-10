@@ -1,4 +1,8 @@
-import { isChoiceSatisfied, type AbilityPicks } from '~/services/abilityScoreChoice'
+import {
+  isChoiceSetSatisfied,
+  sumBonuses,
+  type AbilityPicks,
+} from '~/services/abilityScoreChoice'
 import { raceAbilityBonuses } from '~/services/multiclass'
 import type { AbilityKey, Character, HitDicePool, SpellSlots } from '~/types/character'
 import type { AbilityScoreChoice, Race, Subrace } from '~/types/rulepack'
@@ -180,18 +184,21 @@ function distributedPart(
  * The increases a character's race leaves to the player, while they are still unspent.
  *
  * Derived rather than stored: whatever `appliedRacialBonuses` holds above the fixed
- * bonuses is what was distributed, and the choice stands open until that satisfies one of
- * its distributions. A character built through the wizard has already answered it, so this
- * is undefined for them.
+ * bonuses is what was distributed, and the choices stand open until that spends one
+ * distribution from each. A character built through the wizard has already answered
+ * them, so this is empty for them.
+ *
+ * All of them or none: the answers are summed into one map, so there is no telling
+ * which pick belongs to which choice once a race and its subrace both print one.
  */
-export function outstandingRacialChoice(
+export function outstandingRacialChoices(
   character: Character,
   race: Race | undefined,
   subrace: Subrace | undefined,
-): AbilityScoreChoice | undefined {
-  const { bonuses, choice } = raceAbilityBonuses(race, subrace)
-  if (!choice) return undefined
-  return isChoiceSatisfied(choice, distributedPart(character, bonuses)) ? undefined : choice
+): AbilityScoreChoice[] {
+  const { bonuses, choices } = raceAbilityBonuses(race, subrace)
+  if (choices.length === 0) return []
+  return isChoiceSetSatisfied(choices, distributedPart(character, bonuses)) ? [] : choices
 }
 
 /**
@@ -203,11 +210,12 @@ export function outstandingRacialChoice(
  */
 export function racialChoicePatch(character: Character, picks: AbilityPicks): Partial<Character> {
   const abilityScores = { ...character.abilityScores }
-  const appliedRacialBonuses = { ...(character.appliedRacialBonuses ?? {}) }
   for (const [k, v] of Object.entries(picks)) {
     const key = k as AbilityKey
     abilityScores[key] = Math.min(20, abilityScores[key] + (v ?? 0))
-    appliedRacialBonuses[key] = (appliedRacialBonuses[key] ?? 0) + (v ?? 0)
   }
-  return { abilityScores, appliedRacialBonuses }
+  return {
+    abilityScores,
+    appliedRacialBonuses: sumBonuses([character.appliedRacialBonuses, picks]),
+  }
 }

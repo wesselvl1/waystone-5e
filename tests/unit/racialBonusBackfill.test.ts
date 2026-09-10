@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   backfillRacialBonuses,
-  outstandingRacialChoice,
+  outstandingRacialChoices,
   racialChoicePatch,
 } from '~/services/characterMigration'
 import type { AbilityScores, Character } from '~/types/character'
@@ -139,17 +139,17 @@ describe('the half that cannot be backfilled', () => {
   it('is still outstanding after the fixed bonuses land', () => {
     const out = backfillRacialBonuses(character({ race: 'half-elf' }), HALF_ELF, undefined)
     expect(out.abilityScores.cha).toBe(10)
-    expect(outstandingRacialChoice(out, HALF_ELF, undefined)).toBe(HALF_ELF.abilityScoreChoice)
+    expect(outstandingRacialChoices(out, HALF_ELF, undefined)).toEqual([HALF_ELF.abilityScoreChoice])
   })
 
   it('is outstanding for a race that fixes nothing at all', () => {
     const out = backfillRacialBonuses(character({ race: 'fairy' }), FAIRY, undefined)
-    expect(outstandingRacialChoice(out, FAIRY, undefined)).toBe(FAIRY.abilityScoreChoice)
+    expect(outstandingRacialChoices(out, FAIRY, undefined)).toEqual([FAIRY.abilityScoreChoice])
   })
 
   it('is not outstanding for a race that offers no choice', () => {
     const out = backfillRacialBonuses(character(), DWARF, MOUNTAIN)
-    expect(outstandingRacialChoice(out, DWARF, MOUNTAIN)).toBeUndefined()
+    expect(outstandingRacialChoices(out, DWARF, MOUNTAIN)).toEqual([])
   })
 
   it('is not outstanding once the player has answered it', () => {
@@ -157,19 +157,19 @@ describe('the half that cannot be backfilled', () => {
       race: 'half-elf',
       appliedRacialBonuses: { cha: 2, str: 1, dex: 1 },
     })
-    expect(outstandingRacialChoice(answered, HALF_ELF, undefined)).toBeUndefined()
+    expect(outstandingRacialChoices(answered, HALF_ELF, undefined)).toEqual([])
   })
 
   it('stays outstanding while the answer is incomplete', () => {
     const half = character({ race: 'half-elf', appliedRacialBonuses: { cha: 2, str: 1 } })
-    expect(outstandingRacialChoice(half, HALF_ELF, undefined)).toBe(HALF_ELF.abilityScoreChoice)
+    expect(outstandingRacialChoices(half, HALF_ELF, undefined)).toEqual([HALF_ELF.abilityScoreChoice])
   })
 
   /** A fixed bonus on the same ability must not be mistaken for a distributed one. */
   it('does not count the fixed bonus towards the choice', () => {
     // The half-elf's +2 Charisma alone satisfies nothing, even though it is two points
     const onlyFixed = character({ race: 'half-elf', appliedRacialBonuses: { cha: 2 } })
-    expect(outstandingRacialChoice(onlyFixed, HALF_ELF, undefined)).toBe(HALF_ELF.abilityScoreChoice)
+    expect(outstandingRacialChoices(onlyFixed, HALF_ELF, undefined)).toEqual([HALF_ELF.abilityScoreChoice])
   })
 })
 
@@ -184,7 +184,7 @@ describe('spending the outstanding choice', () => {
   it('closes the choice', () => {
     const c = backfillRacialBonuses(character({ race: 'fairy' }), FAIRY, undefined)
     const spent = { ...c, ...racialChoicePatch(c, { int: 2, wis: 1 }) }
-    expect(outstandingRacialChoice(spent, FAIRY, undefined)).toBeUndefined()
+    expect(outstandingRacialChoices(spent, FAIRY, undefined)).toEqual([])
     expect(spent.abilityScores.int).toBe(12)
     expect(spent.abilityScores.wis).toBe(14)
   })
@@ -198,6 +198,6 @@ describe('spending the outstanding choice', () => {
     )
     const spent = { ...c, ...racialChoicePatch(c, { int: 2, wis: 1 }) }
     expect(spent.abilityScores.int).toBe(20)
-    expect(outstandingRacialChoice(spent, FAIRY, undefined)).toBeUndefined()
+    expect(outstandingRacialChoices(spent, FAIRY, undefined)).toEqual([])
   })
 })

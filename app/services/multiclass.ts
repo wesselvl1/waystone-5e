@@ -1,5 +1,11 @@
 import type { AbilityKey, AbilityScores, Character, ClassEntry, HitDicePool } from '~/types/character'
-import type { ClassDefinition, Race, Rulepack, Subrace } from '~/types/rulepack'
+import type {
+  AbilityScoreChoice,
+  ClassDefinition,
+  Race,
+  Rulepack,
+  Subrace,
+} from '~/types/rulepack'
 
 export interface UnmetRequirement {
   ability: AbilityKey
@@ -112,7 +118,7 @@ export function effectiveScores(
 export function raceAbilityBonuses(
   race: Pick<Race, 'abilityScoreBonuses' | 'abilityScoreChoice'> | undefined,
   subrace: Pick<Subrace, 'abilityScoreBonuses' | 'abilityScoreChoice' | 'replacesRaceAbilityBonuses'> | undefined,
-): { bonuses: Partial<Record<AbilityKey, number>>; choice?: Race['abilityScoreChoice'] } {
+): { bonuses: Partial<Record<AbilityKey, number>>; choices: AbilityScoreChoice[] } {
   const replaces = subrace?.replacesRaceAbilityBonuses === true
   const bonuses: Partial<Record<AbilityKey, number>> = {}
   for (const source of replaces ? [subrace] : [race, subrace]) {
@@ -121,11 +127,15 @@ export function raceAbilityBonuses(
       bonuses[key] = (bonuses[key] ?? 0) + (v ?? 0)
     }
   }
+  // Both apply when the subrace adds to its race, because both were printed: taking
+  // the subrace's in preference lost whatever the race offered, and nothing ever asked
+  // for those points. Only a subrace that restates the whole line replaces it.
+  const choices = replaces
+    ? [subrace?.abilityScoreChoice]
+    : [race?.abilityScoreChoice, subrace?.abilityScoreChoice]
   return {
     bonuses,
-    choice: replaces
-      ? subrace?.abilityScoreChoice
-      : subrace?.abilityScoreChoice ?? race?.abilityScoreChoice,
+    choices: choices.filter((c): c is AbilityScoreChoice => c !== undefined),
   }
 }
 

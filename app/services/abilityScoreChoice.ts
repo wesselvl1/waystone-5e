@@ -11,6 +11,25 @@ import type { AbilityScoreChoice } from '~/types/rulepack'
 
 export type AbilityPicks = Partial<Record<AbilityKey, number>>
 
+/**
+ * Add up several maps of ability bonuses.
+ *
+ * Spreading them instead would let a later map replace a bonus rather than add to it,
+ * which matters wherever a fixed increase and a distributed one can land on the same
+ * ability — the total would be understated and, since the record of the grant is what
+ * says the choice was answered, the player would be asked for it again.
+ */
+export function sumBonuses(maps: Array<AbilityPicks | undefined>): AbilityPicks {
+  const out: AbilityPicks = {}
+  for (const map of maps) {
+    for (const [k, v] of Object.entries(map ?? {})) {
+      const key = k as AbilityKey
+      out[key] = (out[key] ?? 0) + (v ?? 0)
+    }
+  }
+  return out
+}
+
 /** Largest first, so a "+2 and +1" is spent in the order a player would expect. */
 export function orderedAmounts(distribution: number[]): number[] {
   return [...distribution].sort((a, b) => b - a)
@@ -49,6 +68,29 @@ export function isChoiceSatisfied(
 ): boolean {
   if (!choice) return true
   return matchedDistribution(choice, picks) !== undefined
+}
+
+/**
+ * Whether `picks` answers every choice in a set.
+ *
+ * A race and its subrace can each print one, and the answers arrive summed into a
+ * single map — which cannot be attributed back to one choice or the other. So for more
+ * than one choice the test is whether the picks spend exactly one distribution from
+ * each, taken together. A single choice keeps the stricter check, which also verifies
+ * the abilities came from that choice's own pool.
+ */
+export function isChoiceSetSatisfied(
+  choices: AbilityScoreChoice[],
+  picks: AbilityPicks,
+): boolean {
+  if (choices.length === 0) return true
+  if (choices.length === 1) return isChoiceSatisfied(choices[0], picks)
+  const spent = Object.values(picks).filter((v): v is number => (v ?? 0) > 0)
+  const combos = choices.reduce<number[][]>(
+    (acc, c) => acc.flatMap(a => c.distributions.map(d => [...a, ...d])),
+    [[]],
+  )
+  return combos.some(combo => sameAmounts(combo, spent))
 }
 
 /** "+2/+1", or "+1 ×3" where every bonus is the same size. Largest first. */
