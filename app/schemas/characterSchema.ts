@@ -45,6 +45,13 @@ const AttackEntrySchema = z.object({
 
 const ClassSpellcastingSchema = z.object({
   ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']),
+  // A source is not always a class: a race, background or feat grant carries its own
+  // origin and display name, and `abilityChosen` records that the player picked the
+  // ability rather than the source dictating it. Zod strips what it does not declare,
+  // so omitting these silently dropped them on every character import.
+  origin: z.enum(['class', 'race', 'background', 'feat']).optional(),
+  label: z.string().optional(),
+  abilityChosen: z.boolean().optional(),
   spells: z.array(z.lazy(() => SpellEntrySchema)),
 })
 
@@ -60,6 +67,8 @@ const SpellEntrySchema = z.object({
     remaining: z.number().int().min(0),
     recharge: z.enum(['short', 'long', 'dawn']),
   }).optional(),
+  // Cast by spending a class resource (2 Ki), rather than a slot or a free cast.
+  cost: z.object({ resource: z.string(), amount: z.number().int().min(1) }).optional(),
   castAtLevel: z.number().int().min(1).optional(),
   classId: z.string().optional(),
 })
@@ -111,6 +120,8 @@ export const CharacterSchema = z.object({
 
   abilityScores: AbilityScoresSchema,
   abilityScoreOverrides: AbilityScoresSchema.partial(),
+  // Absent on a character created before racial increases were stored at all.
+  appliedRacialBonuses: AbilityScoresSchema.partial().optional(),
 
   hp: z.object({
     max: z.number().int().min(1),

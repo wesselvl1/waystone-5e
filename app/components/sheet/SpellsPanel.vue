@@ -4,9 +4,11 @@ import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import {
   spellSlotMax, spellSaveDCFor, spellAttackBonusFor, spellListLimit, preparesSpells,
+  spellListExpansions,
 } from '~/services/spellcasting'
 import type { SpellListLimit } from '~/services/spellcasting'
 import type { FeatureUsesBonusSource } from '~/types/character'
+import { featureUsesMax } from '~/utils/featureUses'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -41,19 +43,13 @@ function showDetails(spellId: string) {
  *
  * Slots are derived from the character's classes against the multiclass caster-level
  * table rather than stored, so a new class level changes them without a migration.
+ *
+ * `composedPack` rather than a flatMap of `classes`: a sourcebook keeps its subclasses
+ * in its own pack's top-level `subclasses` array, and only the store folds them onto the
+ * classes they patch. Without that, a subclass that supplies the spellcasting — an
+ * Eldritch Knight — is invisible here and the character shows no slots.
  */
-const mergedPack = computed(() => ({
-  id: 'merged',
-  name: 'merged',
-  version: '0',
-  races: [],
-  classes: rulepackStore.rulepacks.flatMap(p => p.classes),
-  backgrounds: [],
-  feats: [],
-  spells: [],
-  creatures: [],
-  optionalFeatures: [],
-}))
+const mergedPack = computed(() => rulepackStore.composedPack())
 
 // ── Spellcasting sources ─────────────────────────────────────────────
 
@@ -68,6 +64,7 @@ interface SpellcastingSource {
    * race or background grant, which has neither.
    */
   limit: SpellListLimit | null
+  expansions: Array<{ label: string; spellIds: string[] }>
 }
 
 /**
@@ -92,6 +89,9 @@ const spellcastingSources = computed<SpellcastingSource[]>(() => {
       saveDC: spellSaveDCFor(ability, mods[ability], prof),
       attackBonus: spellAttackBonusFor(mods[ability], prof),
       limit: spellListLimit(id, char, mergedPack.value, mods[ability]),
+      // Standing rules that widen this list — a guild background, a Divine Soul's cleric
+      // access. Worth naming on the sheet, since the list is wider than the class's own.
+      expansions: spellListExpansions(id, char, mergedPack.value),
     })
   }
 
@@ -236,6 +236,34 @@ function adjustSpellUse(spellId: string, delta: number) {
   emit('update', { spells: updated })
 }
 
+/**
+ * The feature holding a resource-metered spell's pool — the monk's Ki for a Way of
+ * Shadow spell. Matched by name, the same way UPDATE_FEATURE_USES addresses a feature.
+ */
+function costPool(spell: SpellEntry) {
+  if (!spell.cost) return undefined
+  const feature = props.character.features.find(f => f.name === spell.cost!.resource)
+  if (!feature || feature.usesMax === undefined) return undefined
+  return { feature, remaining: feature.usesRemaining ?? featureUsesMax(feature) ?? 0 }
+}
+
+/** Whether there is enough of the resource left to cast it. */
+function canAffordCost(spell: SpellEntry): boolean {
+  const pool = costPool(spell)
+  return !!pool && !!spell.cost && pool.remaining >= spell.cost.amount
+}
+
+/** Spend the cost out of the feature that holds it. */
+function spendCost(spell: SpellEntry) {
+  const pool = costPool(spell)
+  if (!pool || !spell.cost || !canAffordCost(spell)) return
+  const features = props.character.features.map(f =>
+    (f.id === pool.feature.id
+      ? { ...f, usesRemaining: Math.max(0, pool.remaining - spell.cost!.amount) }
+      : f))
+  emit('update', { features })
+}
+
 function removeSpell(spellId: string) {
   emit('update', { spells: props.character.spells.filter(s => s.id !== spellId) })
 }
@@ -312,6 +340,17 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
             shows how many it has prepared, one with a fixed list how many it knows. Being
             at the cap is what matters when swapping spells at a table that allows it.
           -->
+          <div v-if="source.expansions.length > 0" class="min-w-[7rem]">
+            <p class="stat-label">Added to list</p>
+            <p
+              v-for="exp in source.expansions"
+              :key="exp.label"
+              class="text-xs text-accent-400"
+              :title="`${exp.spellIds.length} spell(s) this list may draw from beyond its own`"
+            >
+              {{ exp.label }} <span class="text-slate-500 tabular-nums">+{{ exp.spellIds.length }}</span>
+            </p>
+          </div>
           <div v-if="source.limit" class="w-28">
             <p class="stat-label">{{ source.limit.kind === 'prepared' ? 'Prepared' : 'Known' }}</p>
             <button
@@ -492,6 +531,24 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
                 @click="adjustSpellUse(spell.id, 1)"
               >+</button>
             </div>
+
+            <!--
+              Cast by spending a class resource. The pool lives on the feature that owns
+              it, so this spends from there rather than tracking a second copy here.
+            -->
+            <button
+              v-if="spell.cost"
+              class="flex-shrink-0 px-1.5 h-5 rounded border border-surface-600 bg-surface-700 text-[10px] font-mono tabular-nums disabled:opacity-30"
+              :class="canAffordCost(spell) ? 'text-accent-400' : 'text-slate-600'"
+              :disabled="!canAffordCost(spell)"
+              :title="costPool(spell)
+                ? `Spend ${spell.cost.amount} ${spell.cost.resource} (${costPool(spell)!.remaining} left)`
+                : `Costs ${spell.cost.amount} ${spell.cost.resource} — no such feature on this character`"
+              @click="spendCost(spell)"
+            >
+              {{ spell.cost.amount }} {{ spell.cost.resource }}
+              <span v-if="costPool(spell)" class="text-slate-500">· {{ costPool(spell)!.remaining }}</span>
+            </button>
 
             <SpellRollBadge :spell-id="spell.spellId" />
             <button class="btn-danger p-1" @click="removeSpell(spell.id)">

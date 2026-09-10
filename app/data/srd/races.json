@@ -2,7 +2,7 @@
   "id": "srd-5.1",
   "name": "D&D 5e SRD 5.1",
   "version": "5.1",
-  "description": "System Reference Document 5.1. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Races and classes included \u2014 backgrounds, feats, and spells to follow.",
+  "description": "System Reference Document 5.1. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). Races and classes included — backgrounds, feats, and spells to follow.",
   "author": "Wizards of the Coast",
   "races": [
     {
@@ -219,7 +219,7 @@
         },
         {
           "name": "Skill Versatility",
-          "description": "You gain proficiency in two skills of your choice. Choose them on the Skills panel \u2014 this is not applied automatically."
+          "description": "You gain proficiency in two skills of your choice. Choose them on the Skills panel — this is not applied automatically."
         }
       ],
       "languages": [
@@ -228,7 +228,6 @@
         "1 extra language of your choice"
       ],
       "abilityScoreChoice": {
-        "count": 2,
         "from": [
           "con",
           "dex",
@@ -236,7 +235,12 @@
           "str",
           "wis"
         ],
-        "bonus": 1
+        "distributions": [
+          [
+            1,
+            1
+          ]
+        ]
       }
     },
     {

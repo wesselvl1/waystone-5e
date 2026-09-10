@@ -106,6 +106,12 @@ export interface SpellEntry {
    * expending a slot, recharging on a rest. Ordinary spells draw on spellSlots instead.
    */
   uses?: { max: number; remaining: number; recharge: 'short' | 'long' | 'dawn' }
+  /**
+   * Cast by spending a class resource rather than a slot or a rest-limited free cast —
+   * a Way of Shadow monk pays 2 Ki. `resource` names a feature on the character, which
+   * is where the pool itself is tracked, so nothing is duplicated here.
+   */
+  cost?: { resource: string; amount: number }
   /** Fixed slot level for a free cast, e.g. hellish rebuke as a 2nd-level spell. */
   castAtLevel?: number
   classId?: string              // Which class's spell list this spell belongs to
@@ -189,6 +195,18 @@ export interface Character {
 
   abilityScores: AbilityScores
   abilityScoreOverrides: Partial<AbilityScores>  // Manual overrides
+  /**
+   * The racial ability increases already folded into `abilityScores` — the race's and
+   * subrace's fixed bonuses plus whatever the player distributed.
+   *
+   * Its ABSENCE is what marks a character as predating racial increases being stored at
+   * all, which nothing about the scores themselves can reveal: a dwarf at Constitution
+   * 16 could be a 14 plus the race's +2, or a 16 that never received it.
+   *
+   * Records what was granted, not what fit: a bonus the 20 cap swallowed still appears
+   * here, so the record of the grant stays stable while the scores respect the cap.
+   */
+  appliedRacialBonuses?: Partial<Record<AbilityKey, number>>
 
   // Combat
   hp: { max: number; current: number; temp: number }

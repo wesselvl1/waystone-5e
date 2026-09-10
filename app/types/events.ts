@@ -54,6 +54,43 @@ export interface SetSpellcastingAbilityEvent {
   ability: AbilityKey
 }
 
+/**
+ * Reported, never applied: a list may now draw from more than its class list.
+ *
+ * The rule is re-derived from the character's sources on every read (see
+ * `expandedSpellIdsFor`), for the same reason spell slots are — a background is chosen
+ * before any class, and the expansion has to reach a class taken later. This event
+ * exists so the level-up screen can say the list widened; `applyAutomaticEvents` writes
+ * nothing for it.
+ */
+export interface ExpandSpellListEvent {
+  type: 'EXPAND_SPELL_LIST'
+  /** classId, or 'all' for every list the character has or later gains. */
+  addTo: string
+  /** Ids named outright by the rule. Empty when it names whole class lists instead. */
+  spellIds: string[]
+  /** Whole class lists the rule adds. */
+  classes?: string[]
+  /** Guard that was satisfied to produce this event, kept for traceability. */
+  whenOption?: { choiceId: string; optionId: string }
+  label?: string
+}
+
+/**
+ * The character becomes a spellcaster from a source that is not their class's own
+ * spellcasting — an Eldritch Knight fighter. Registers the source so it gets its own DC
+ * and attack bonus; slots stay derived from the subclass's table, never written here.
+ */
+export interface GrantSpellcastingEvent {
+  type: 'GRANT_SPELLCASTING'
+  addTo: string
+  ability: AbilityKey
+  /** Class list the spells come from, when not the parent class's own. */
+  list?: string
+  origin?: SpellcastingOrigin
+  label?: string
+}
+
 export interface UpdateHitDieEvent {
   type: 'UPDATE_HIT_DIE'
   /** Which class's pool gains a die. */
@@ -74,6 +111,8 @@ export interface GrantSpellsEvent {
   origin?: SpellcastingOrigin
   label?: string
   uses?: { max: number; recharge: 'short' | 'long' | 'dawn' }
+  /** Cast by spending a class resource — 2 Ki — rather than a slot or a free cast. */
+  cost?: { resource: string; amount: number }
   castAtLevel?: number
 }
 
@@ -105,6 +144,18 @@ export interface ChooseSpellEvent {
   replace?: boolean     // Whether player can also swap an existing spell
   classes?: string[]    // Restrict to spells from these class lists
   schools?: string[]    // Restrict to spells from these schools of magic
+  /**
+   * Hard cap on spell level, overriding the target class's own cap. Set by sources that
+   * grant a spell level outright — a feat gives a non-caster a 1st-level spell, where
+   * the class cap would be 0.
+   */
+  maxLevel?: number
+  /** Guard that was satisfied to produce this event, kept for traceability. */
+  whenOption?: { choiceId: string; optionId: string }
+  /** A free cast of whatever is picked, carried through to the stored spell entry. */
+  uses?: { max: number; recharge: 'short' | 'long' | 'dawn' }
+  cost?: { resource: string; amount: number }
+  castAtLevel?: number
   /** Source metadata when addTo names a race or background rather than a class. */
   ability?: AbilityKey
   origin?: SpellcastingOrigin
@@ -117,6 +168,19 @@ export interface ChangeSpellEvent {
   amount: number        // Number of spells the player may swap out
   classes?: string[]    // Restrict replacements to spells from these class lists
   schools?: string[]    // Restrict replacements to spells from these schools of magic
+}
+
+/**
+ * Asks which ability casts a source's spells, for the sources that leave it to the
+ * player. The answer is recorded against `addTo` in Character.classSpellcasting, giving
+ * that source its own DC and attack bonus.
+ */
+export interface ChooseSpellcastingAbilityEvent {
+  type: 'CHOOSE_SPELLCASTING_ABILITY'
+  addTo: string
+  from: AbilityKey[]
+  origin?: SpellcastingOrigin
+  label?: string
 }
 
 export interface ChooseExpertiseEvent {
@@ -150,7 +214,8 @@ export interface ChooseOptionEvent {
   type: 'CHOOSE_OPTION'
   id: string           // unique id for this choice (e.g. "totem-spirit")
   label: string        // display label (e.g. "Choose a Totem Spirit")
-  options: Array<{ id: string; name: string; description: string }>
+  /** Same shape as the def, minLevel included: an option can open later than the pool. */
+  options: Array<{ id: string; name: string; description: string; minLevel?: number }>
   /** Shared pool this choice draws from, when it has one (e.g. "metamagic"). */
   group?: string
 }
@@ -177,6 +242,13 @@ export interface ResolvedChoiceSpell {
   type: 'RESOLVED_CHOOSE_SPELL'
   spellIds: string[]
   removedSpellIds: string[]
+  /**
+   * The free-cast terms the choice was offered under. Carried on the answer so the
+   * stored entry gets them: the player picked the spell, but the source set the limit.
+   */
+  uses?: { max: number; recharge: 'short' | 'long' | 'dawn' }
+  cost?: { resource: string; amount: number }
+  castAtLevel?: number
   classId?: string              // Which source's spell list these spells belong to
   /** Set when the source is a race or background with its own ability. */
   ability?: AbilityKey
@@ -189,6 +261,15 @@ export interface ResolvedChoiceFeat {
   featId: string
   /** Ability score bonuses chosen by the player for feats with abilityScoreChoice. */
   abilityBonus?: Partial<Record<AbilityKey, number>>
+}
+
+/** The ability the player picked to cast a source's spells with. */
+export interface ResolvedSpellcastingAbility {
+  type: 'RESOLVED_SPELLCASTING_ABILITY'
+  sourceId: string
+  ability: AbilityKey
+  origin?: SpellcastingOrigin
+  label?: string
 }
 
 export interface ResolvedASI {
@@ -229,6 +310,8 @@ export interface ResolvedOptionalFeatures {
 
 export type AutomaticLevelUpEvent =
   | AddHpEvent
+  | GrantSpellcastingEvent
+  | ExpandSpellListEvent
   | UpdateSpellSlotsEvent
   | UpdateWarlockSlotsEvent
   | AddFeatureEvent
@@ -241,6 +324,7 @@ export type AutomaticLevelUpEvent =
 
 export type ChoiceLevelUpEvent =
   | ChooseSpellEvent
+  | ChooseSpellcastingAbilityEvent
   | ChangeSpellEvent
   | ChooseExpertiseEvent
   | ChooseFeatEvent
@@ -265,6 +349,7 @@ export interface ResolvedSkill {
 }
 
 export type ResolvedChoice =  | ResolvedChoiceSpell
+  | ResolvedSpellcastingAbility
   | ResolvedChoiceFeat
   | ResolvedASI
   | ResolvedSubclass

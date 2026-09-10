@@ -1,5 +1,16 @@
 import type { AbilityKey, AbilityScores, SkillKey, SpellcastingOrigin, SpellSlotLevel } from './character'
 
+/**
+ * Which ability a granted or chosen spell casts with.
+ *
+ * 'increased' means the ability this FEAT's own increase went to — Tasha's phrasing,
+ * "the spells' spellcasting ability is the ability increased by this feat" (Fey Touched,
+ * Shadow Touched, Telekinetic, Telepathic). It cannot be written down in the pack
+ * because it depends on how the player answered the feat's own abilityScoreChoice, so
+ * it is resolved when the feat is taken.
+ */
+export type SpellAbilityRef = AbilityKey | 'increased'
+
 export interface RaceTrait {
   name: string
   description: string
@@ -23,6 +34,25 @@ export interface SourceLevelEvents {
   levelUpEvents: LevelUpEventDef[]
 }
 
+/**
+ * Ability increases the player distributes rather than the pack fixing.
+ *
+ * `distributions` lists the legal ways to spend them; each entry is the bonuses to hand
+ * out, one per *distinct* ability drawn from `from`. The half-elf's "+1 to two ability
+ * scores of your choice" is `[[1, 1]]`, and Custom Lineage's "one ability score of your
+ * choice increases by 2" is `[[2]]`.
+ *
+ * Monsters of the Multiverse states its rule as a choice between two shapes — "increase
+ * one score by 2 and increase a different score by 1, or increase three different scores
+ * by 1" — which is `[[2, 1], [1, 1, 1]]`. Neither half of that fits a single `bonus`
+ * repeated `count` times: the first mixes two sizes, and the two shapes hand out
+ * different totals to different numbers of abilities.
+ */
+export interface AbilityScoreChoice {
+  from: AbilityKey[]
+  distributions: number[][]
+}
+
 export interface Race {
   id: string
   name: string
@@ -32,7 +62,7 @@ export interface Race {
   traits: RaceTrait[]
   languages: string[]
   /** Bonuses the player distributes, e.g. half-elf's +1 to two abilities of choice. */
-  abilityScoreChoice?: { count: number; from: AbilityKey[]; bonus: number }
+  abilityScoreChoice?: AbilityScoreChoice
   /** Events fired at a given total character level (tiefling spells, dragonborn ancestry). */
   levelUpEvents?: SourceLevelEvents[]
   subraces?: Subrace[]
@@ -42,7 +72,22 @@ export interface Subrace {
   id: string
   name: string
   abilityScoreBonuses: Partial<Record<AbilityKey, number>>
+  /**
+   * Bonuses the player distributes, as on a race — the winged tiefling's +2 to Dexterity
+   * or Charisma, a dragonmark's +1 to one ability of choice.
+   */
+  abilityScoreChoice?: AbilityScoreChoice
   traits: RaceTrait[]
+  /**
+   * The subrace's ability bonuses REPLACE the race's rather than adding to them.
+   *
+   * Most subraces add: a mountain dwarf's +2 Strength sits on top of the dwarf's +2
+   * Constitution. A few restate the whole line instead — the Mordenkainen tiefling
+   * bloodlines, the Wildemount dragonborn, the Eberron dragonmarks — and adding those
+   * would double the parent's bonus. Covers `abilityScoreChoice` too, so a dragonmarked
+   * half-elf gets the mark's pick instead of the half-elf's, not both.
+   */
+  replacesRaceAbilityBonuses?: true
   /** Speed values this subrace grants or overrides (e.g. fly: 30 for Winged Tiefling). */
   speedOverrides?: Partial<RaceSpeeds>
   /** Events fired at a given total character level (high elf's cantrip). */
@@ -65,6 +110,12 @@ export interface ChooseOptionDef {
   id: string
   name: string
   description: string
+  /**
+   * Class level this option becomes available at, when the pool it belongs to opens
+   * earlier than the option does. An artificer picks infusions from 2nd level, but
+   * Arcane Propulsion Armor is not on offer until 14th.
+   */
+  minLevel?: number
 }
 
 export type LevelUpEventDef =
@@ -81,8 +132,111 @@ export type LevelUpEventDef =
       cantrip?: boolean
       classes?: string[]
       schools?: string[]
+      /**
+       * Highest spell level that may be picked. Only needed when the source is not a
+       * class: a class's own cap comes from its level (`maxSpellLevelForClass`), but a
+       * feat grants a fixed level regardless — Magic Initiate gives a non-caster fighter
+       * a 1st-level spell, and without this the class cap of 0 would filter it out.
+       */
+      maxLevel?: number
+      /**
+       * Only asked once the player has picked this option. Lets one choice decide which
+       * list a later pick draws from — Magic Initiate's class, a Strixhaven college.
+       *
+       * Unlike a guarded GRANT_SPELLS this cannot be replayed after the fact: a question
+       * has to be *asked*. The level-up wizard therefore queues it in a second stage,
+       * once the option it depends on has been answered.
+       */
+      whenOption?: { choiceId: string; optionId: string }
       /** Source metadata, when `addTo` names a race or background rather than a class. */
-      ability?: AbilityKey
+      ability?: SpellAbilityRef
+      origin?: SpellcastingOrigin
+      label?: string
+      /**
+       * A free cast of whatever the player picks, on the same terms GRANT_SPELLS states
+       * them: Magic Initiate's 1st-level spell and Fey Touched's two are each castable
+       * once per long rest without a slot.
+       */
+      uses?: { max: number; recharge: 'short' | 'long' | 'dawn' }
+      /** Cast by spending a class resource instead. As GRANT_SPELLS.cost. */
+      cost?: { resource: string; amount: number }
+      /** Fixed slot level for the free cast. As GRANT_SPELLS.castAtLevel. */
+      castAtLevel?: number
+    }
+  | {
+      /**
+       * Widens what a spell list may draw from, without granting anything to cast with.
+       * A Ravnica guild background, a Divine Soul's access to the cleric list.
+       *
+       * Unlike every other event here this is **never applied to a character**: it is a
+       * standing rule, re-derived from the character's sources whenever a list is read
+       * (see `expandedSpellIdsFor`). It has to be, for two reasons the books force:
+       *
+       * - A background is chosen before any class. "These spells are added to the spell
+       *   list of your spellcasting class" has no list to write to yet, and must still
+       *   hold for a class taken at 4th level.
+       * - "If you are a multiclass character with multiple spell lists, these spells are
+       *   added to all of them" — so the target is a rule, not a fixed id.
+       */
+      type: 'EXPAND_SPELL_LIST'
+      /**
+       * The list that gains the spells: a classId, or `'all'` for every spellcasting
+       * list the character has or later gains.
+       */
+      addTo: string
+      /** Spells added by id. */
+      spellIds?: string[]
+      /** Whole class lists added — Divine Soul adds the cleric list to a sorcerer's. */
+      classes?: string[]
+      /**
+       * Only in force once the player has picked this option, so one choice can drive
+       * several alternative expansions — which genie a Genie warlock is bound to, each
+       * with its own expanded list. Mirrors GRANT_SPELLS.whenOption.
+       *
+       * Being derived, this needs no replay at the level the option is chosen: the
+       * answer lands in `chosenOptions` and the next read picks it up.
+       */
+      whenOption?: { choiceId: string; optionId: string }
+      /**
+       * Character level from which the expansion applies, when that is later than the
+       * level the rule is declared at. The Genie adds *wish* to its list only from 9th,
+       * while the rest of the pact list arrives at 1st.
+       */
+      minLevel?: number
+      /** Display name for the rule, e.g. "Azorius Guild Spells". */
+      label?: string
+    }
+  | {
+      /**
+       * The source makes the character a spellcaster where they were not one before —
+       * an Eldritch Knight fighter, an Arcane Trickster rogue. It registers the source
+       * so it gets its own DC; the slots themselves stay derived, from the subclass's
+       * own `spellSlots` table and `SubclassSpellcasting.progression`.
+       *
+       * Not for widening an existing caster's list (Divine Soul, Chronurgy) — that adds
+       * nothing to cast with and needs no registration.
+       */
+      type: 'GRANT_SPELLCASTING'
+      /** Source id to register. For a subclass this is the parent classId. */
+      addTo: string
+      ability: AbilityKey
+      /** Class list the spells come from, when not the parent class's own. */
+      list?: string
+      origin?: SpellcastingOrigin
+      label?: string
+    }
+  | {
+      /**
+       * The source grants spells but lets the player say which ability casts them —
+       * "Intelligence, Wisdom or Charisma (your choice)", as every Monsters of the
+       * Multiverse race and the Strixhaven and Dragonlance initiate feats are written.
+       * Distinct from a fixed `ability` on GRANT_SPELLS / CHOOSE_SPELL, which is the
+       * source dictating it.
+       */
+      type: 'CHOOSE_SPELLCASTING_ABILITY'
+      /** Source id to record the answer against, keying Character.classSpellcasting. */
+      addTo: string
+      from: AbilityKey[]
       origin?: SpellcastingOrigin
       label?: string
     }
@@ -101,12 +255,17 @@ export type LevelUpEventDef =
        * Spellcasting ability for `addTo` when it is not a class. A race or background
        * grant uses its own — charisma for a tiefling, intelligence for a high elf.
        */
-      ability?: AbilityKey
+      ability?: SpellAbilityRef
       origin?: SpellcastingOrigin
       /** Display name for the source, e.g. "Infernal Legacy". */
       label?: string
       /** A free cast: castable this many times, recharging on a rest. */
       uses?: { max: number; recharge: 'short' | 'long' | 'dawn' }
+      /**
+       * Cast by spending a class resource instead — 2 Ki for a Way of Shadow monk.
+       * `resource` names a feature, which is where the pool is tracked.
+       */
+      cost?: { resource: string; amount: number }
       /** Fixed slot level for the free cast, e.g. hellish rebuke as 2nd level. */
       castAtLevel?: number
     }
@@ -148,13 +307,51 @@ export interface SubclassFeature {
 export interface SubclassLevel {
   level: number                        // Parent class level when features are gained
   features: SubclassFeature[]
+  /**
+   * The subclass's own slot table, for a subclass that supplies the spellcasting its
+   * class lacks. Read the same way a ClassLevel's is, so nothing about the derivation
+   * changes — an Eldritch Knight's slots are simply printed on the subclass rather than
+   * the class.
+   */
+  spellSlots?: Partial<Record<SpellSlotLevel, number>>
+  cantripsKnown?: number
+  spellsKnown?: number
   levelUpEvents?: LevelUpEventDef[]
+}
+
+/**
+ * Spellcasting a subclass supplies to a class that has none — Eldritch Knight, Arcane
+ * Trickster. A subclass of a class that already casts does not need this; widening what
+ * such a class may learn is a different thing entirely.
+ *
+ * `progression` is used only for the multiclass caster-level sum, where the SRD rounds
+ * down. A single-classed character reads the subclass's own printed table instead, which
+ * rounds the other way — the same split the class-level code already makes for paladins.
+ */
+/**
+ * How a class's level converts to caster levels when spell slots are pooled across
+ * several classes.
+ *
+ * `half` and `third` round DOWN, per the SRD's multiclassing rule. `artificer` is its
+ * own case because Tasha's says to round UP — which is also why an artificer 1 has two
+ * 1st-level slots where a half caster has none.
+ */
+export type CasterProgression = 'full' | 'half' | 'third' | 'artificer'
+
+export interface SubclassSpellcasting {
+  ability: AbilityKey
+  progression: CasterProgression
+  /** Class id whose spell list may be learned from, when not the parent class's own. */
+  list?: string
+  preparation?: SpellPreparation
 }
 
 export interface SubclassDefinition {
   id: string
   name: string
   description: string
+  /** Set when the subclass is what makes the character a spellcaster at all. */
+  spellcasting?: SubclassSpellcasting
   levels: SubclassLevel[]
 }
 
@@ -189,6 +386,11 @@ export interface ClassDefinition {
   /** Absent means the class cannot be multiclassed into. */
   multiclassing?: MulticlassingRules
   spellcastingAbility?: AbilityKey
+  /**
+   * Preferred over the two booleans below, which cannot express the artificer's
+   * round-up rule. They remain honoured so data predating this keeps working.
+   */
+  casterProgression?: CasterProgression
   isFullCaster?: boolean
   isHalfCaster?: boolean
   pactMagic?: boolean                  // Warlock-style pact magic (slots separate from regular slots)
@@ -327,11 +529,25 @@ export interface FeatDefinition {
   /** Direct flat ability score bonuses applied when the feat is taken. */
   abilityScoreBonus?: Partial<Record<AbilityKey, number>>
   /** Let the player choose which abilities to boost (e.g. +1 to one of Wis/Int/Cha). */
-  abilityScoreChoice?: { count: number; from: AbilityKey[]; bonus: number }
+  abilityScoreChoice?: AbilityScoreChoice
   /** Spell ids automatically granted when this feat is taken. */
   grantedSpells?: string[]
   /** Extra HP added per level (retroactively + on every future level-up, e.g. Tough = 2). */
   hpBonusPerLevel?: number
+  /**
+   * Everything the feat does that a flat field cannot express, reusing the same event
+   * vocabulary as a class level. Fired when the feat is taken, not at a fixed level: a
+   * feat has no levels of its own, so there is no `SourceLevelEvents` wrapper here.
+   *
+   * `grantedSpells` handles a fixed list; this is for the ones that ask the player
+   * something — Magic Initiate's two cantrips plus a 1st-level spell, Fey Touched's
+   * pick from divination and enchantment — and for the proficiencies a feat hands out
+   * (Moderately Armored's medium armour and shields).
+   *
+   * Choices here are answered *after* the feat is picked, so the level-up wizard appends
+   * them to the run rather than knowing them up front.
+   */
+  levelUpEvents?: LevelUpEventDef[]
 }
 
 export interface SpellDefinition {
