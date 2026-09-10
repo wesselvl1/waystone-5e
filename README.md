@@ -72,6 +72,12 @@ The **SRD 5.1** rulepack is bundled as a set of fragment files in `app/data/srd/
 
 Rulepack files are validated with Zod against the schema in `app/schemas/rulepackSchema.ts`.
 
+### Entry ids
+
+Ids are the merge key: an incoming entry whose id matches an existing one **replaces** it. The SRD uses bare ids (`satyr`, `fighter`), so a custom pack should prefix its own ids with a short source abbreviation — `mpmm-satyr`, `tce-artificer` — and reuse a bare id only when overriding the SRD deliberately (or when a patch entry's `classId` / `raceId` points at an SRD class or race on purpose).
+
+Two books' takes on the same race are meant to coexist: prefixed ids keep both, and the pickers list each with the name of the pack it came from.
+
 ## Project Structure
 
 ```

@@ -539,6 +539,7 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
               @click="addSpellFromList(spell)"
             >
               {{ spell.name }}
+              <span class="text-[10px] text-slate-500 ml-1">{{ spell.sourceName }}</span>
             </button>
             <!-- Reading a spell here is how you decide whether to add it, so the row
                  keeps adding on tap and details get their own control. -->
