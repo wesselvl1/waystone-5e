@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Pack every non-SRD rulepack fragment under app/data/ into a single zip in out/.
  *
@@ -20,6 +19,12 @@
  *
  * The zip is deterministic: fixed timestamps and a fixed entry order, so re-running over
  * unchanged data produces byte-identical output.
+ *
+ * No `#!/usr/bin/env node` line, unlike the other scripts here: this one is also imported
+ * by tests/unit/rulepackZipImport.test.ts, and vitest fails to load a module whose source
+ * starts with a shebang (`SyntaxError: Invalid or unexpected token`, before any test
+ * runs). package.json invokes it as `node scripts/pack-rulepacks.mjs` and the file is not
+ * executable, so the line bought nothing.
  */
 
 import { readFileSync, readdirSync, mkdirSync, writeFileSync, statSync, existsSync } from 'node:fs'
