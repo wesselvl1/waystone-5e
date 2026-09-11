@@ -486,6 +486,57 @@ export function backfillPoolPickFeatures(character: Character, rulepack: Rulepac
   return { ...character, features: [...character.features, ...missing] }
 }
 
+/** The id a subclass feature is filed under, wherever one is granted. */
+function subclassFeatureId(subclassId: string, featureName: string, level: number): string {
+  return `${subclassId}-${featureName.toLowerCase().replaceAll(' ', '-')}-${level}`
+}
+
+/**
+ * Gives a character the subclass features its subclass has gained since it was chosen.
+ *
+ * Book content arrives a level at a time and a printing is often incomplete at first —
+ * the Chronurgy tradition was stored with its 2nd-level blurb and neither Chronal Shift
+ * nor Temporal Awareness — and a character already past that level never sees the
+ * correction, because the features are copied onto the sheet when the level is taken.
+ * This walks every level up to the one the character has and adds what is missing.
+ *
+ * Matching on the name as well as the id is what makes it safe to run on every load: a
+ * feature granted under an older id shape is still that feature, and adding it twice
+ * would double whatever it grants.
+ */
+export function backfillSubclassFeatures(character: Character, rulepack: Rulepack): Character {
+  const missing: Feature[] = []
+  for (const entry of character.classes) {
+    if (!entry.subclassId) continue
+    const subclassDef = rulepack.classes
+      .flatMap(c => c.subclasses ?? [])
+      .find(s => s.id === entry.subclassId)
+    if (!subclassDef) continue
+
+    for (const levelData of subclassDef.levels) {
+      if (levelData.level > entry.level) continue
+      for (const feat of levelData.features ?? []) {
+        const id = subclassFeatureId(entry.subclassId, feat.name, levelData.level)
+        const already = character.features.some(f => f.id === id)
+          || character.features.some(f => f.name === feat.name && f.source === subclassDef.name)
+          || missing.some(f => f.id === id)
+        if (already) continue
+        missing.push({
+          id,
+          name: feat.name,
+          source: subclassDef.name,
+          description: feat.description,
+          usesMax: feat.usesMax,
+          usesRemaining: feat.usesMax,
+          recharge: feat.recharge,
+        })
+      }
+    }
+  }
+  if (missing.length === 0) return character
+  return { ...character, features: [...character.features, ...missing] }
+}
+
 /**
  * Translates a REPLACE_OPTION definition into the offer to retrain one pick.
  *
@@ -823,7 +874,7 @@ export function resolveLevelUpEvents(
     events.push({
       type: 'ADD_FEATURE',
       feature: {
-        id: `${subclassId}-${feat.name.toLowerCase().replaceAll(' ', '-')}-${newLevel}`,
+        id: subclassFeatureId(subclassId!, feat.name, newLevel),
         name: feat.name,
         source: subclassDef!.name,
         description: feat.description,
@@ -1608,7 +1659,7 @@ export function applyResolvedChoices(
             const subclassLevel = subclassDef.levels.find(l => l.level === currentLevel)
             const levelFeatures = subclassLevel?.features ?? []
             for (const feat of levelFeatures) {
-              const featId = `${choice.subclassId}-${feat.name.toLowerCase().replaceAll(' ', '-')}-${currentLevel}`
+              const featId = subclassFeatureId(choice.subclassId, feat.name, currentLevel)
               if (!updated.features.some(f => f.id === featId)) {
                 updated.features.push({
                   id: featId,

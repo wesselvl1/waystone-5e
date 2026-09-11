@@ -3,7 +3,7 @@ import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { exportCharacter } from '~/services/characterIO'
 import { backfillRacialBonuses } from '~/services/characterMigration'
-import { backfillPoolPickFeatures } from '~/services/levelUpService'
+import { backfillPoolPickFeatures, backfillSubclassFeatures } from '~/services/levelUpService'
 import type { Character } from '~/types/character'
 import type { ClassDefinition } from '~/types/rulepack'
 
@@ -23,6 +23,7 @@ onMounted(async () => {
   character.value = repairFeatures(character.value)
   character.value = await backfillRacialIncreases(character.value)
   character.value = await backfillPoolPicks(character.value)
+  character.value = await backfillSubclassFeats(character.value)
   character.value = await backfillSubraceSpeeds(character.value)
   loading.value = false
 })
@@ -35,6 +36,18 @@ onMounted(async () => {
  */
 async function backfillPoolPicks(char: Character): Promise<Character> {
   const filled = backfillPoolPickFeatures(char, rulepackStore.composedPack())
+  if (filled === char) return char
+  await characterStore.save(filled)
+  return filled
+}
+
+/**
+ * Adds subclass features the character's level entitles it to but its sheet never got —
+ * a subclass whose rulepack entry has gained a feature since the level was taken. Needs
+ * the loaded packs, so it runs here rather than as a shape migration.
+ */
+async function backfillSubclassFeats(char: Character): Promise<Character> {
+  const filled = backfillSubclassFeatures(char, rulepackStore.composedPack())
   if (filled === char) return char
   await characterStore.save(filled)
   return filled
