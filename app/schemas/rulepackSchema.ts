@@ -488,6 +488,25 @@ const WeaponDefinitionSchema = z.object({
   weight: z.number().min(0).optional(),
 })
 
+const ArmorDefinitionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: z.enum(['unarmored', 'light', 'medium', 'heavy', 'shield']),
+  baseAC: z.number().int(),
+  // Absent means uncapped, which is not the same as 0 — light armour adds the whole
+  // modifier, heavy armour none — so this stays optional rather than defaulting.
+  maxDexBonus: z.number().int().min(0).optional(),
+  extraAbility: AbilityKeySchema.optional(),
+  // Absent means a shield is allowed; only the monk's Unarmored Defense says otherwise.
+  shieldAllowed: z.boolean().optional(),
+  classId: z.string().optional(),
+  description: z.string().optional(),
+  strengthRequirement: z.number().int().min(0).optional(),
+  stealthDisadvantage: z.boolean().optional(),
+  cost: z.string().optional(),
+  weight: z.number().min(0).optional(),
+})
+
 export const OptionalClassFeatureSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -528,6 +547,8 @@ export const RulepackSchema = z.object({
   creatures: z.array(CreatureDefinitionSchema).optional().default([]),
   /** The equipment table's weapons: what the sheet's attack picker lists. */
   weapons: z.array(WeaponDefinitionSchema).optional().default([]),
+  /** The equipment table's armour and shields: what the AC calculator lists. */
+  armor: z.array(ArmorDefinitionSchema).optional().default([]),
   /** Top-level subclass patches: each entry carries a classId specifying which class to attach to. */
   subclasses: z.array(SubclassPatchEntrySchema).optional().default([]),
   /** Top-level subrace patches: each entry carries a raceId specifying which race to attach to. */

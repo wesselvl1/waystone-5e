@@ -1,0 +1,173 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1 armor, shields, and the class features that set an armor class in their place. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).",
+  "author": "Wizards of the Coast",
+  "armor": [
+    {
+      "id": "unarmored",
+      "name": "Unarmored",
+      "category": "unarmored",
+      "baseAC": 10,
+      "description": "No armor at all: 10 plus your Dexterity modifier."
+    },
+    {
+      "id": "unarmored-defense-barbarian",
+      "name": "Unarmored Defense (Barbarian)",
+      "category": "unarmored",
+      "baseAC": 10,
+      "extraAbility": "con",
+      "classId": "barbarian",
+      "description": "While you are not wearing any armor, your AC equals 10 + your Dexterity modifier + your Constitution modifier. You can use a shield and still gain this benefit."
+    },
+    {
+      "id": "unarmored-defense-monk",
+      "name": "Unarmored Defense (Monk)",
+      "category": "unarmored",
+      "baseAC": 10,
+      "extraAbility": "wis",
+      "shieldAllowed": false,
+      "classId": "monk",
+      "description": "While you are wearing no armor and not wielding a shield, your AC equals 10 + your Dexterity modifier + your Wisdom modifier."
+    },
+    {
+      "id": "draconic-resilience",
+      "name": "Draconic Resilience (Sorcerer)",
+      "category": "unarmored",
+      "baseAC": 13,
+      "classId": "sorcerer",
+      "description": "When you aren't wearing armor, your AC equals 13 + your Dexterity modifier."
+    },
+    {
+      "id": "natural-armor",
+      "name": "Natural Armor",
+      "category": "unarmored",
+      "baseAC": 10,
+      "description": "A thick hide, scales or a shell. Set the base number and the Dexterity cap to whatever your race prints."
+    },
+    {
+      "id": "padded",
+      "name": "Padded",
+      "category": "light",
+      "baseAC": 11,
+      "stealthDisadvantage": true,
+      "cost": "5 gp",
+      "weight": 8
+    },
+    {
+      "id": "leather",
+      "name": "Leather",
+      "category": "light",
+      "baseAC": 11,
+      "cost": "10 gp",
+      "weight": 10
+    },
+    {
+      "id": "studded-leather",
+      "name": "Studded Leather",
+      "category": "light",
+      "baseAC": 12,
+      "cost": "45 gp",
+      "weight": 13
+    },
+    {
+      "id": "hide",
+      "name": "Hide",
+      "category": "medium",
+      "baseAC": 12,
+      "maxDexBonus": 2,
+      "cost": "10 gp",
+      "weight": 12
+    },
+    {
+      "id": "chain-shirt",
+      "name": "Chain Shirt",
+      "category": "medium",
+      "baseAC": 13,
+      "maxDexBonus": 2,
+      "cost": "50 gp",
+      "weight": 20
+    },
+    {
+      "id": "scale-mail",
+      "name": "Scale Mail",
+      "category": "medium",
+      "baseAC": 14,
+      "maxDexBonus": 2,
+      "stealthDisadvantage": true,
+      "cost": "50 gp",
+      "weight": 45
+    },
+    {
+      "id": "breastplate",
+      "name": "Breastplate",
+      "category": "medium",
+      "baseAC": 14,
+      "maxDexBonus": 2,
+      "cost": "400 gp",
+      "weight": 20
+    },
+    {
+      "id": "half-plate",
+      "name": "Half Plate",
+      "category": "medium",
+      "baseAC": 15,
+      "maxDexBonus": 2,
+      "stealthDisadvantage": true,
+      "cost": "750 gp",
+      "weight": 40
+    },
+    {
+      "id": "ring-mail",
+      "name": "Ring Mail",
+      "category": "heavy",
+      "baseAC": 14,
+      "maxDexBonus": 0,
+      "stealthDisadvantage": true,
+      "cost": "30 gp",
+      "weight": 40
+    },
+    {
+      "id": "chain-mail",
+      "name": "Chain Mail",
+      "category": "heavy",
+      "baseAC": 16,
+      "maxDexBonus": 0,
+      "strengthRequirement": 13,
+      "stealthDisadvantage": true,
+      "cost": "75 gp",
+      "weight": 55
+    },
+    {
+      "id": "splint",
+      "name": "Splint",
+      "category": "heavy",
+      "baseAC": 17,
+      "maxDexBonus": 0,
+      "strengthRequirement": 15,
+      "stealthDisadvantage": true,
+      "cost": "200 gp",
+      "weight": 60
+    },
+    {
+      "id": "plate",
+      "name": "Plate",
+      "category": "heavy",
+      "baseAC": 18,
+      "maxDexBonus": 0,
+      "strengthRequirement": 15,
+      "stealthDisadvantage": true,
+      "cost": "1,500 gp",
+      "weight": 65
+    },
+    {
+      "id": "shield",
+      "name": "Shield",
+      "category": "shield",
+      "baseAC": 2,
+      "cost": "10 gp",
+      "weight": 6
+    }
+  ]
+}

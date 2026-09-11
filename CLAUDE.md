@@ -51,7 +51,7 @@ Game content is data, not code. A **rulepack** (`app/types/rulepack.ts`) holds r
 
 `RulepackSchema` (`app/schemas/rulepackSchema.ts`) is actually a **fragment** schema: every content array is optional and defaults to `[]`, and it accepts top-level `subclasses` / `subraces` arrays whose entries carry a `classId` / `raceId`. `useRulepacksStore().add(fragment)` merges a fragment into an existing pack **by matching `id`** (`mergeById`, incoming wins) and distributes those patch entries into the target class/race. This is how the bundled SRD is assembled from the JSON files in `app/data/srd/`, which all share `"id": "srd-5.1"`. There is one fragment per class (`fighter.json`, `wizard.json`, …), each carrying its own subclasses nested inside the class, plus `races.json`, `subraces.json`, `backgrounds.json`, `feats.json`, `spells.json` and `beasts.json`. No SRD fragment uses the top-level `subclasses` patch array any more — `subraces.json` is the only remaining patch fragment.
 
-The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass`, `getAllCreatures`, `getCreature`, `getCreaturesMatching`, `getAllWeapons`, `getWeapon` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
+The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass`, `getAllCreatures`, `getCreature`, `getCreaturesMatching`, `getAllWeapons`, `getWeapon`, `getAllArmor`, `getArmor` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
 
 Because ids are the merge key, a custom pack is expected to **prefix its entry ids with a source abbreviation** (`mpmm-satyr`) and reuse a bare SRD id only to override deliberately. So two books' versions of the same race are two entries, not a conflict — the `getAll*` list getters return both, each tagged with a `sourceName` (`WithSource<T>`), and every picker labels them. Don't "fix" that by de-duplicating a list by name; the source label is the disambiguator. Those getters also sort — by name, or level-then-name for spells — so merging a pack in never reshuffles a list. `composedPack()` deliberately stays on the raw arrays: `sourceName` is for display, not for the level-up pipeline.
 
@@ -160,6 +160,19 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   drops the EXIF GPS tag on the way. `CharacterSchema` checks the data URL against the
   raster types that pipeline writes, since an imported file otherwise decides what the
   sheet puts in an `<img src>`.
+- **Armour class is derived the way an attack is.** `app/services/armorClass.ts` builds it
+  from a base, the Dexterity that base admits, an optional second ability, a shield and
+  the same three named slots (`magic`, `feat`, `misc`), stored on the character as
+  `armorClassConfig`; `armorClass` survives as the hand-entered total that overrides the
+  lot, which is what a character created before this carries. Armour is rulepack data
+  (`app/data/srd/armor.json`), and the `unarmored` category is where the features that
+  stand in for armour live — Unarmored Defense, Draconic Resilience, natural armour are
+  all "base + Dex + maybe a second ability", so they are rows in the same list rather
+  than a hard-coded union, and a book can add a tortle's shell without code. An entry
+  sets `shieldAllowed: false` where its wording forbids one (a monk's Unarmored Defense,
+  not a barbarian's); the calculator drops the shield and says why rather than silently
+  dropping it. Nothing switched on mid-fight belongs here — Shield, Blade Song and
+  barkskin last a minute, and this is the number on the sheet.
 - Tailwind's `capitalize` title-cases *every* word, so it belongs only on values the
   schema stores lowercase — a damage type, a weapon property. Over a range or free text it
   produces "150/600 Ft." and re-cases whatever the player typed.

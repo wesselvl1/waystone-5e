@@ -12,8 +12,8 @@ const rulepackStore = useRulepacksStore()
 
 const editingHP = ref<'current' | 'max' | 'temp' | null>(null)
 const draftHP = ref(0)
-const editingAC = ref(false)
-const draftAC = ref(0)
+/** AC is a calculator rather than a number box, so it gets a modal like an attack. */
+const acModalOpen = ref(false)
 const editingSpeed = ref(false)
 const draftSpeed = ref(30)
 
@@ -27,14 +27,9 @@ function commitHPEdit(field: 'current' | 'max' | 'temp') {
   editingHP.value = null
 }
 
-function startACEdit() {
-  editingAC.value = true
-  draftAC.value = stats.armorClass.value
-}
-
-function commitACEdit() {
-  emit('update', { armorClass: draftAC.value })
-  editingAC.value = false
+function saveArmorClass(patch: Pick<Character, 'armorClass' | 'armorClassConfig'>) {
+  emit('update', patch)
+  acModalOpen.value = false
 }
 
 function startSpeedEdit() {
@@ -212,12 +207,9 @@ function applyHpChange() {
 
     <!-- Combat stats grid -->
     <div class="grid grid-cols-4 gap-2">
-      <div class="stat-box cursor-pointer col-span-1" @click="startACEdit">
+      <div class="stat-box cursor-pointer col-span-1" @click="acModalOpen = true">
         <span class="stat-label">AC</span>
-        <template v-if="editingAC">
-          <input v-model.number="draftAC" type="number" class="input text-center text-lg w-14 px-1 py-0" autofocus @blur="commitACEdit" @keydown.enter="commitACEdit" @click.stop />
-        </template>
-        <span v-else class="stat-value">{{ stats.armorClass.value }}</span>
+        <span class="stat-value">{{ stats.armorClass.value }}</span>
       </div>
       <div class="stat-box col-span-1">
         <span class="stat-label">Init</span>
@@ -428,6 +420,13 @@ function applyHpChange() {
       </div>
     </div>
   </div>
+
+  <SheetArmorClassModal
+    :open="acModalOpen"
+    :character="character"
+    @save="saveArmorClass"
+    @close="acModalOpen = false"
+  />
 
   <!-- Damage / Heal modal -->
   <Teleport to="body">

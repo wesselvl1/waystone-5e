@@ -45,6 +45,25 @@ const AttackBonusSetSchema = z.object({
   misc: z.number().int().optional(),
 })
 
+// How the computed AC is built up. Every field bar the id is denormalized off a rulepack
+// armour entry, so an imported character still computes the same number with no pack.
+const ArmorClassConfigSchema = z.object({
+  armorId: z.string(),
+  armorName: z.string(),
+  baseValue: z.number().int(),
+  // null is uncapped, 0 is none at all — so nullable rather than optional.
+  dexCap: z.number().int().min(0).nullable(),
+  extraAbility: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']).optional(),
+  shieldAllowed: z.boolean().optional(),
+  shield: z.object({
+    equipped: z.boolean(),
+    armorId: z.string().optional(),
+    name: z.string().optional(),
+    bonus: z.number().int(),
+  }).optional(),
+  bonuses: AttackBonusSetSchema.optional(),
+})
+
 const AttackEntrySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -160,6 +179,7 @@ export const CharacterSchema = z.object({
     temp: z.number().int().min(0),
   }),
   armorClass: z.number().nullable(),
+  armorClassConfig: ArmorClassConfigSchema.optional(),
   speeds: z.object({
     walk: z.number().int().min(0),
     climb: z.number().int().min(0).optional(),

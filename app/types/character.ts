@@ -45,6 +45,57 @@ export interface AttackBonusSet {
   misc?: number
 }
 
+/**
+ * The same three slots an attack's bonuses use, applied to the armour class total: a
+ * cloak of protection, the Defense fighting style, and whatever the table ruled tonight.
+ * Kept apart rather than summed for the same reason — they leave independently.
+ */
+export type ArmorClassBonuses = AttackBonusSet
+
+/**
+ * A shield, held apart from the bonus slots because it is a thing carried rather than a
+ * number: `equipped` lets a sword-and-board character drop it for a round without losing
+ * what it was worth. `bonus` is its whole contribution — 2 for the equipment table's, 3
+ * for a +1 — so unequipping takes the enchantment with it.
+ */
+export interface ArmorClassShield {
+  equipped: boolean
+  armorId?: string
+  name?: string
+  bonus: number
+}
+
+/**
+ * How a character's armour class is arrived at, as opposed to what it comes to.
+ *
+ * Every field bar the id is denormalized off the rulepack armour entry, so the sheet
+ * computes the same number with the pack that supplied it gone — and so a player can
+ * nudge one part (a natural armour's base, a Medium Armor Master's raised cap) without
+ * the pack having to model their exact case.
+ *
+ * `armorClass` on the character still wins outright when it is not null; this is what
+ * produces the number when it is.
+ */
+export interface ArmorClassConfig {
+  /** The ArmorDefinition this was built from — an armour, or an unarmored base. */
+  armorId: string
+  /** Denormalized for display without the pack that defines it. */
+  armorName: string
+  /** The number before any ability modifier. */
+  baseValue: number
+  /** Maximum Dexterity added; null is uncapped, 0 is none. */
+  dexCap: number | null
+  /** A second modifier on top of Dexterity — Unarmored Defense's CON or WIS. */
+  extraAbility?: AbilityKey
+  /**
+   * Denormalized rather than read back off the pack, so a monk's Unarmored Defense keeps
+   * ruling the shield out when the pack defining it is not loaded. Absent means allowed.
+   */
+  shieldAllowed?: boolean
+  shield?: ArmorClassShield
+  bonuses?: ArmorClassBonuses
+}
+
 /** The ability an attack rolls with, or a flat roll that adds none. */
 export type AttackAbility = AbilityKey | 'none'
 
@@ -273,7 +324,12 @@ export interface Character {
 
   // Combat
   hp: { max: number; current: number; temp: number }
-  armorClass: number | null             // null = use computed value
+  armorClass: number | null             // null = compute from armorClassConfig
+  /**
+   * How the computed armour class is built up. Absent on characters predating it, which
+   * the calculator reads as plain unarmored — the 10 + Dex they were already shown.
+   */
+  armorClassConfig?: ArmorClassConfig
   speeds: { walk: number; climb?: number; swim?: number; fly?: number }
   initiative: number | null             // null = use dex modifier
   /**
