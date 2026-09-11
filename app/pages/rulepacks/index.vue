@@ -92,6 +92,15 @@ async function removePack(id: string, name: string) {
   if (!confirm(`Remove "${name}"? Characters using it won't be affected but lookups will break.`)) return
   await rulepackStore.remove(id)
 }
+
+async function removeAllPacks() {
+  const count = rulepackStore.rulepacks.length
+  if (!confirm(
+    `Remove all ${count} rulepack${count === 1 ? '' : 's'}? Imported packs have to be imported again. `
+    + 'The bundled SRD comes back the next time the app starts.',
+  )) return
+  await rulepackStore.removeAll()
+}
 </script>
 
 <template>
@@ -149,6 +158,15 @@ async function removePack(id: string, name: string) {
             </svg>
           </button>
         </div>
+      </div>
+
+      <div v-if="rulepackStore.rulepacks.length > 0" class="pt-2 flex justify-center">
+        <button class="btn-danger text-xs" @click="removeAllPacks">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Delete all rulepacks
+        </button>
       </div>
     </main>
 

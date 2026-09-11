@@ -98,6 +98,16 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     rulepacks.value = rulepacks.value.filter(r => r.id !== id)
   }
 
+  /**
+   * Drop every stored pack, the bundled SRD included. The SRD loader re-seeds on the next
+   * startup because its version check finds no stored pack, so this is how a user clears
+   * dev fragments or a half-merged book that `remove` alone cannot separate out again.
+   */
+  async function removeAll(): Promise<void> {
+    await db.rulepacks.clear()
+    rulepacks.value = []
+  }
+
   function getById(id: string): Rulepack | undefined {
     return rulepacks.value.find(r => r.id === id)
   }
@@ -304,6 +314,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     loadAll,
     add,
     remove,
+    removeAll,
     getById,
     getRace,
     getClass,
