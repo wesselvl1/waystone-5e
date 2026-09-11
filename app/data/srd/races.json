@@ -224,7 +224,6 @@
         "Elvish",
         "1 extra language of your choice"
       ],
-      "subraceOptional": true,
       "abilityScoreChoice": {
         "from": [
           "con",
