@@ -188,6 +188,7 @@ export const CharacterSchema = z.object({
     fly: z.number().int().min(0).optional(),
   }),
   initiative: z.number().nullable(),
+  initiativeBonuses: AttackBonusSetSchema.optional(),
   // Either the pre-multiclass single pool or the per-class array; normalised below.
   hitDice: z.union([
     z.object({

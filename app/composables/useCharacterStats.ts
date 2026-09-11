@@ -1,5 +1,6 @@
 import type { Character, AbilityKey, AbilityScores, SkillKey } from '~/types/character'
 import { characterArmorClass } from '~/services/armorClass'
+import { initiativeBreakdown } from '~/services/initiative'
 
 const SKILL_ABILITY: Record<SkillKey, AbilityKey> = {
   acrobatics: 'dex',
@@ -90,12 +91,13 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
 
   const passivePerception = computed(() => 10 + (skills.value.perception ?? 0))
 
-  const initiative = computed(() => {
-    const c = characterRef.value
-    return c?.initiative !== null && c?.initiative !== undefined
-      ? c.initiative
-      : abilityModifiers.value.dex
-  })
+  // Dexterity plus whatever the character's features add to the roll — a Chronurgy
+  // wizard's Intelligence, the Alert feat's +5 — plus the hand-entered slots, with the
+  // stored total still overriding the lot. The modal shows the same sum's working.
+  const initiative = computed(() => initiativeBreakdown(characterRef.value, {
+    modifiers: abilityModifiers.value,
+    proficiencyBonus: profBonus.value,
+  }).total)
 
   const armorClass = computed(() => {
     const c = characterRef.value
