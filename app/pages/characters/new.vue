@@ -354,7 +354,9 @@ function signed(n: number | undefined) {
 </script>
 
 <template>
-  <div class="min-h-screen pb-8">
+  <!-- pb clears the Back/Next bar below, which is fixed above the nav: at pb-8 the tail
+       of the last card sat under it with no way to scroll to it. -->
+  <div class="min-h-screen pb-24">
     <!-- Top bar -->
     <header class="sticky top-0 z-40 flex items-center gap-2 px-3 py-2 bg-surface-900/95 backdrop-blur border-b border-surface-700/60">
       <NuxtLink to="/" class="btn-ghost p-2">

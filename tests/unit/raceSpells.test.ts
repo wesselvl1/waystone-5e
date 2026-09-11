@@ -436,3 +436,69 @@ describe('races that stand on their own', () => {
     }
   })
 })
+
+describe('a proficiency an option grants', () => {
+  const CHOICE = 'test-weapon-variant'
+
+  function pack(): Rulepack {
+    const built = structuredClone(rulepack) as Rulepack
+    built.races.find(r => r.id === 'half-elf')!.subraces = [{
+      id: 'test-weapons', name: 'Test Weapons Half-Elf', abilityScoreBonuses: {},
+      replacesRaceTraits: ['Skill Versatility'],
+      traits: [{ name: 'Variant Feature', description: 'Choose one.' }],
+      levelUpEvents: [{
+        level: 1,
+        levelUpEvents: [
+          {
+            type: 'CHOOSE_OPTION', id: CHOICE, label: 'Variant Feature',
+            options: [
+              { id: 'weapons', name: 'Elf Weapon Training', description: 'Four weapons.' },
+              { id: 'other', name: 'Something Else', description: 'Not weapons.' },
+            ],
+          },
+          { type: 'GAIN_PROFICIENCY', proficiency: 'Longsword', whenOption: { choiceId: CHOICE, optionId: 'weapons' } },
+          { type: 'GAIN_PROFICIENCY', proficiency: 'Shortbow', whenOption: { choiceId: CHOICE, optionId: 'weapons' } },
+        ],
+      }],
+    }] as never
+    return built
+  }
+
+  const weapons = pack()
+  const subject = (over: Partial<Character> = {}) => char({
+    race: 'half-elf', subrace: 'test-weapons', classes: [{ classId: 'fighter', level: 1 }],
+    otherProficiencies: [], ...over,
+  })
+
+  it('hands nothing over while the question is unanswered', () => {
+    const events = resolveLevelUpEvents(
+      subject({ classes: [{ classId: 'fighter', level: 0 }] }), 'fighter', 1, weapons)
+    expect(events.filter(e => e.type === 'GAIN_PROFICIENCY')).toHaveLength(0)
+  })
+
+  it('grants them when that arm is picked in the same run', () => {
+    const applied = applyResolvedChoices(
+      subject(), [{ type: 'RESOLVED_OPTION', choiceId: CHOICE, optionId: 'weapons' }], weapons, 'fighter')
+    expect(applied.otherProficiencies).toEqual(['Longsword', 'Shortbow'])
+  })
+
+  it('grants none of them for the other arm', () => {
+    const applied = applyResolvedChoices(
+      subject(), [{ type: 'RESOLVED_OPTION', choiceId: CHOICE, optionId: 'other' }], weapons, 'fighter')
+    expect(applied.otherProficiencies).toEqual([])
+  })
+
+  it('grants them off a stored answer on a later run', () => {
+    const stored = subject({ classes: [{ classId: 'fighter', level: 0 }], chosenOptions: { [CHOICE]: 'weapons' } })
+    const events = resolveLevelUpEvents(stored, 'fighter', 1, weapons)
+    const applied = applyAutomaticEvents(stored, getAutomaticEvents(events), 'average')
+    expect(applied.otherProficiencies).toEqual(['Longsword', 'Shortbow'])
+  })
+
+  it('never adds the same proficiency twice', () => {
+    const applied = applyResolvedChoices(
+      subject({ otherProficiencies: ['Longsword'] }),
+      [{ type: 'RESOLVED_OPTION', choiceId: CHOICE, optionId: 'weapons' }], weapons, 'fighter')
+    expect(applied.otherProficiencies).toEqual(['Longsword', 'Shortbow'])
+  })
+})

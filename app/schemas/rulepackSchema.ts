@@ -120,7 +120,25 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     type: z.literal('UPDATE_SPELL_SLOTS'),
     slots: z.partialRecord(SpellSlotLevelSchema, z.number()),
   }),
-  z.object({ type: z.literal('GAIN_PROFICIENCY'), proficiency: z.string() }),
+  z.object({
+    type: z.literal('SET_SPEED'),
+    mode: z.enum(['walk', 'climb', 'swim', 'fly']),
+    speed: z.number().int().min(0),
+    // Set only when an option was picked, e.g. the Fleet of Foot arm.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+  }),
+  z.object({
+    type: z.literal('GAIN_PROFICIENCY'),
+    proficiency: z.string(),
+    // Granted only when an option was picked, e.g. the Elf Weapon Training arm.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+  }),
   z.object({
     type: z.literal('CHOOSE_SPELL'),
     addTo: z.string(),

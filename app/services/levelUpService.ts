@@ -31,6 +31,7 @@ import type {
   UpdateFeatureUsesEvent,
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
+  SetSpeedEvent,
   ResolvedChoice,
 } from '~/types/events'
 
@@ -65,6 +66,35 @@ function chooseSkillEvent(
     return undefined
   }
   return { type: 'CHOOSE_SKILL', count: def.count, from: [...(def.from ?? ALL_SKILL_KEYS)] }
+}
+
+/**
+ * The proficiency, unless an option the character has not picked guards it. Same gate,
+ * and same ordering caveat, as a guarded spell grant: an answer given during this run is
+ * applied by RESOLVED_OPTION instead.
+ */
+function gainProficiencyEvent(
+  def: Extract<LevelUpEventDef, { type: 'GAIN_PROFICIENCY' }>,
+  character: Character,
+): GainProficiencyEvent | undefined {
+  if (def.whenOption
+    && character.chosenOptions?.[def.whenOption.choiceId] !== def.whenOption.optionId) {
+    return undefined
+  }
+  // The category is 'skill' at every def-driven call site and nothing reads it.
+  return { type: 'GAIN_PROFICIENCY', proficiency: def.proficiency, category: 'skill' }
+}
+
+/** The speed, unless an option the character has not picked guards it. */
+function setSpeedEvent(
+  def: Extract<LevelUpEventDef, { type: 'SET_SPEED' }>,
+  character: Character,
+): SetSpeedEvent | undefined {
+  if (def.whenOption
+    && character.chosenOptions?.[def.whenOption.choiceId] !== def.whenOption.optionId) {
+    return undefined
+  }
+  return { type: 'SET_SPEED', mode: def.mode, speed: def.speed }
 }
 
 function rollDie(sides: number): number {
@@ -780,13 +810,16 @@ export function resolveLevelUpEvents(
       case 'UPDATE_SPELL_SLOTS':
         // Already handled above
         break
-      case 'GAIN_PROFICIENCY':
-        events.push({
-          type: 'GAIN_PROFICIENCY',
-          proficiency: eventDef.proficiency,
-          category: 'skill',
-        } satisfies GainProficiencyEvent)
+      case 'GAIN_PROFICIENCY': {
+        const proficiency = gainProficiencyEvent(eventDef, character)
+        if (proficiency) events.push(proficiency)
         break
+      }
+      case 'SET_SPEED': {
+        const speed = setSpeedEvent(eventDef, character)
+        if (speed) events.push(speed)
+        break
+      }
       case 'CHOOSE_SPELL': {
         const choice = chooseSpellEvent(eventDef, character)
         if (choice) events.push(choice)
@@ -915,13 +948,16 @@ export function resolveLevelUpEvents(
         if (grant) events.push(grant)
         break
       }
-      case 'GAIN_PROFICIENCY':
-        events.push({
-          type: 'GAIN_PROFICIENCY',
-          proficiency: eventDef.proficiency,
-          category: 'skill',
-        } satisfies GainProficiencyEvent)
+      case 'GAIN_PROFICIENCY': {
+        const proficiency = gainProficiencyEvent(eventDef, character)
+        if (proficiency) events.push(proficiency)
         break
+      }
+      case 'SET_SPEED': {
+        const speed = setSpeedEvent(eventDef, character)
+        if (speed) events.push(speed)
+        break
+      }
       case 'SET_WILD_SHAPE_LIMITS':
         events.push({
           type: 'SET_WILD_SHAPE_LIMITS',
@@ -995,13 +1031,16 @@ export function resolveLevelUpEvents(
             }
             break
           }
-          case 'GAIN_PROFICIENCY':
-            events.push({
-              type: 'GAIN_PROFICIENCY',
-              proficiency: eventDef.proficiency,
-              category: 'skill',
-            } satisfies GainProficiencyEvent)
+          case 'GAIN_PROFICIENCY': {
+            const proficiency = gainProficiencyEvent(eventDef, character)
+            if (proficiency) events.push(proficiency)
             break
+          }
+          case 'SET_SPEED': {
+            const speed = setSpeedEvent(eventDef, character)
+            if (speed) events.push(speed)
+            break
+          }
           case 'CHOOSE_SKILL': {
             const skills = chooseSkillEvent(eventDef, character)
             if (skills) events.push(skills)
@@ -1091,15 +1130,16 @@ export function resolveFeatEvents(
         if (expand) events.push(expand)
         break
       }
-      case 'GAIN_PROFICIENCY':
-        events.push({
-          type: 'GAIN_PROFICIENCY',
-          proficiency: eventDef.proficiency,
-          // The definition carries no category, and nothing reads it — every def-driven
-          // translation in this file says 'skill' for the same reason.
-          category: 'skill',
-        } satisfies GainProficiencyEvent)
+      case 'GAIN_PROFICIENCY': {
+        const proficiency = gainProficiencyEvent(eventDef, character)
+        if (proficiency) events.push(proficiency)
         break
+      }
+      case 'SET_SPEED': {
+        const speed = setSpeedEvent(eventDef, character)
+        if (speed) events.push(speed)
+        break
+      }
       case 'CHOOSE_EXPERTISE':
         events.push({
           type: 'CHOOSE_EXPERTISE',
@@ -1307,6 +1347,10 @@ export function applyAutomaticEvents(
         if (!updated.otherProficiencies.includes(event.proficiency)) {
           updated.otherProficiencies.push(event.proficiency)
         }
+        break
+      }
+      case 'SET_SPEED': {
+        updated.speeds = { ...updated.speeds, [event.mode]: event.speed }
         break
       }
       case 'SET_SPELLCASTING_ABILITY': {
@@ -1622,9 +1666,15 @@ export function applyResolvedChoices(
               .flatMap(sub => sub.levels.find(l => l.level === entry.level)?.levelUpEvents ?? []),
           ]
           for (const evt of levelEvents) {
-            if (evt.type !== 'GRANT_SPELLS' || !evt.whenOption) continue
-            if (evt.whenOption.choiceId !== choice.choiceId) continue
+            if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY') continue
+            if (evt.whenOption?.choiceId !== choice.choiceId) continue
             if (evt.whenOption.optionId !== choice.optionId) continue
+            if (evt.type === 'GAIN_PROFICIENCY') {
+              if (!updated.otherProficiencies.includes(evt.proficiency)) {
+                updated.otherProficiencies.push(evt.proficiency)
+              }
+              continue
+            }
             grantSpellsTo(
               updated,
               evt.addTo,
@@ -1645,9 +1695,22 @@ export function applyResolvedChoices(
             // same option also gates grants waiting at 3rd and 5th.
             if (group.level > totalLevel(updated)) continue
             for (const evt of group.levelUpEvents) {
-              if (evt.type !== 'GRANT_SPELLS' || !evt.whenOption) continue
-              if (evt.whenOption.choiceId !== choice.choiceId) continue
+              if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY'
+                && evt.type !== 'SET_SPEED') continue
+              if (evt.whenOption?.choiceId !== choice.choiceId) continue
               if (evt.whenOption.optionId !== choice.optionId) continue
+              // Elf Weapon Training and Fleet of Foot: the arm grants a proficiency or a
+              // speed rather than spells, and the answer landed in this very run.
+              if (evt.type === 'GAIN_PROFICIENCY') {
+                if (!updated.otherProficiencies.includes(evt.proficiency)) {
+                  updated.otherProficiencies.push(evt.proficiency)
+                }
+                continue
+              }
+              if (evt.type === 'SET_SPEED') {
+                updated.speeds = { ...updated.speeds, [evt.mode]: evt.speed }
+                continue
+              }
               // Through grantSpellsEvent, not by hand: it is what resolves the ability,
               // the free casts and the fixed slot level the grant was printed with, and
               // `updated` already carries the answer this case just recorded.
