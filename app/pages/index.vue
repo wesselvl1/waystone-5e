@@ -28,9 +28,14 @@ async function handleImportFile(e: Event) {
   }
 }
 
-async function deleteCharacter(id: string, name: string) {
-  if (!confirm(`Delete ${name}? This cannot be undone.`)) return
-  await characterStore.remove(id)
+/** The character awaiting confirmation, or null when no dialog is open. */
+const pendingDelete = ref<{ id: string; name: string } | null>(null)
+
+async function confirmDelete() {
+  const pending = pendingDelete.value
+  pendingDelete.value = null
+  if (!pending) return
+  await characterStore.remove(pending.id)
 }
 
 function totalLevel(classes: { level: number }[]) {
@@ -108,7 +113,7 @@ function raceName(raceId: string) {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" />
               </svg>
             </NuxtLink>
-            <button class="btn-danger text-xs p-2" title="Delete" @click="deleteCharacter(character.id, character.name)">
+            <button class="btn-danger text-xs p-2" title="Delete" @click="pendingDelete = { id: character.id, name: character.name }">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
@@ -121,5 +126,15 @@ function raceName(raceId: string) {
         <NuxtLink to="/about" class="text-xs text-slate-500 hover:text-slate-300 transition-colors">About Waystone</NuxtLink>
       </footer>
     </main>
+
+    <ConfirmDialog
+      :open="!!pendingDelete"
+      :title="`Delete ${pendingDelete?.name}?`"
+      message="This cannot be undone."
+      confirm-label="Delete"
+      danger
+      @confirm="confirmDelete"
+      @cancel="pendingDelete = null"
+    />
   </div>
 </template>

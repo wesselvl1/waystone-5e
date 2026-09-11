@@ -88,18 +88,36 @@ function packContents(pack: Rulepack) {
   ].filter(entry => entry.count > 0)
 }
 
-async function removePack(id: string, name: string) {
-  if (!confirm(`Remove "${name}"? Characters using it won't be affected but lookups will break.`)) return
-  await rulepackStore.remove(id)
-}
+/**
+ * What the open confirmation is for, or null when none is. Held as one ref rather than a
+ * flag per button so only one dialog can ever be on screen.
+ */
+const pendingRemoval = ref<{ kind: 'one'; id: string; name: string } | { kind: 'all'; count: number } | null>(null)
 
-async function removeAllPacks() {
-  const count = rulepackStore.rulepacks.length
-  if (!confirm(
-    `Remove all ${count} rulepack${count === 1 ? '' : 's'}? Imported packs have to be imported again. `
-    + 'The bundled SRD comes back the next time the app starts.',
-  )) return
-  await rulepackStore.removeAll()
+const removalPrompt = computed(() => {
+  const pending = pendingRemoval.value
+  if (!pending) return null
+  if (pending.kind === 'one') {
+    return {
+      title: `Remove "${pending.name}"?`,
+      message: "Characters using it won't be affected, but lookups will break.",
+      confirmLabel: 'Remove',
+    }
+  }
+  return {
+    title: `Remove all ${pending.count} rulepack${pending.count === 1 ? '' : 's'}?`,
+    message: 'Imported packs have to be imported again. The bundled SRD comes back the '
+      + 'next time the app starts.',
+    confirmLabel: 'Remove all',
+  }
+})
+
+async function confirmRemoval() {
+  const pending = pendingRemoval.value
+  pendingRemoval.value = null
+  if (!pending) return
+  if (pending.kind === 'one') await rulepackStore.remove(pending.id)
+  else await rulepackStore.removeAll()
 }
 </script>
 
@@ -152,7 +170,7 @@ async function removeAllPacks() {
               <span v-if="packContents(pack).length === 0">empty</span>
             </div>
           </NuxtLink>
-          <button class="btn-danger flex-shrink-0 p-2" @click="removePack(pack.id, pack.name)">
+          <button class="btn-danger flex-shrink-0 p-2" @click="pendingRemoval = { kind: 'one', id: pack.id, name: pack.name }">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -161,7 +179,7 @@ async function removeAllPacks() {
       </div>
 
       <div v-if="rulepackStore.rulepacks.length > 0" class="pt-2 flex justify-center">
-        <button class="btn-danger text-xs" @click="removeAllPacks">
+        <button class="btn-danger text-xs" @click="pendingRemoval = { kind: 'all', count: rulepackStore.rulepacks.length }">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
@@ -187,5 +205,15 @@ async function removeAllPacks() {
         </div>
       </div>
     </Teleport>
+
+    <ConfirmDialog
+      :open="!!removalPrompt"
+      :title="removalPrompt?.title ?? ''"
+      :message="removalPrompt?.message"
+      :confirm-label="removalPrompt?.confirmLabel"
+      danger
+      @confirm="confirmRemoval"
+      @cancel="pendingRemoval = null"
+    />
   </div>
 </template>
