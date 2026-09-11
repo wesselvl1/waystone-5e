@@ -283,6 +283,13 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     return withSource(p => p.backgrounds).sort(byName)
   }
 
+  function getBackground(backgroundId: string): Background | undefined {
+    for (const pack of rulepacks.value) {
+      const background = pack.backgrounds.find(b => b.id === backgroundId)
+      if (background) return background
+    }
+  }
+
   function getSubclassesForClass(classId: string): SubclassDefinition[] {
     const cls = getClass(classId)
     return cls?.subclasses ?? []
@@ -374,6 +381,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     getAllArmor,
     getArmor,
     getAllBackgrounds,
+    getBackground,
     getSubclassesForClass,
     getSubclass,
     composedPack,
