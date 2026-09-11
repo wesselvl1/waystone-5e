@@ -54,9 +54,14 @@ function titleCaseItem(name: string): string {
     .join('')
 }
 
-/** Coins weigh something: fifty of any denomination make a pound. */
+/** Fifty coins of any denomination make a pound. */
 export const COINS_PER_POUND = 50
 
+/**
+ * What the purse weighs. Plenty of tables ignore coin weight, which is what
+ * `Character.countCoinWeight` is for — this reports the weight either way, and
+ * `carriedWeight` is where the toggle decides whether it counts.
+ */
 export function coinWeight(currency: Currency | undefined): number {
   if (!currency) return 0
   const coins = (['cp', 'sp', 'ep', 'gp', 'pp'] as const)
@@ -73,13 +78,20 @@ export function entryWeight(entry: EquipmentEntry): number {
 export interface CarriedWeight {
   /** Pounds of equipment that has a weight recorded. */
   gear: number
-  /** Pounds of coin. */
+  /** What the purse weighs, whether or not the table counts it. */
   coins: number
+  /** False where the player has turned coin weight off; see `countCoinWeight`. */
+  countsCoins: boolean
   total: number
   /** Entries carrying a quantity but no weight — what the total is missing. */
   unweighed: number
 }
 
+/**
+ * The purse is weighed either way, and only the total is allowed to forget it: a player
+ * who has turned coin weight off is more likely to turn it back on than to want the
+ * number hidden, and a table that argues about it wants to see what it is arguing over.
+ */
 export function carriedWeight(character: Character): CarriedWeight {
   const equipment = character.equipment ?? []
   const gear = equipment.reduce((sum, e) => sum + entryWeight(e), 0)
@@ -87,7 +99,8 @@ export function carriedWeight(character: Character): CarriedWeight {
     e => (typeof e.weight !== 'number' || !Number.isFinite(e.weight)) && (e.quantity ?? 0) > 0,
   ).length
   const coins = coinWeight(character.currency)
-  return { gear, coins, total: gear + coins, unweighed }
+  const countsCoins = character.countCoinWeight !== false
+  return { gear, coins, countsCoins, total: gear + (countsCoins ? coins : 0), unweighed }
 }
 
 /**

@@ -98,7 +98,40 @@ describe('weight is summed over whatever has been weighed', () => {
       { currency: { cp: 0, sp: 0, ep: 0, gp: 50, pp: 0 } },
     ))
     expect(carried.coins).toBe(1)
+    expect(carried.countsCoins).toBe(true)
     expect(carried.total).toBe(8)
+  })
+})
+
+describe('a table that ignores coin weight can turn it off', () => {
+  const purse = (countCoinWeight?: boolean) => carriedWeight(withEquipment(
+    [{ id: 'a', name: 'Bedroll', quantity: 1, weight: 7 }],
+    { currency: { cp: 0, sp: 0, ep: 0, gp: 50, pp: 0 }, ...(countCoinWeight === undefined ? {} : { countCoinWeight }) },
+  ))
+
+  it('counts it by default, which is the rule as written', () => {
+    expect(purse().countsCoins).toBe(true)
+    expect(purse().total).toBe(8)
+  })
+
+  it('leaves it out of the total when it is off', () => {
+    const carried = purse(false)
+    expect(carried.countsCoins).toBe(false)
+    expect(carried.total).toBe(7)
+  })
+
+  /** The sheet still prints what the purse weighs, so turning it back on is informed. */
+  it('still reports what the coins weigh', () => {
+    expect(purse(false).coins).toBe(1)
+  })
+
+  it('counts it again when it is switched back on', () => {
+    expect(purse(true).total).toBe(8)
+  })
+
+  it('does not disturb the gear total either way', () => {
+    expect(purse(false).gear).toBe(7)
+    expect(purse(true).gear).toBe(7)
   })
 })
 

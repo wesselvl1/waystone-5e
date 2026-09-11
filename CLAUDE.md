@@ -183,7 +183,9 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   `armorClass` idiom again. Nothing stores a character's size, so size is not a factor.
   Weight is optional per `EquipmentEntry` because a list that demands a number per line is
   one nobody fills in: the total covers what has been weighed and the sheet says how many
-  entries it skipped, and coins count at fifty to the pound.
+  entries it skipped. Coins count at fifty to the pound, which `countCoinWeight` turns
+  off for a table that ignores it — `coinWeight()` reports the purse either way and only
+  the total forgets it, so turning it back on is an informed choice.
 - **An item name loses the source it was filed under.** Book content names an item the way
   5etools does (`fine clothes|phb`), and the pipe is a corpus disambiguator that was never
   meant to be read. `cleanEquipmentName()` strips it at creation *and* in

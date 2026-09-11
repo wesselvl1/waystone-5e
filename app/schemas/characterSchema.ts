@@ -249,6 +249,7 @@ export const CharacterSchema = z.object({
     pp: z.number().int().min(0),
   }),
   carryingCapacityMultiplier: z.number().positive().nullable().optional(),
+  countCoinWeight: z.boolean().optional(),
 
   notes: z.string(),
   appearance: z.string().optional(),

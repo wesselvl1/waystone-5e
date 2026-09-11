@@ -383,6 +383,12 @@ export interface Character {
    * capacity — see `carryingCapacity()` for why that is a guess worth overriding.
    */
   carryingCapacityMultiplier?: number | null
+  /**
+   * Whether the purse counts against what the character is carrying. Absent means it
+   * does, which is the rule as written; plenty of tables ignore coin weight, and a
+   * character carries the answer so it survives an export to the table that set it.
+   */
+  countCoinWeight?: boolean
 
   notes: string
   appearance?: string

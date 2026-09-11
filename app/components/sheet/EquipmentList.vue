@@ -134,6 +134,10 @@ function setMultiplier(value: number | null) {
   emit('update', { carryingCapacityMultiplier: value })
 }
 
+function setCountCoinWeight(value: boolean) {
+  emit('update', { countCoinWeight: value })
+}
+
 const activeMultiplier = computed(() =>
   capacity.value.manual ? props.character.carryingCapacityMultiplier ?? null : null,
 )
@@ -223,8 +227,8 @@ const CURRENCY: { key: keyof Currency; label: string; color: string }[] = [
             <span>Gear</span>
             <span>{{ lb(carried.gear) }} lb</span>
           </div>
-          <div class="flex justify-between text-slate-400">
-            <span>Coins</span>
+          <div class="flex justify-between" :class="carried.countsCoins ? 'text-slate-400' : 'text-slate-600'">
+            <span>Coins{{ carried.countsCoins ? '' : ' (not counted)' }}</span>
             <span>{{ lb(carried.coins) }} lb</span>
           </div>
         </div>
@@ -247,6 +251,20 @@ const CURRENCY: { key: keyof Currency; label: string; color: string }[] = [
           <p class="text-[11px] text-slate-500 mt-1">
             Auto doubles it for each feature that says it does — Powerful Build, a bear totem.
           </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <input
+            id="coin-weight-toggle"
+            :checked="carried.countsCoins"
+            type="checkbox"
+            class="w-4 h-4 rounded accent-primary-500"
+            @change="setCountCoinWeight(($event.target as HTMLInputElement).checked)"
+          />
+          <label for="coin-weight-toggle" class="text-xs text-slate-300">
+            Count coin weight
+            <span class="text-slate-500">(50 coins to the pound)</span>
+          </label>
         </div>
       </div>
     </div>
