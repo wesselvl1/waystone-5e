@@ -1,3 +1,4 @@
+import { isImageDataUrl } from '~/services/characterArt'
 import { migrateCharacterShape } from '~/services/characterMigration'
 import { z } from 'zod'
 
@@ -117,6 +118,18 @@ const EquipmentEntrySchema = z.object({
   notes: z.string().optional(),
 })
 
+/**
+ * Character art travels inside the character, so an imported file decides what the sheet
+ * will put in an `<img src>`. The data URL is checked against the raster types the app
+ * writes rather than taken on trust: nothing else should reach a `src` attribute, and a
+ * hand-edited export is exactly the path by which something else would.
+ */
+const CharacterImageSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  data: z.string().refine(isImageDataUrl, 'must be a base64 image data URL'),
+})
+
 const SkillProficienciesSchema = z.record(z.string(), z.union([z.literal(0), z.literal(1), z.literal(2)]))
 
 const WarlockSlotsSchema = z.object({
@@ -217,6 +230,7 @@ export const CharacterSchema = z.object({
 
   notes: z.string(),
   appearance: z.string().optional(),
+  images: z.array(CharacterImageSchema).optional(),
 
   createdAt: z.string(),
   updatedAt: z.string(),

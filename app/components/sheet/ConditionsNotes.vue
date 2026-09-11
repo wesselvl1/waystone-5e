@@ -78,6 +78,9 @@ function saveAppearance() {
       />
     </div>
 
+    <!-- Character art -->
+    <SheetCharacterArt :character="character" @update="emit('update', $event)" />
+
     <!-- Notes -->
     <div class="card space-y-2">
       <p class="section-header">Notes</p>
