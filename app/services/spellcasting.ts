@@ -214,6 +214,31 @@ export function expandedSpellIdsFor(
 }
 
 /**
+ * Every spell id one list may draw from, or null where the list narrows nothing.
+ *
+ * A spell names the classes whose list it is on, so a cleric draws from cleric spells,
+ * widened by whatever EXPAND_SPELL_LIST rules are in force — a Divine Soul's cleric
+ * access, a guild background.
+ *
+ * Null is the answer for a source that owns no spells of its own: a race or background
+ * grant, or a subclass caster filed under its parent class (an Eldritch Knight's source
+ * is `fighter`, and no spell is a fighter spell). Those are not a narrow list, they are
+ * no list — narrowing a fighter to the three spells their background added would hide
+ * every wizard spell they exist to cast — so the caller offers everything instead.
+ */
+export function spellIdsForList(
+  listId: string,
+  character: ExpansionContext,
+  rulepack: Rulepack,
+): Set<string> | null {
+  const own = rulepack.spells.filter(s => s.classes.includes(listId))
+  if (own.length === 0) return null
+  const ids = expandedSpellIdsFor(listId, character, rulepack)
+  for (const spell of own) ids.add(spell.id)
+  return ids
+}
+
+/**
  * The expansions in force, grouped for display: one entry per rule, so the sheet can
  * say *why* a list is wider than its class list.
  */

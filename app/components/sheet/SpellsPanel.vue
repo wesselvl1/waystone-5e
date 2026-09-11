@@ -4,7 +4,7 @@ import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import {
   spellSlotMax, spellSaveDCFor, spellAttackBonusFor, spellListLimit, preparesSpells,
-  spellListExpansions,
+  spellListExpansions, spellIdsForList,
 } from '~/services/spellcasting'
 import type { SpellListLimit } from '~/services/spellcasting'
 import type { FeatureUsesBonusSource } from '~/types/character'
@@ -275,18 +275,36 @@ const addLevel = ref(0)
 const addClassId = ref<string>('')
 const searchQuery = ref('')
 
+/**
+ * Escape hatch for a spell that is on no list of the character's — a scroll, a magic
+ * item, a DM's ruling. Off by default, since picking a list is how a player says which
+ * list they are adding from.
+ */
+const showOffListSpells = ref(false)
+
 // Default the add-class selector to the active tab class (if applicable)
 watch(activeTab, (tab) => { addClassId.value = tab === 'all' ? '' : tab })
 
 const allSpells = computed(() => rulepackStore.getAllSpells())
 
-const filteredSpells = computed(() =>
-  allSpells.value.filter(s =>
+/** The spell ids the chosen list may draw from, or null when it narrows nothing. */
+const addListSpellIds = computed<Set<string> | null>(() =>
+  (addClassId.value
+    ? spellIdsForList(addClassId.value, props.character, mergedPack.value)
+    : null))
+
+/** Whether the chosen list actually narrows the offer, so the toggle is worth showing. */
+const addListNarrows = computed(() => addListSpellIds.value !== null)
+
+const filteredSpells = computed(() => {
+  const listIds = showOffListSpells.value ? null : addListSpellIds.value
+  return allSpells.value.filter(s =>
     s.level === addLevel.value
     && !props.character.spells.some(cs => cs.spellId === s.id)
+    && (listIds === null || listIds.has(s.id))
     && (searchQuery.value === '' || s.name.toLowerCase().includes(searchQuery.value.toLowerCase())),
-  ),
-)
+  )
+})
 
 function addSpellFromList(spellDef: { id: string; name: string; level: number }) {
   const entry: SpellEntry = {
@@ -585,6 +603,12 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
           </select>
           <input v-model="searchQuery" class="input flex-1 min-w-24" placeholder="Search spells…" />
         </div>
+        <!-- Shown only where the list narrows the offer, so it never promises a filter
+             that is not being applied. -->
+        <label v-if="addListNarrows" class="flex items-center gap-2 text-xs text-slate-400">
+          <input v-model="showOffListSpells" type="checkbox" class="w-4 h-4 rounded accent-primary-500" />
+          Show spells outside this list
+        </label>
         <div class="max-h-40 overflow-y-auto space-y-0.5">
           <div
             v-for="spell in filteredSpells.slice(0, 50)"
@@ -613,7 +637,11 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
             </button>
           </div>
           <p v-if="filteredSpells.length === 0" class="text-slate-500 text-xs text-center py-2">
-            {{ allSpells.length === 0 ? 'No rulepacks loaded' : 'No matching spells' }}
+            {{ allSpells.length === 0
+              ? 'No rulepacks loaded'
+              : addListNarrows && !showOffListSpells
+                ? 'No matching spells on this list'
+                : 'No matching spells' }}
           </p>
         </div>
       </div>

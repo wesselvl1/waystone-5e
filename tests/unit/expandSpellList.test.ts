@@ -6,7 +6,7 @@ import {
   applyResolvedChoices,
   getAutomaticEvents,
 } from '~/services/levelUpService'
-import { expandedSpellIdsFor, spellListExpansions } from '~/services/spellcasting'
+import { expandedSpellIdsFor, spellListExpansions, spellIdsForList } from '~/services/spellcasting'
 import type { Character } from '~/types/character'
 import type { Rulepack } from '~/types/rulepack'
 import { validCharacter } from '../fixtures'
@@ -213,6 +213,34 @@ describe('several rules at once', () => {
     })
     const groups = spellListExpansions('sorcerer', both, rulepack)
     expect(groups.map(g => g.label).sort()).toEqual(['Azorius Guild Spells', 'Divine Magic'])
+  })
+})
+
+describe('the spells a list may draw from', () => {
+  const plain = (over: Partial<Character> = {}) => char({ background: 'plain', ...over })
+
+  it('is the class list, not every spell in the pack', () => {
+    const ids = spellIdsForList('cleric', plain({ classes: [{ classId: 'cleric', level: 5 }] }), rulepack)!
+    expect(ids.has('cure-wounds')).toBe(true)
+    // A wizard/sorcerer spell no cleric prepares
+    expect(ids.has('fireball')).toBe(false)
+    expect(ids.size).toBe(clericSpellIds.length)
+  })
+
+  it('includes whatever the expansions in force add', () => {
+    const ds = char({ classes: [{ classId: 'sorcerer', level: 1, subclassId: 'divine-soul' }] })
+    const ids = spellIdsForList('sorcerer', ds, rulepack)!
+    expect(ids.has('fireball')).toBe(true)          // the sorcerer's own
+    expect(ids.has('cure-wounds')).toBe(true)       // Divine Magic
+    for (const id of GUILD_SPELLS) expect(ids.has(id), id).toBe(true)
+  })
+
+  it('narrows nothing for a source that owns no spells', () => {
+    // An Eldritch Knight's list is filed under `fighter`, and no spell is a fighter
+    // spell — offering only the three the background added would hide the rest
+    const ek = char({ classes: [{ classId: 'fighter', level: 3 }] })
+    expect(spellIdsForList('fighter', ek, rulepack)).toBeNull()
+    expect(spellIdsForList('high-elf', plain(), rulepack)).toBeNull()
   })
 })
 
