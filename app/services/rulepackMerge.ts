@@ -1,5 +1,6 @@
 import type {
   ClassDefinition,
+  OptionPoolPatch,
   Race,
   SubclassPatchEntry,
   SubracePatchEntry,
@@ -50,4 +51,26 @@ export function distributeSubraces(
     else unresolved.push(entry)
   }
   return unresolved
+}
+
+/**
+ * Merge option-pool patches, one entry per pool, options within a pool merged by id.
+ *
+ * Not `mergeById`: a pool patch has no id of its own, and two fragments of the same book
+ * legitimately both widen `eldritch-invocation` — Xanathar's warlock invocations could
+ * arrive in one file and its pact boons in another. Replacing wholesale would drop the
+ * first file's work, so the pools are keyed by what they name and their options unioned.
+ */
+export function mergeOptionPools(
+  existing: OptionPoolPatch[],
+  incoming: OptionPoolPatch[],
+): OptionPoolPatch[] {
+  const key = (pool: OptionPoolPatch) => `${pool.group ?? ''}|${pool.choiceId ?? ''}`
+  const map = new Map<string, OptionPoolPatch>()
+  for (const pool of [...existing, ...incoming]) {
+    const seen = map.get(key(pool))
+    if (!seen) map.set(key(pool), { ...pool, options: [...pool.options] })
+    else seen.options = mergeById(seen.options, pool.options)
+  }
+  return [...map.values()]
 }

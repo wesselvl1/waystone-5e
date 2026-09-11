@@ -659,6 +659,29 @@ export interface OptionalClassFeature {
   recharge?: 'short' | 'long' | 'dawn'
 }
 
+/**
+ * Extra entries for a `CHOOSE_OPTION` pool declared somewhere else.
+ *
+ * A book that adds Eldritch Invocations has nowhere to put them. The SRD prints the whole
+ * pool inline on every warlock level that picks from it, and fragments merge by id, so a
+ * fragment adding one invocation would have to redeclare the entire warlock class — and
+ * would then own it, stale levels and all. A pool patch names the *pool* instead of the
+ * class: `group` for a shared pool (`eldritch-invocation`, `metamagic`), or `choiceId`
+ * for a one-off choice that has no group (`pact-boon`, which Tasha's widens with Pact of
+ * the Talisman). The level-up pipeline unions the patches in wherever that pool is
+ * offered, so the book stays a separate, individually removable pack.
+ *
+ * Options carry the same prerequisites as any other — a patched invocation gets its
+ * `minLevel` and `requiresOption` gate from `optionAvailable` like the SRD's do.
+ */
+export interface OptionPoolPatch {
+  /** Shared pool to widen, matching the `group` on the choices that draw from it. */
+  group?: string
+  /** A single choice to widen, matching its `id`. For a choice declaring no group. */
+  choiceId?: string
+  options: ChooseOptionDef[]
+}
+
 export interface Rulepack {
   id: string
   name: string
@@ -680,6 +703,8 @@ export interface Rulepack {
    */
   subclasses?: SubclassPatchEntry[]
   subraces?: SubracePatchEntry[]
+  /** Entries this pack contributes to option pools owned by another pack. */
+  optionPools?: OptionPoolPatch[]
 }
 
 /** A subclass entry in a patch file — carries the target classId alongside the subclass definition. */
@@ -715,4 +740,6 @@ export interface RulepackFragment {
   subraces?: SubracePatchEntry[]
   /** Optional class features (e.g. from Tasha's) — stored flat with classId/level. */
   optionalFeatures?: OptionalClassFeature[]
+  /** Options to add to a pool (`eldritch-invocation`) defined in another pack. */
+  optionPools?: OptionPoolPatch[]
 }

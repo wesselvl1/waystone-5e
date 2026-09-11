@@ -118,6 +118,14 @@ const STUBS = {
     traits: [],
     _todo: true,
   }),
+  optionPools: ({ name, minLevel, requiresOption, requiresSpell }) => ({
+    name,
+    description: '',
+    ...(minLevel ? { minLevel } : {}),
+    ...(requiresOption ? { requiresOption } : {}),
+    ...(requiresSpell ? { requiresSpell } : {}),
+    _todo: true,
+  }),
   spells: ({ name }) => ({
     name,
     level: 0,
@@ -143,7 +151,43 @@ const CATEGORY_FILES = {
   backgrounds: 'backgrounds.json',
   races: 'races.json',
   subraces: 'subraces.json',
+  optionPools: 'option-pools.json',
   spells: 'spells.json',
+}
+
+/**
+ * `optionPools` is the one category that is not a flat list of entries: the file holds
+ * one pool per `group` / `choiceId`, each wrapping the options that widen it. The
+ * manifest still lists options one per line, so they are grouped on the way out — and
+ * flattened again on the way in, so a description already filled in is matched by id and
+ * survives, exactly as it does for every other category.
+ */
+const POOL_KEY = pool => `${pool.group ?? ''}|${pool.choiceId ?? ''}`
+
+function flattenPools(pools) {
+  return (pools ?? []).flatMap(pool =>
+    (pool.options ?? []).map(option => ({
+      ...option,
+      group: pool.group,
+      choiceId: pool.choiceId,
+    })),
+  )
+}
+
+function groupPools(options) {
+  const byPool = new Map()
+  for (const { group, choiceId, ...option } of options) {
+    const pool = { group, choiceId }
+    if (!byPool.has(POOL_KEY(pool))) {
+      byPool.set(POOL_KEY(pool), {
+        ...(group ? { group } : {}),
+        ...(choiceId ? { choiceId } : {}),
+        options: [],
+      })
+    }
+    byPool.get(POOL_KEY(pool)).options.push(option)
+  }
+  return [...byPool.values()]
 }
 
 /**
@@ -173,7 +217,10 @@ function idsInFolder(dir, category, excludeFile) {
     if (!file.endsWith('.json') || file === excludeFile) continue
     try {
       const data = JSON.parse(readFileSync(join(dir, file), 'utf8'))
-      for (const item of data?.[category] ?? []) ids.add(item.id)
+      const items = category === 'optionPools'
+        ? flattenPools(data?.optionPools)
+        : data?.[category] ?? []
+      for (const item of items) ids.add(item.id)
     }
     catch {
       // A file being edited by hand may be mid-save; it is not this script's job to fail on that
@@ -202,7 +249,10 @@ for (const book of BOOKS) {
       : null
 
     // Index what is already on disk so filled-in entries are never overwritten
-    const byId = new Map((existing?.[category] ?? []).map(item => [item.id, item]))
+    const onDisk = category === 'optionPools'
+      ? flattenPools(existing?.optionPools)
+      : existing?.[category] ?? []
+    const byId = new Map(onDisk.map(item => [item.id, item]))
     const before = byId.size
 
     // An id may already live in a differently-named file in this folder — a hand-written
@@ -215,10 +265,20 @@ for (const book of BOOKS) {
       const entry = normalize(raw)
       const id = entry.id ?? `${book.abbrev}.${slug(entry.name)}`
       if (byId.has(id) || elsewhere.has(id)) continue
-      byId.set(id, { id, ...STUBS[category](entry) })
+      byId.set(id, {
+        id,
+        ...STUBS[category](entry),
+        ...(category === 'optionPools'
+          ? { group: entry.group, choiceId: entry.choiceId }
+          : {}),
+      })
     }
 
-    const out = { ...envelope(book), [category]: [...byId.values()] }
+    const values = [...byId.values()]
+    const out = {
+      ...envelope(book),
+      [category]: category === 'optionPools' ? groupPools(values) : values,
+    }
     const newCount = byId.size - before
     added += newCount
     kept += before

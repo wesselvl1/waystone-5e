@@ -85,6 +85,12 @@ function packContents(pack: Rulepack) {
     { label: 'feats', count: pack.feats.length },
     { label: 'spells', count: pack.spells.length },
     { label: 'optional features', count: pack.optionalFeatures.length },
+    {
+      // Counted as options rather than as pools: "1 option pool" is a shape of the file,
+      // where "14 invocations" is what the book actually adds.
+      label: 'pool options',
+      count: (pack.optionPools ?? []).reduce((n, pool) => n + pool.options.length, 0),
+    },
   ].filter(entry => entry.count > 0)
 }
 

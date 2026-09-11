@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { db } from '~/db'
 import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, Background, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
-import { mergeById, distributeSubclasses, distributeSubraces } from '~/services/rulepackMerge'
+import { mergeById, mergeOptionPools, distributeSubclasses, distributeSubraces } from '~/services/rulepackMerge'
 
 /** A rulepack entry carrying the name of the pack that defines it, for display. */
 export type WithSource<T> = T & { sourceName: string }
@@ -33,6 +33,7 @@ function applyFragment(existing: Rulepack, fragment: RulepackFragment): Rulepack
     optionalFeatures: mergeById(existing.optionalFeatures, fragment.optionalFeatures ?? []),
     subclasses: mergeById(existing.subclasses ?? [], pendingSubclasses),
     subraces: mergeById(existing.subraces ?? [], pendingSubraces),
+    optionPools: mergeOptionPools(existing.optionPools ?? [], fragment.optionPools ?? []),
   }
 }
 
@@ -59,6 +60,7 @@ function fragmentToRulepack(fragment: RulepackFragment): Rulepack {
     optionalFeatures: fragment.optionalFeatures ?? [],
     subclasses: pendingSubclasses,
     subraces: pendingSubraces,
+    optionPools: mergeOptionPools([], fragment.optionPools ?? []),
   }
 }
 
@@ -286,6 +288,9 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
       spells: rulepacks.value.flatMap(p => p.spells),
       creatures: getAllCreatures(),
       optionalFeatures: rulepacks.value.flatMap(p => p.optionalFeatures),
+      // Not distributed into anything: a pool patch is resolved where the pool is
+      // offered, so it only has to reach the composed pack to widen an SRD class's list.
+      optionPools: rulepacks.value.flatMap(p => p.optionPools ?? []),
     }
   }
 

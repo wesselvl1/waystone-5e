@@ -302,6 +302,41 @@ function choiceIdsInGroup(rulepack: Rulepack, group: string): string[] {
 }
 
 /**
+ * Options another pack contributes to a pool, from `rulepack.optionPools`.
+ *
+ * A sourcebook's Eldritch Invocations cannot live on the warlock's own CHOOSE_OPTION
+ * lists — those are printed inline in the SRD pack, and a fragment touching them would
+ * have to redeclare the class. So a book names the pool instead and its options are
+ * unioned in here, at every point the pool is read: the pick itself, the retraining
+ * offer, and the feature a pick is worth on the sheet.
+ *
+ * Matched on `group` when the choice has one, and on the choice's own id otherwise, so a
+ * book can also widen a single ungrouped choice — Tasha's adds Pact of the Talisman to
+ * the SRD warlock's `pact-boon`.
+ */
+/**
+ * Options as a player reads them: by name.
+ *
+ * A pack's own list is already alphabetical, but a patched-in option would otherwise land
+ * wherever the union happened to append it — Tasha's invocations in a block after
+ * Witch Sight rather than filed among the rest. Sorting at the point of offer is the same
+ * rule the store's `getAll*` getters follow: merging a book in never reshuffles a list.
+ */
+function byName(options: PoolOption[]): PoolOption[] {
+  return [...options].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+function poolExtras(rulepack: Rulepack, group?: string, choiceId?: string): PoolOption[] {
+  const out: PoolOption[] = []
+  for (const pool of rulepack.optionPools ?? []) {
+    const matches = (group !== undefined && pool.group === group)
+      || (choiceId !== undefined && pool.choiceId === choiceId)
+    if (matches) out.push(...pool.options)
+  }
+  return out
+}
+
+/**
  * Every option the pool offers, deduplicated by id.
  *
  * Each pick in a group repeats the whole list, so any one of them would do — except that
@@ -314,7 +349,10 @@ function optionsInGroup(rulepack: Rulepack, group: string): PoolOption[] {
     if (def.group !== group) continue
     for (const option of def.options) if (!byId.has(option.id)) byId.set(option.id, option)
   }
-  return [...byId.values()]
+  for (const option of poolExtras(rulepack, group)) {
+    if (!byId.has(option.id)) byId.set(option.id, option)
+  }
+  return byName([...byId.values()])
 }
 
 /**
@@ -347,8 +385,16 @@ export function resolveOptionChoice(
       .map(id => character.chosenOptions?.[id])
       .filter((id): id is string => !!id),
   )
-  const options = eventDef.options.filter(o =>
-    !taken.has(o.id) && optionAvailable(o, character, level))
+  const offered = [...eventDef.options]
+  const known = new Set(offered.map(o => o.id))
+  for (const extra of poolExtras(rulepack, eventDef.group, eventDef.id)) {
+    if (!known.has(extra.id)) {
+      known.add(extra.id)
+      offered.push(extra)
+    }
+  }
+  const options = byName(offered.filter(o =>
+    !taken.has(o.id) && optionAvailable(o, character, level)))
   if (options.length === 0) return undefined
   return {
     type: 'CHOOSE_OPTION',
@@ -383,7 +429,10 @@ function poolPickFeature(
     for (const level of cls.levels) {
       for (const def of level.levelUpEvents ?? []) {
         if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId || !def.group) continue
+        // Patched-in options too, or a sourcebook invocation would be picked and then
+        // named nothing on the sheet.
         const option = def.options.find(o => o.id === optionId)
+          ?? poolExtras(rulepack, def.group, def.id).find(o => o.id === optionId)
         if (!option) return undefined
         return {
           id: poolFeatureId(choiceId),
@@ -404,6 +453,7 @@ function poolPickFeature(
         for (const def of group.levelUpEvents) {
           if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId) continue
           const option = def.options.find(o => o.id === optionId)
+            ?? poolExtras(rulepack, def.group, def.id).find(o => o.id === optionId)
           if (!option) return undefined
           return {
             id: poolFeatureId(choiceId),

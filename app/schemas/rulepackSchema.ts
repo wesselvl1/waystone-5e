@@ -482,6 +482,20 @@ export const OptionalClassFeatureSchema = z.object({
   recharge: z.enum(['short', 'long', 'dawn']).optional(),
 })
 
+/**
+ * Options a pack contributes to a pool it does not own — a sourcebook's Eldritch
+ * Invocations landing in the SRD warlock's pool. Named by `group` (a shared pool) or
+ * `choiceId` (a single choice with no group); one of the two is required, since a patch
+ * naming neither could never be matched to anything.
+ */
+const OptionPoolPatchSchema = z.object({
+  group: z.string().optional(),
+  choiceId: z.string().optional(),
+  options: z.array(ChooseOptionDefSchema).min(1),
+}).refine(p => !!(p.group || p.choiceId), {
+  message: 'An option pool patch needs a group or a choiceId to say which pool it widens',
+})
+
 export const RulepackSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -501,6 +515,8 @@ export const RulepackSchema = z.object({
   subraces: z.array(SubracePatchEntrySchema).optional().default([]),
   /** Optional class features from supplemental sourcebooks. */
   optionalFeatures: z.array(OptionalClassFeatureSchema).optional().default([]),
+  /** Top-level option-pool patches: entries for a CHOOSE_OPTION pool another pack owns. */
+  optionPools: z.array(OptionPoolPatchSchema).optional().default([]),
 }).strip()
 
 export type RulepackInput = z.input<typeof RulepackSchema>
