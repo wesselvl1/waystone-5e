@@ -192,14 +192,19 @@ async function doLongRest() {
   // first is the conventional default and needs no prompt.
   const totalDice = character.value.hitDice.reduce((s, p) => s + p.total, 0)
   let toRecover = Math.max(1, Math.floor(totalDice / 2))
-  const hitDice = [...character.value.hitDice]
-    .sort((a, b) => Number.parseInt(b.die.slice(1)) - Number.parseInt(a.die.slice(1)))
-    .map((p) => {
-      const spent = p.total - p.remaining
-      const give = Math.min(spent, toRecover)
-      toRecover -= give
-      return { ...p, remaining: p.remaining + give }
-    })
+  // Spend the budget largest-die-first, but keep the stored pool order: the sheet renders
+  // hitDice in array order, so sorting in place would reshuffle the card on every rest.
+  const recovered = new Map<string, number>()
+  for (const p of [...character.value.hitDice]
+    .sort((a, b) => Number.parseInt(b.die.slice(1)) - Number.parseInt(a.die.slice(1)))) {
+    const give = Math.min(p.total - p.remaining, toRecover)
+    toRecover -= give
+    recovered.set(p.classId, give)
+  }
+  const hitDice = character.value.hitDice.map(p => ({
+    ...p,
+    remaining: p.remaining + (recovered.get(p.classId) ?? 0),
+  }))
   const hp = { ...character.value.hp, current: character.value.hp.max }
   // Regular spell slots recharge on a long rest
   const spellSlots = Object.fromEntries(
