@@ -200,6 +200,11 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     count: z.number().int().min(1),
     // Omitted means every skill, which is what "two skills of your choice" prints.
     from: z.array(SkillKeySchema).min(1).optional(),
+    // Asked only when an option was picked, e.g. the Skill Versatility arm of a variant.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
   }),
   z.object({
     type: z.literal('GRANT_SPELLS'),
@@ -304,6 +309,8 @@ const RaceSchema = z.object({
   languages: z.array(z.string()),
   abilityScoreChoice: AbilityScoreChoiceSchema.optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
+  // The race stands on its own; any subraces are sourcebook variants, so "None" is offered.
+  subraceOptional: z.literal(true).optional(),
   subraces: z.array(SubraceSchema).optional(),
 })
 

@@ -82,6 +82,10 @@ const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id ==
  * Skill Versatility for a heritage feature. Showing both would claim the character has
  * each, and the replaced trait's level-up events are skipped for the same reason.
  */
+/** Whether step 1 may not continue until a subrace is picked. */
+const subraceRequired = computed(() =>
+  (selectedRace.value?.subraces?.length ?? 0) > 0 && selectedRace.value?.subraceOptional !== true)
+
 const raceTraits = computed(() => {
   const replaced = selectedSubrace.value?.replacesRaceTraits ?? []
   return (selectedRace.value?.traits ?? []).filter(t => !replaced.includes(t.name))
@@ -152,8 +156,11 @@ function toggleSkill(skill: SkillKey) {
 function canProceed() {
   if (step.value === 0) {
     if (!draft.raceId) return false
-    // Require subrace selection if the chosen race has subraces
-    if ((selectedRace.value?.subraces?.length ?? 0) > 0 && !draft.subraceId) return false
+    // Require a subrace where the race is incomplete without one — a dwarf, an elf. A
+    // race the SRD prints whole says so, and its subraces are sourcebook variants a
+    // player may decline; blocking there made a plain half-elf unbuildable as soon as
+    // one of those books was loaded.
+    if (subraceRequired.value && !draft.subraceId) return false
     return true
   }
   if (step.value === 1) return !!draft.classId
@@ -404,8 +411,19 @@ function signed(n: number | undefined) {
 
         <!-- Subrace picker -->
         <template v-if="selectedRace?.subraces?.length">
-          <p class="section-header mt-2">Choose a {{ selectedRace.name }} subrace</p>
+          <p class="section-header mt-2">
+            Choose a {{ selectedRace.name }} subrace<span v-if="!subraceRequired"> (optional)</span>
+          </p>
           <div class="grid grid-cols-2 gap-3">
+            <button
+              v-if="!subraceRequired"
+              class="card text-left transition-colors hover:border-primary-500/50"
+              :class="draft.subraceId === '' ? 'border-primary-500 bg-primary-900/20' : ''"
+              @click="draft.subraceId = ''"
+            >
+              <p class="font-semibold text-white text-sm">None</p>
+              <p class="text-xs text-slate-500 mt-0.5">The {{ selectedRace.name }} as printed, with no variant</p>
+            </button>
             <button
               v-for="sub in selectedRace.subraces"
               :key="sub.id"

@@ -34,6 +34,7 @@
         "Common",
         "Draconic"
       ],
+      "subraceOptional": true,
       "levelUpEvents": [
         {
           "level": 1,
@@ -223,6 +224,7 @@
         "Elvish",
         "1 extra language of your choice"
       ],
+      "subraceOptional": true,
       "abilityScoreChoice": {
         "from": [
           "con",
@@ -283,7 +285,8 @@
       "languages": [
         "Common",
         "Orc"
-      ]
+      ],
+      "subraceOptional": true
     },
     {
       "id": "halfling",
@@ -333,7 +336,8 @@
       "languages": [
         "Common",
         "1 extra language of your choice"
-      ]
+      ],
+      "subraceOptional": true
     },
     {
       "id": "tiefling",
@@ -364,6 +368,7 @@
         "Common",
         "Infernal"
       ],
+      "subraceOptional": true,
       "levelUpEvents": [
         {
           "level": 1,

@@ -70,6 +70,15 @@ export interface Race {
   abilityScoreChoice?: AbilityScoreChoice
   /** Events fired at a given total character level (tiefling spells, dragonborn ancestry). */
   levelUpEvents?: SourceLevelEvents[]
+  /**
+   * The race is playable without picking a subrace, so the wizard offers "None".
+   *
+   * Set on the races the SRD prints whole — a half-elf, a human, a tiefling. Their
+   * subraces only exist because a sourcebook adds variants, and forcing one of those on
+   * a player who wants the plain race is wrong. A dwarf or an elf, whose subrace the SRD
+   * requires, leaves this unset.
+   */
+  subraceOptional?: true
   subraces?: Subrace[]
 }
 
@@ -300,7 +309,16 @@ export type LevelUpEventDef =
    * "three skills of your choice". `from` narrows the list; omitted, every skill is on
    * offer. Ones the character already has are shown but not pickable.
    */
-  | { type: 'CHOOSE_SKILL'; count: number; from?: SkillKey[] }
+  | {
+    type: 'CHOOSE_SKILL'
+    count: number
+    from?: SkillKey[]
+    /**
+     * Ask only when a `CHOOSE_OPTION` was answered this way — the Skill Versatility arm
+     * of a half-elf descent's variant feature. Gated the same way a `GRANT_SPELLS` is.
+     */
+    whenOption?: { choiceId: string; optionId: string }
+  }
   | { type: 'CHOOSE_FEAT' }
   | { type: 'ABILITY_SCORE_IMPROVEMENT'; points: number }
   | { type: 'CHOOSE_SUBCLASS'; label: string }
