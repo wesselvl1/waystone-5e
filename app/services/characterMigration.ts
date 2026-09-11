@@ -5,6 +5,7 @@ import {
 } from '~/services/abilityScoreChoice'
 import { raceAbilityBonuses } from '~/services/multiclass'
 import { abilityMod } from '~/composables/useCharacterStats'
+import { cleanEquipmentName } from '~/services/equipment'
 import type { AbilityKey, AttackEntry, Character, HitDicePool, SpellSlots } from '~/types/character'
 import type { AbilityScoreChoice, Race, Subrace } from '~/types/rulepack'
 
@@ -35,8 +36,27 @@ export function migrateCharacterShape<T extends object>(raw: T): T {
   )
   out.features = dedupeFeatures(src.features)
   out.attacks = migrateAttacks(src.attacks, src)
+  out.equipment = migrateEquipment(src.equipment)
 
   return out as T
+}
+
+/**
+ * Strip the source off an item name that came in as a data reference.
+ *
+ * A background's equipment used to be copied onto the character verbatim, so a book that
+ * writes its list the way 5etools does put "fine clothes|phb" on the sheet. The pipe is a
+ * corpus disambiguator and was never meant to be read; cleaning it here rather than only
+ * at creation is what fixes the characters that already carry it.
+ */
+function migrateEquipment(value: unknown): unknown {
+  if (!Array.isArray(value)) return value
+  return value.map((entry) => {
+    if (typeof entry !== 'object' || entry === null) return entry
+    const item = entry as { name?: unknown }
+    if (typeof item.name !== 'string' || !item.name.includes('|')) return entry
+    return { ...item, name: cleanEquipmentName(item.name) }
+  })
 }
 
 /**

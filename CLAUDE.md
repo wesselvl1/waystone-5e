@@ -173,6 +173,23 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   not a barbarian's); the calculator drops the shield and says why rather than silently
   dropping it. Nothing switched on mid-fight belongs here — Shield, Blade Song and
   barkskin last a minute, and this is the number on the sheet.
+- **Carrying capacity is derived, and what doubles it is found by wording.**
+  `app/services/equipment.ts` builds it from Strength × 15, doubled once per feature
+  whose text both mentions carrying capacity and says it is doubled or counts you one size
+  larger — Powerful Build and the bear Aspect of the Beast both phrase it that way, so a
+  race or totem from any book works without a code change where a name list would only
+  know the names written into it. A sniff is a guess, so
+  `Character.carryingCapacityMultiplier` overrides it (null = derive), which is the
+  `armorClass` idiom again. Nothing stores a character's size, so size is not a factor.
+  Weight is optional per `EquipmentEntry` because a list that demands a number per line is
+  one nobody fills in: the total covers what has been weighed and the sheet says how many
+  entries it skipped, and coins count at fifty to the pound.
+- **An item name loses the source it was filed under.** Book content names an item the way
+  5etools does (`fine clothes|phb`), and the pipe is a corpus disambiguator that was never
+  meant to be read. `cleanEquipmentName()` strips it at creation *and* in
+  `migrateCharacterShape`, which is what fixes the sheets already carrying it. It
+  re-cases only names that carried a source — those came from a lowercase data file — and
+  leaves a name a player typed exactly as typed.
 - Tailwind's `capitalize` title-cases *every* word, so it belongs only on values the
   schema stores lowercase — a damage type, a weapon property. Over a range or free text it
   produces "150/600 Ft." and re-cases whatever the player typed.

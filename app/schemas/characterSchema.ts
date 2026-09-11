@@ -133,7 +133,8 @@ const EquipmentEntrySchema = z.object({
   id: z.string(),
   name: z.string(),
   quantity: z.number().int().min(0),
-  weight: z.number().optional(),
+  /** Pounds for one of them, not for the stack. Absent where nobody weighed it. */
+  weight: z.number().min(0).optional(),
   notes: z.string().optional(),
 })
 
@@ -247,6 +248,7 @@ export const CharacterSchema = z.object({
     gp: z.number().int().min(0),
     pp: z.number().int().min(0),
   }),
+  carryingCapacityMultiplier: z.number().positive().nullable().optional(),
 
   notes: z.string(),
   appearance: z.string().optional(),

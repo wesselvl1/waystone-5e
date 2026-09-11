@@ -377,6 +377,12 @@ export interface Character {
   features: Feature[]
   equipment: EquipmentEntry[]
   currency: Currency
+  /**
+   * What to multiply Strength x 15 by, when the player would rather say than have it
+   * worked out. Null or absent means derive it from the features that widen carrying
+   * capacity — see `carryingCapacity()` for why that is a guess worth overriding.
+   */
+  carryingCapacityMultiplier?: number | null
 
   notes: string
   appearance?: string
