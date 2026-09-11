@@ -9,6 +9,11 @@ const emit = defineEmits<{ update: [Partial<Character>] }>()
 const rulepackStore = useRulepacksStore()
 
 const raceName = computed(() => rulepackStore.getRace(props.character.race)?.name ?? props.character.race)
+// The stored value is the background's id, which by convention carries a source
+// abbreviation ("tce-guild-artisan"). The sheet names the background; the source belongs
+// to the picker in the creation wizard, where it tells two books' versions apart.
+const backgroundName = computed(() =>
+  rulepackStore.getBackground(props.character.background)?.name ?? props.character.background)
 const classLabel = computed(() =>
   props.character.classes
     .map(c => {
@@ -127,7 +132,7 @@ function fmt(n: number) {
       <span class="text-slate-600">·</span>
       <span class="text-slate-500">Level {{ totalLevel }}</span>
       <span v-if="character.background" class="text-slate-600">·</span>
-      <span v-if="character.background" class="text-slate-500 capitalize">{{ character.background }}</span>
+      <span v-if="character.background" class="text-slate-500">{{ backgroundName }}</span>
     </div>
 
     <!-- XP bar -->
