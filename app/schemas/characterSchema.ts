@@ -34,12 +34,30 @@ const SpellSlotsSchema = z.partialRecord(
   }).transform(({ used, bonus }) => (bonus === undefined ? { used } : { used, bonus })),
 )
 
+// A modifier an attack may roll with, or a flat roll adding none.
+const AttackAbilitySchema = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha', 'none'])
+
+// Kept apart rather than summed so each can be edited — and removed — on its own.
+const AttackBonusSetSchema = z.object({
+  magic: z.number().int().optional(),
+  feat: z.number().int().optional(),
+  misc: z.number().int().optional(),
+})
+
 const AttackEntrySchema = z.object({
   id: z.string(),
   name: z.string(),
   bonus: z.number().nullable(),
+  ability: AttackAbilitySchema.optional(),
+  proficient: z.boolean().optional(),
+  attackBonuses: AttackBonusSetSchema.optional(),
+  damageAbility: AttackAbilitySchema.optional(),
+  damageBonuses: AttackBonusSetSchema.optional(),
   damageDice: z.string(),
   damageType: z.string(),
+  weaponId: z.string().optional(),
+  properties: z.array(z.string()).optional(),
+  range: z.string().optional(),
   notes: z.string().optional(),
 })
 

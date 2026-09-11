@@ -682,6 +682,41 @@ export interface OptionPoolPatch {
   options: ChooseOptionDef[]
 }
 
+/** Simple or martial — the line every class's weapon proficiencies are drawn along. */
+export type WeaponCategory = 'simple' | 'martial'
+
+/**
+ * A weapon as printed in the equipment table.
+ *
+ * Rulepack data rather than a constant in the sheet, for the same reason races and spells
+ * are: a sourcebook adds a double-bladed scimitar by shipping a fragment, and the pickers
+ * list it beside the SRD's without a code change. An attack stores the weapon's id plus
+ * its own copy of the dice, so a sheet still renders when the pack is gone.
+ */
+export interface WeaponDefinition {
+  id: string
+  name: string
+  category: WeaponCategory
+  rangeType: 'melee' | 'ranged'
+  /** The dice alone, e.g. "1d8". Empty for a weapon that deals none (the net). */
+  damageDice: string
+  damageType: string
+  /**
+   * Lowercase property tags as printed: finesse, light, heavy, two-handed, thrown,
+   * versatile, ammunition, loading, reach, special. Lowercase because `finesse` and
+   * `thrown` decide which ability an attack defaults to, and a pack should not be able
+   * to break that by capitalising.
+   */
+  properties?: string[]
+  /** The two-handed dice of a versatile weapon, e.g. "1d10". */
+  versatileDamage?: string
+  /** Normal/long range in feet for a ranged or thrown weapon, e.g. "80/320". */
+  range?: string
+  cost?: string
+  /** In pounds. Fractional for a dart. */
+  weight?: number
+}
+
 export interface Rulepack {
   id: string
   name: string
@@ -694,6 +729,7 @@ export interface Rulepack {
   feats: FeatDefinition[]
   spells: SpellDefinition[]
   creatures: CreatureDefinition[]
+  weapons: WeaponDefinition[]
   optionalFeatures: OptionalClassFeature[]
   /**
    * Patch entries whose target class/race lives in ANOTHER loaded pack, so they could not
@@ -734,6 +770,7 @@ export interface RulepackFragment {
   feats?: FeatDefinition[]
   spells?: SpellDefinition[]
   creatures?: CreatureDefinition[]
+  weapons?: WeaponDefinition[]
   /** Subclasses to attach to existing classes identified by classId. */
   subclasses?: SubclassPatchEntry[]
   /** Subraces to attach to existing races identified by raceId. */

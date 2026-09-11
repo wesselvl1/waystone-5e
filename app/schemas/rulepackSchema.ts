@@ -471,6 +471,23 @@ export const SubracePatchEntrySchema = SubraceSchema.extend({
   raceId: z.string(),
 })
 
+const WeaponDefinitionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: z.enum(['simple', 'martial']),
+  rangeType: z.enum(['melee', 'ranged']),
+  // Empty for the net, which deals no damage at all.
+  damageDice: z.string(),
+  damageType: z.string(),
+  // Lowercased on the way in: `finesse` and `thrown` decide an attack's default ability,
+  // and a pack writing "Finesse" should not quietly turn that off.
+  properties: z.array(z.string().transform(p => p.toLowerCase())).optional(),
+  versatileDamage: z.string().optional(),
+  range: z.string().optional(),
+  cost: z.string().optional(),
+  weight: z.number().min(0).optional(),
+})
+
 export const OptionalClassFeatureSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -509,6 +526,8 @@ export const RulepackSchema = z.object({
   spells: z.array(SpellDefinitionSchema).optional().default([]),
   /** Creature statblocks: beasts for Wild Shape now, summons and familiars later. */
   creatures: z.array(CreatureDefinitionSchema).optional().default([]),
+  /** The equipment table's weapons: what the sheet's attack picker lists. */
+  weapons: z.array(WeaponDefinitionSchema).optional().default([]),
   /** Top-level subclass patches: each entry carries a classId specifying which class to attach to. */
   subclasses: z.array(SubclassPatchEntrySchema).optional().default([]),
   /** Top-level subrace patches: each entry carries a raceId specifying which race to attach to. */

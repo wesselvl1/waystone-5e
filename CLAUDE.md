@@ -47,11 +47,11 @@ Nuxt 4 with `ssr: false` — a pure client-side SPA/PWA. There is no backend and
 
 ### Rulepacks are the rules engine
 
-Game content is data, not code. A **rulepack** (`app/types/rulepack.ts`) holds races, classes, subclasses, backgrounds, feats, spells and optional features. Characters store only ids (`race`, `background`, `classes[].classId`, `spells[].spellId`) plus denormalized display names so a sheet still renders if a pack is missing.
+Game content is data, not code. A **rulepack** (`app/types/rulepack.ts`) holds races, classes, subclasses, backgrounds, feats, spells, weapons and optional features. Characters store only ids (`race`, `background`, `classes[].classId`, `spells[].spellId`) plus denormalized display names so a sheet still renders if a pack is missing.
 
 `RulepackSchema` (`app/schemas/rulepackSchema.ts`) is actually a **fragment** schema: every content array is optional and defaults to `[]`, and it accepts top-level `subclasses` / `subraces` arrays whose entries carry a `classId` / `raceId`. `useRulepacksStore().add(fragment)` merges a fragment into an existing pack **by matching `id`** (`mergeById`, incoming wins) and distributes those patch entries into the target class/race. This is how the bundled SRD is assembled from the JSON files in `app/data/srd/`, which all share `"id": "srd-5.1"`. There is one fragment per class (`fighter.json`, `wizard.json`, …), each carrying its own subclasses nested inside the class, plus `races.json`, `subraces.json`, `backgrounds.json`, `feats.json`, `spells.json` and `beasts.json`. No SRD fragment uses the top-level `subclasses` patch array any more — `subraces.json` is the only remaining patch fragment.
 
-The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass`, `getAllCreatures`, `getCreature`, `getCreaturesMatching` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
+The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass`, `getAllCreatures`, `getCreature`, `getCreaturesMatching`, `getAllWeapons`, `getWeapon` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
 
 Because ids are the merge key, a custom pack is expected to **prefix its entry ids with a source abbreviation** (`mpmm-satyr`) and reuse a bare SRD id only to override deliberately. So two books' versions of the same race are two entries, not a conflict — the `getAll*` list getters return both, each tagged with a `sourceName` (`WithSource<T>`), and every picker labels them. Don't "fix" that by de-duplicating a list by name; the source label is the disambiguator. Those getters also sort — by name, or level-then-name for spells — so merging a pack in never reshuffles a list. `composedPack()` deliberately stays on the raw arrays: `sourceName` is for display, not for the level-up pipeline.
 
@@ -139,4 +139,19 @@ All external JSON (character import, rulepack import from file or URL) goes thro
 - `classSpellcasting` is keyed by *source*, not strictly by class: entries carry `origin` (`class` | `race` | `background` | `feat`), an optional `label`, and `abilityChosen`, so a race or background grant can use its own ability without another shape change.
 - `Character.hitDice` is one pool **per class** (`HitDicePool[]`), because a fighter/wizard spends d10s and d6s separately. A long rest recovers half the character's total, largest die first.
 - Tailwind uses a custom dark palette (`surface`, `primary`, `accent`, `danger`, `success`) in `tailwind.config.ts` with `darkMode: 'class'`; the app is dark-only in practice. Prefer these tokens over raw hex/slate values in new components.
+- **An attack is derived the way a save is.** `app/services/attacks.ts` computes the roll
+  from `ability` + proficiency + three named bonus slots (`magic`, `feat`, `misc`), with
+  the same three again on damage and its own `damageAbility` — a thrown finesse weapon
+  need not damage with the ability it attacks with. The slots stay apart rather than
+  summed because they leave independently: the +1 with the weapon, the style with a
+  retrain. `AttackEntry.bonus` survives as a total that overrides the lot, and is what a
+  character created before this carries; `migrateCharacterShape` gives those an explicit
+  ability and proficiency reproducing exactly what the old sheet displayed, plus
+  `damageAbility: 'none'`, since a legacy `damageDice` ("1d8+3") already has the modifier
+  written into it. Weapons are rulepack data (`app/data/srd/weapons.json`), so the
+  picker in `AttackEditModal.vue` lists a book's weapons beside the SRD's; `properties`
+  are lowercased by the schema because `finesse` and `thrown` pick the default ability.
+- Tailwind's `capitalize` title-cases *every* word, so it belongs only on values the
+  schema stores lowercase — a damage type, a weapon property. Over a range or free text it
+  produces "150/600 Ft." and re-cases whatever the player typed.
 - The sheet is mobile-first: five tabs with touch-swipe navigation implemented in `app/pages/characters/[id]/index.vue`; tab components in `app/components/sheet/` receive the character and emit `update` patches upward (the page owns saving).

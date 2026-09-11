@@ -31,12 +31,55 @@ export interface SpellSlotState {
 
 export type SpellSlots = Partial<Record<SpellSlotLevel, SpellSlotState>>
 
+/**
+ * Stacking bonuses on one attack, split by where they come from rather than summed.
+ *
+ * A +1 weapon, Archery, and a circumstantial +2 all land on the same roll, but they come
+ * and go independently — the weapon is swapped, the fighting style is retrained, the
+ * circumstance passes. Keeping them apart is what lets one be edited without the player
+ * re-deriving the other two from a single total they can no longer take apart.
+ */
+export interface AttackBonusSet {
+  magic?: number
+  feat?: number
+  misc?: number
+}
+
+/** The ability an attack rolls with, or a flat roll that adds none. */
+export type AttackAbility = AbilityKey | 'none'
+
 export interface AttackEntry {
   id: string
   name: string
-  bonus: number | null          // null = use computed value
-  damageDice: string            // e.g. "1d8+3"
+  /**
+   * A hand-entered total that overrides everything derived below; null derives the roll
+   * from `ability`, `proficient` and `attackBonuses`. Predates those fields and is kept
+   * because a player transcribing a number off a paper sheet should not have to explain
+   * where it came from.
+   */
+  bonus: number | null
+  /** Which modifier the attack rolls with. Absent on attacks stored before this existed. */
+  ability?: AttackAbility
+  /** Whether the proficiency bonus applies. */
+  proficient?: boolean
+  attackBonuses?: AttackBonusSet
+  /**
+   * The modifier added to damage, usually the same as `ability` — but not always: a
+   * thrown finesse weapon rolls with DEX and a Duergar's enlarged damage does not follow
+   * from the roll at all. 'none' covers both the net and a legacy entry whose modifier is
+   * already written into `damageDice`.
+   */
+  damageAbility?: AttackAbility
+  damageBonuses?: AttackBonusSet
+  /** The dice alone, e.g. "1d8" — the modifier is derived and appended for display. */
+  damageDice: string
   damageType: string
+  /** The rulepack weapon this was built from, when it came from the weapon list. */
+  weaponId?: string
+  /** Copied off the weapon at pick time so the sheet still shows them with no pack loaded. */
+  properties?: string[]
+  /** Normal/long range in feet, e.g. "80/320", or a reach weapon's "10 ft.". */
+  range?: string
   notes?: string
 }
 

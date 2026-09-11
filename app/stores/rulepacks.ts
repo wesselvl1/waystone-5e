@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { db } from '~/db'
-import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, Background, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter } from '~/types/rulepack'
+import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, Background, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter, WeaponDefinition } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
 import { mergeById, mergeOptionPools, distributeSubclasses, distributeSubraces } from '~/services/rulepackMerge'
 
@@ -30,6 +30,7 @@ function applyFragment(existing: Rulepack, fragment: RulepackFragment): Rulepack
     feats: mergeById(existing.feats, fragment.feats ?? []),
     spells: mergeById(existing.spells, fragment.spells ?? []),
     creatures: mergeById(existing.creatures ?? [], fragment.creatures ?? []),
+    weapons: mergeById(existing.weapons ?? [], fragment.weapons ?? []),
     optionalFeatures: mergeById(existing.optionalFeatures, fragment.optionalFeatures ?? []),
     subclasses: mergeById(existing.subclasses ?? [], pendingSubclasses),
     subraces: mergeById(existing.subraces ?? [], pendingSubraces),
@@ -57,6 +58,7 @@ function fragmentToRulepack(fragment: RulepackFragment): Rulepack {
     feats: fragment.feats ?? [],
     spells: fragment.spells ?? [],
     creatures: fragment.creatures ?? [],
+    weapons: fragment.weapons ?? [],
     optionalFeatures: fragment.optionalFeatures ?? [],
     subclasses: pendingSubclasses,
     subraces: pendingSubraces,
@@ -244,6 +246,22 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
   }
 
 
+  /**
+   * Every weapon across all loaded packs, for the sheet's attack picker. Tagged with its
+   * source like the other pick-lists, since two books' takes on the same weapon are two
+   * entries and the label is what tells them apart.
+   */
+  function getAllWeapons(): Array<WithSource<WeaponDefinition>> {
+    return withSource(p => p.weapons ?? []).sort(byName)
+  }
+
+  function getWeapon(weaponId: string): WeaponDefinition | undefined {
+    for (const pack of rulepacks.value) {
+      const weapon = (pack.weapons ?? []).find(w => w.id === weaponId)
+      if (weapon) return weapon
+    }
+  }
+
   function getAllBackgrounds(): Array<WithSource<Background>> {
     return withSource(p => p.backgrounds).sort(byName)
   }
@@ -287,6 +305,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
       feats: rulepacks.value.flatMap(p => p.feats),
       spells: rulepacks.value.flatMap(p => p.spells),
       creatures: getAllCreatures(),
+      weapons: rulepacks.value.flatMap(p => p.weapons ?? []),
       optionalFeatures: rulepacks.value.flatMap(p => p.optionalFeatures),
       // Not distributed into anything: a pool patch is resolved where the pool is
       // offered, so it only has to reach the composed pack to widen an SRD class's list.
@@ -332,6 +351,8 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     getAllCreatures,
     getCreature,
     getCreaturesMatching,
+    getAllWeapons,
+    getWeapon,
     getAllBackgrounds,
     getSubclassesForClass,
     getSubclass,
