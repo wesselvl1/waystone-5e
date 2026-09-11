@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Character } from '~/types/character'
 import { useRulepacksStore } from '~/stores/rulepacks'
+import { xpProgress } from '~/utils/experience'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -35,6 +36,53 @@ function saveName() {
 function cancelEdit() {
   draftName.value = props.character.name
   editingName.value = false
+}
+
+const xp = computed(() => xpProgress(props.character.experiencePoints, totalLevel.value))
+
+const editingXp = ref(false)
+// `v-model` on a number input hands back a number, or '' while the field is empty.
+const xpDraft = ref<number | string>('')
+const xpInput = ref<HTMLInputElement | null>(null)
+
+function openXpEditor() {
+  editingXp.value = true
+  xpDraft.value = ''
+  nextTick(() => xpInput.value?.focus())
+}
+
+function closeXpEditor() {
+  editingXp.value = false
+  xpDraft.value = ''
+}
+
+/** The typed amount, or undefined when the field is empty or not a number. */
+const xpAmount = computed(() => {
+  const raw = String(xpDraft.value).trim()
+  if (!raw) return undefined
+  const n = Number(raw)
+  return Number.isFinite(n) ? Math.trunc(n) : undefined
+})
+
+/** Award (or, with a negative amount, take back) XP. Total XP never goes below zero. */
+function addXp() {
+  const amount = xpAmount.value
+  if (amount === undefined) { closeXpEditor(); return }
+  emit('update', { experiencePoints: Math.max(0, props.character.experiencePoints + amount) })
+  closeXpEditor()
+}
+
+/** Overwrite the total, for a sheet copied in from elsewhere. */
+function setXp() {
+  const amount = xpAmount.value
+  if (amount === undefined) { closeXpEditor(); return }
+  emit('update', { experiencePoints: Math.max(0, amount) })
+  closeXpEditor()
+}
+
+const numberFormat = new Intl.NumberFormat()
+function fmt(n: number) {
+  return numberFormat.format(n)
 }
 </script>
 
@@ -84,12 +132,48 @@ function cancelEdit() {
 
     <!-- XP bar -->
     <div class="pt-1">
-      <div class="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-        <span>XP</span>
-        <span>{{ character.experiencePoints }}</span>
-      </div>
+      <button
+        type="button"
+        class="w-full flex items-center justify-between gap-2 text-[11px] text-slate-500 mb-1 hover:text-slate-300 transition-colors"
+        :title="editingXp ? 'Close the XP editor' : 'Add or set experience points'"
+        @click="editingXp ? closeXpEditor() : openXpEditor()"
+      >
+        <span class="flex items-center gap-1.5">
+          <span>XP</span>
+          <span v-if="xp.canLevelUp" class="text-success-400 font-medium">Level up ready</span>
+        </span>
+        <span class="tabular-nums">
+          {{ fmt(character.experiencePoints) }}
+          <template v-if="xp.nextLevelAt !== undefined">
+            <span class="text-slate-600">/ {{ fmt(xp.nextLevelAt) }}</span>
+          </template>
+        </span>
+      </button>
       <div class="h-1 bg-surface-700 rounded-full overflow-hidden">
-        <div class="h-full bg-primary-600 rounded-full transition-all" style="width: 30%" />
+        <div
+          class="h-full rounded-full transition-all"
+          :class="xp.canLevelUp ? 'bg-success-500' : 'bg-primary-600'"
+          :style="{ width: `${xp.fraction * 100}%` }"
+        />
+      </div>
+
+      <div v-if="editingXp" class="mt-2 flex items-center gap-1.5">
+        <input
+          ref="xpInput"
+          v-model="xpDraft"
+          type="number"
+          inputmode="numeric"
+          class="input flex-1 py-1.5 tabular-nums"
+          placeholder="Amount"
+          @keydown.enter="addXp"
+          @keydown.esc="closeXpEditor"
+        />
+        <button type="button" class="btn-primary px-3 py-1.5" :disabled="xpAmount === undefined" @click="addXp">
+          Add
+        </button>
+        <button type="button" class="btn-ghost px-3 py-1.5" :disabled="xpAmount === undefined" title="Replace the total instead of adding to it" @click="setXp">
+          Set
+        </button>
       </div>
     </div>
   </div>
