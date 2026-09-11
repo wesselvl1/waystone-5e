@@ -4,7 +4,8 @@ import {
   type AbilityPicks,
 } from '~/services/abilityScoreChoice'
 import { raceAbilityBonuses } from '~/services/multiclass'
-import type { AbilityKey, Character, HitDicePool, SpellSlots } from '~/types/character'
+import { abilityMod } from '~/composables/useCharacterStats'
+import type { AbilityKey, AttackEntry, Character, HitDicePool, SpellSlots } from '~/types/character'
 import type { AbilityScoreChoice, Race, Subrace } from '~/types/rulepack'
 
 /**
@@ -33,8 +34,53 @@ export function migrateCharacterShape<T extends object>(raw: T): T {
     src.spellcastingAbility,
   )
   out.features = dedupeFeatures(src.features)
+  out.attacks = migrateAttacks(src.attacks, src)
 
   return out as T
+}
+
+/**
+ * Give an attack stored before it had one an explicit ability and proficiency.
+ *
+ * The old shape held a single `bonus`, and null there meant "work it out": the sheet
+ * showed the spell attack bonus if the character had one, otherwise the better of
+ * Strength and Dexterity plus proficiency. That guess is spelled out here so the number
+ * on screen does not move, and so the player can now see — and change — what produced it.
+ *
+ * Damage is left alone deliberately. A legacy `damageDice` is free text with the modifier
+ * already written into it ("1d8+3"), so `damageAbility: 'none'` keeps it from being added
+ * a second time; editing the attack is where a player splits the two apart.
+ */
+function migrateAttacks(value: unknown, src: Record<string, unknown>): unknown {
+  if (!Array.isArray(value)) return value
+  return value.map((entry) => {
+    if (typeof entry !== 'object' || entry === null) return entry
+    const attack = entry as Partial<AttackEntry>
+    if (attack.ability !== undefined || attack.damageAbility !== undefined) return attack
+
+    // An explicit total already overrode everything the old sheet derived.
+    if (attack.bonus !== null && attack.bonus !== undefined) {
+      return { ...attack, ability: 'none', proficient: false, damageAbility: 'none' }
+    }
+
+    const mods = storedAbilityModifiers(src)
+    const spellcasting = src.spellcastingAbility
+    const ability = typeof spellcasting === 'string' && spellcasting in mods
+      ? spellcasting as AbilityKey
+      : mods.dex > mods.str ? 'dex' : 'str'
+
+    return { ...attack, ability, proficient: true, damageAbility: 'none' }
+  })
+}
+
+/** Ability modifiers off a raw stored character, overrides applied as the sheet does. */
+function storedAbilityModifiers(src: Record<string, unknown>): Record<AbilityKey, number> {
+  const scores = (src.abilityScores ?? {}) as Partial<Record<AbilityKey, number>>
+  const overrides = (src.abilityScoreOverrides ?? {}) as Partial<Record<AbilityKey, number>>
+  const keys: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha']
+  const out = {} as Record<AbilityKey, number>
+  for (const key of keys) out[key] = abilityMod(overrides[key] ?? scores[key] ?? 10)
+  return out
 }
 
 /**
