@@ -1,4 +1,5 @@
 import type { Character, AbilityKey, AbilityScores, SkillKey } from '~/types/character'
+import { characterArmorClass } from '~/services/armorClass'
 
 const SKILL_ABILITY: Record<SkillKey, AbilityKey> = {
   acrobatics: 'dex',
@@ -98,9 +99,8 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
 
   const armorClass = computed(() => {
     const c = characterRef.value
-    return c?.armorClass !== null && c?.armorClass !== undefined
-      ? c.armorClass
-      : 10 + abilityModifiers.value.dex
+    if (!c) return 10 + abilityModifiers.value.dex
+    return characterArmorClass(c, { modifiers: abilityModifiers.value })
   })
 
   const spellSaveDC = computed(() => {

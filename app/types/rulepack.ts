@@ -717,6 +717,53 @@ export interface WeaponDefinition {
   weight?: number
 }
 
+export type ArmorCategory = 'unarmored' | 'light' | 'medium' | 'heavy' | 'shield'
+
+/**
+ * A row of the equipment table's armour list — and, in the `unarmored` category, the
+ * class and racial features that set an AC in place of armour.
+ *
+ * Unarmored Defense, Draconic Resilience and a lizardfolk's natural armour are all
+ * "base number, plus Dexterity, sometimes plus a second ability", which is the same
+ * arithmetic a breastplate does. Keeping them in one list is what lets the sheet offer a
+ * single armour dropdown, and lets a sourcebook add a tortle's shell without code: the
+ * alternative was a hard-coded union that every new book would have to be taught.
+ *
+ * `maxDexBonus` carries the whole light/medium/heavy distinction — undefined for light,
+ * 2 for medium, 0 for heavy — so armour that breaks the pattern needs no code change.
+ */
+export interface ArmorDefinition {
+  id: string
+  name: string
+  category: ArmorCategory
+  /** The number before any ability modifier: 14 for a breastplate, 2 for a shield. */
+  baseAC: number
+  /** Maximum Dexterity added. Undefined means uncapped; 0 means none at all. */
+  maxDexBonus?: number
+  /**
+   * A second modifier added on top of Dexterity — the Constitution of a barbarian's
+   * Unarmored Defense, the Wisdom of a monk's. Only the unarmored category uses it.
+   */
+  extraAbility?: AbilityKey
+  /**
+   * False where the feature's own wording rules a shield out: a monk's Unarmored Defense
+   * applies only while wielding none, where a barbarian's says a shield is fine. Absent
+   * means allowed, so only the exceptions carry it.
+   */
+  shieldAllowed?: boolean
+  /** The class whose feature grants this, so the picker can mark what suits the build. */
+  classId?: string
+  /** Shown under the entry in the picker — what the feature actually says. */
+  description?: string
+  /** Minimum Strength; below it the wearer's speed drops by 10 feet. */
+  strengthRequirement?: number
+  /** Imposes disadvantage on Stealth checks. */
+  stealthDisadvantage?: boolean
+  cost?: string
+  /** In pounds. */
+  weight?: number
+}
+
 export interface Rulepack {
   id: string
   name: string
@@ -730,6 +777,7 @@ export interface Rulepack {
   spells: SpellDefinition[]
   creatures: CreatureDefinition[]
   weapons: WeaponDefinition[]
+  armor: ArmorDefinition[]
   optionalFeatures: OptionalClassFeature[]
   /**
    * Patch entries whose target class/race lives in ANOTHER loaded pack, so they could not
