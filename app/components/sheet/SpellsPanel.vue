@@ -282,8 +282,27 @@ const searchQuery = ref('')
  */
 const showOffListSpells = ref(false)
 
-// Default the add-class selector to the active tab class (if applicable)
-watch(activeTab, (tab) => { addClassId.value = tab === 'all' ? '' : tab })
+/**
+ * The list a single-list caster adds to, so the selector can default to it. A string
+ * rather than the source itself: the sources recompute on every character update, and a
+ * watcher on the object would reset a player's own pick each time they add a spell.
+ */
+const soleSourceId = computed(() =>
+  (spellcastingSources.value.length === 1 ? spellcastingSources.value[0]!.id : ''))
+
+/**
+ * Default the add-class selector to the list being viewed — the active tab, or the only
+ * list there is. A cleric's spells are nearly all cleric spells, so defaulting to "No
+ * list" made the common add a two-step one; "No list" stays in the dropdown for the
+ * spell that belongs to none.
+ *
+ * Immediate, because the sole list is only known once the rulepacks have loaded.
+ */
+watch(
+  [activeTab, soleSourceId],
+  ([tab, sole]) => { addClassId.value = tab === 'all' ? sole : tab },
+  { immediate: true },
+)
 
 const allSpells = computed(() => rulepackStore.getAllSpells())
 
