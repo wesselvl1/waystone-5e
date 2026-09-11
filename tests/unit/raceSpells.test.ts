@@ -427,13 +427,23 @@ describe('a variant feature the player chooses', () => {
 describe('races that stand on their own', () => {
   it('marks the ones a subrace is optional for', () => {
     const optional = rulepack.races.filter(r => r.subraceOptional).map(r => r.id).sort()
-    expect(optional).toEqual(['dragonborn', 'half-elf', 'half-orc', 'human', 'tiefling'])
+    expect(optional).toEqual(['dragonborn', 'half-orc', 'human', 'tiefling'])
   })
 
   it('leaves the ones whose subrace the SRD requires unmarked', () => {
     for (const id of ['dwarf', 'elf', 'gnome', 'halfling']) {
       expect(rulepack.races.find(r => r.id === id)!.subraceOptional, id).toBeUndefined()
     }
+  })
+
+  /**
+   * Not optional, unlike the other four: every half-elf has an elf parent, and Half-Elf
+   * Versatility is chosen from that parentage's list — with Skill Versatility, the
+   * General option, on every one of those lists. A "None" would have meant a half-elf
+   * with no parentage at all, which is not a thing the rules describe.
+   */
+  it('requires a half-elf to name its heritage once a pack supplies them', () => {
+    expect(rulepack.races.find(r => r.id === 'half-elf')!.subraceOptional).toBeUndefined()
   })
 })
 
