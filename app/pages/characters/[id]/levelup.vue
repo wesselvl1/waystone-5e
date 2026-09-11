@@ -213,6 +213,15 @@ function confirmASI() {
 // Choose spell
 const spellSelections = ref<string[]>([])
 
+/**
+ * The spell being read, by rulepack id. A pick-list row commits on tap, so a spell is
+ * read by holding its row — or by the info control beside it, for a mouse or a keyboard.
+ */
+const previewSpellId = ref<string | null>(null)
+
+const { pressing: heldSpellId, bind: bindSpellHold, cancel: cancelSpellHold }
+  = useLongPress<string>(id => previewSpellId.value = id)
+
 function toggleSpell(spellId: string) {
   const choiceEvent = currentChoice.value as ChooseSpellEvent | null
   const maxChoices = choiceEvent?.count ?? 1
@@ -772,6 +781,7 @@ watch(currentChoiceIdx, () => {
   replacementSearch.value = ''
   optionalFeatureSearch.value = ''
   spellLevelOverrides.value = new Map()
+  cancelSpellHold()
 })
 
 function confirmSubclass() {
@@ -1055,7 +1065,8 @@ watch(isFirstCharacterLevel, (val) => {
         <!-- Choose Spell -->
         <template v-else-if="currentChoice.type === 'CHOOSE_SPELL'">
           <h2 class="font-semibold text-white text-lg">Choose {{ currentChoice.count }} {{ currentChoice.cantrip ? 'Cantrip' : 'Spell' }}{{ currentChoice.count > 1 ? 's' : '' }}</h2>
-          <p class="text-sm text-slate-400 mb-2">{{ spellSelections.length }}/{{ currentChoice.count }} selected</p>
+          <p class="text-sm text-slate-400">{{ spellSelections.length }}/{{ currentChoice.count }} selected</p>
+          <p class="text-xs text-slate-500 mb-2">Hold a spell to read it before you pick.</p>
           <SearchBox
             v-if="availableSpells.length > 6"
             v-model="spellSearch"
@@ -1085,16 +1096,38 @@ watch(isFirstCharacterLevel, (val) => {
                 >{{ selectedInSpellLevel(group.level) }} selected</span>
               </button>
               <div v-if="spellLevelOpen(group.level)" class="space-y-1.5 mt-1">
-                <button
+                <!-- The row picks on tap, so reading the spell is a hold; the info
+                     control is the same thing for a mouse or a keyboard. -->
+                <div
                   v-for="spell in group.spells"
                   :key="spell.id"
-                  class="card w-full text-left text-sm py-2 hover:border-primary-500/50 transition-colors"
-                  :class="spellSelections.includes(spell.id) ? 'border-primary-500 bg-primary-900/20' : ''"
-                  @click="toggleSpell(spell.id)"
+                  class="card flex items-center gap-1 p-0 select-none transition-colors hover:border-primary-500/50"
+                  :class="[
+                    spellSelections.includes(spell.id) ? 'border-primary-500 bg-primary-900/20' : '',
+                    heldSpellId === spell.id ? 'border-primary-400 bg-primary-900/10' : '',
+                  ]"
+                  v-bind="bindSpellHold(spell.id)"
                 >
-                  <span class="font-medium text-white">{{ spell.name }}</span>
-                  <span class="text-slate-500 ml-2 text-xs">{{ spell.school }} · {{ spell.castingTime }} · {{ spell.sourceName }}</span>
-                </button>
+                  <button
+                    class="flex-1 min-w-0 text-left text-sm py-2 pl-3"
+                    @click="toggleSpell(spell.id)"
+                  >
+                    <span class="font-medium text-white">{{ spell.name }}</span>
+                    <span class="text-slate-500 ml-2 text-xs">{{ spell.school }} · {{ spell.castingTime }} · {{ spell.sourceName }}</span>
+                  </button>
+                  <button
+                    class="px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors"
+                    :title="`Read ${spell.name}`"
+                    :aria-label="`Read ${spell.name}`"
+                    @click.stop="previewSpellId = spell.id"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="9" />
+                      <path stroke-linecap="round" d="M12 11v5" />
+                      <path stroke-linecap="round" d="M12 8h.01" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
             <p v-if="filteredSpells.length === 0" class="text-slate-500 text-sm text-center py-4">Nothing matches “{{ spellSearch }}”.</p>
@@ -1560,5 +1593,7 @@ watch(isFirstCharacterLevel, (val) => {
         </button>
       </template>
     </div>
+
+    <SheetSpellDetailModal :spell-id="previewSpellId" @close="previewSpellId = null" />
   </div>
 </template>

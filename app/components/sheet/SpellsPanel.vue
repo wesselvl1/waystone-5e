@@ -37,6 +37,13 @@ function showDetails(spellId: string) {
 }
 
 /**
+ * A row of the add list commits on tap, so holding it reads the spell instead — the
+ * same gesture the level-up picker uses, where there is no room for a details control
+ * beside every row.
+ */
+const { pressing: heldSpellId, bind: bindSpellHold } = useLongPress<string>(showDetails)
+
+/**
  * Every loaded pack as one, because a class may come from any of them. Declared before
  * the spellcasting sources that read it: `watch(showTabs)` evaluates that chain during
  * setup, so a `const` further down the file would still be in its temporal dead zone.
@@ -628,11 +635,14 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
           <input v-model="showOffListSpells" type="checkbox" class="w-4 h-4 rounded accent-primary-500" />
           Show spells outside this list
         </label>
+        <p class="text-[10px] text-slate-500">Tap to add · hold to read the spell first.</p>
         <div class="max-h-40 overflow-y-auto space-y-0.5">
           <div
             v-for="spell in filteredSpells.slice(0, 50)"
             :key="spell.id"
-            class="flex items-center rounded hover:bg-surface-700 transition-colors"
+            class="flex items-center rounded select-none transition-colors hover:bg-surface-700"
+            :class="heldSpellId === spell.id ? 'bg-surface-700' : ''"
+            v-bind="bindSpellHold(spell.id)"
           >
             <button
               class="flex-1 text-left px-2 py-1.5 text-sm text-slate-300"
