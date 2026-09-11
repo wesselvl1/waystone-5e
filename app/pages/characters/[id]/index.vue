@@ -23,6 +23,7 @@ onMounted(async () => {
   character.value = repairFeatures(character.value)
   character.value = await backfillRacialIncreases(character.value)
   character.value = await backfillPoolPicks(character.value)
+  character.value = await backfillSubraceSpeeds(character.value)
   loading.value = false
 })
 
@@ -35,6 +36,26 @@ onMounted(async () => {
 async function backfillPoolPicks(char: Character): Promise<Character> {
   const filled = backfillPoolPickFeatures(char, rulepackStore.composedPack())
   if (filled === char) return char
+  await characterStore.save(filled)
+  return filled
+}
+
+/**
+ * Gives a character the movement its subrace grants beyond walking.
+ *
+ * `speedOverrides` went unread until recently, so a Winged Tiefling was stored with a
+ * walking speed and nothing else. Walking is deliberately left alone: it is editable on
+ * the sheet, and overwriting it here would undo a deliberate change.
+ */
+async function backfillSubraceSpeeds(char: Character): Promise<Character> {
+  const race = rulepackStore.getRace(char.race)
+  const overrides = race?.subraces?.find(s => s.id === char.subrace)?.speedOverrides
+  if (!overrides) return char
+  const missing = Object.entries(overrides)
+    .filter(([key, value]) => key !== 'walk' && typeof value === 'number'
+      && char.speeds[key as keyof Character['speeds']] === undefined)
+  if (missing.length === 0) return char
+  const filled = { ...char, speeds: { ...char.speeds, ...Object.fromEntries(missing) } }
   await characterStore.save(filled)
   return filled
 }

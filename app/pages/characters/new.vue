@@ -2,7 +2,7 @@
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { resolveLevelUpEvents, getChoiceEvents } from '~/services/levelUpService'
-import { raceAbilityBonuses } from '~/services/multiclass'
+import { raceAbilityBonuses, raceSpeeds } from '~/services/multiclass'
 import {
   choiceSummary,
   isChoiceSatisfied,
@@ -76,6 +76,28 @@ const selectedSubrace = computed(() => selectedRace.value?.subraces?.find(s => s
 const selectedClass = computed(() => rulepackStore.getClass(draft.classId))
 const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id === draft.backgroundId))
 
+/**
+ * The race's traits minus any the chosen subrace supersedes: a SCAG tiefling bloodline
+ * prints "This trait replaces the Infernal Legacy trait", and a half-elf descent trades
+ * Skill Versatility for a heritage feature. Showing both would claim the character has
+ * each, and the replaced trait's level-up events are skipped for the same reason.
+ */
+/**
+ * The race's speeds with the subrace's overrides on top — a Winged Tiefling flies, an
+ * Aquatic Elf Descent half-elf swims. Declared on Subrace all along and read nowhere, so
+ * every one of those characters was stored walking and nothing else.
+ */
+const speeds = computed(() => raceSpeeds(selectedRace.value, selectedSubrace.value))
+
+/** Whether step 1 may not continue until a subrace is picked. */
+const subraceRequired = computed(() =>
+  (selectedRace.value?.subraces?.length ?? 0) > 0 && selectedRace.value?.subraceOptional !== true)
+
+const raceTraits = computed(() => {
+  const replaced = selectedSubrace.value?.replacesRaceTraits ?? []
+  return (selectedRace.value?.traits ?? []).filter(t => !replaced.includes(t.name))
+})
+
 // ── Effective abilities (base + race ASI + subrace ASI) ────────────────────────
 // Through raceAbilityBonuses so a subrace that restates the whole ability line replaces
 // the race's rather than stacking on it — a Draconblood dragonborn is INT +2 / CHA +1,
@@ -141,8 +163,11 @@ function toggleSkill(skill: SkillKey) {
 function canProceed() {
   if (step.value === 0) {
     if (!draft.raceId) return false
-    // Require subrace selection if the chosen race has subraces
-    if ((selectedRace.value?.subraces?.length ?? 0) > 0 && !draft.subraceId) return false
+    // Require a subrace where the race is incomplete without one — a dwarf, an elf. A
+    // race the SRD prints whole says so, and its subraces are sourcebook variants a
+    // player may decline; blocking there made a plain half-elf unbuildable as soon as
+    // one of those books was loaded.
+    if (subraceRequired.value && !draft.subraceId) return false
     return true
   }
   if (step.value === 1) return !!draft.classId
@@ -225,7 +250,7 @@ async function createCharacter() {
           temp: 0,
         },
     armorClass: null,
-    speeds: selectedRace.value?.speeds ?? { walk: 30 },
+    speeds: speeds.value,
     initiative: null,
     hitDice: startingLevel > 0
       ? [{ classId: draft.classId, die: cls?.hitDie ?? 'd8', total: startingLevel, remaining: startingLevel }]
@@ -248,13 +273,13 @@ async function createCharacter() {
     attacks: [],
 
     features: [
-      ...(selectedRace.value?.traits.map(t => ({
+      ...raceTraits.value.map(t => ({
         id: `race-${t.name.toLowerCase().replaceAll(' ', '-')}`,
 
         name: t.name,
         source: selectedRace.value?.name ?? 'Race',
         description: t.description,
-      })) ?? []),
+      })),
       ...(selectedSubrace.value?.traits.map(t => ({
         id: `subrace-${t.name.toLowerCase().replaceAll(' ', '-')}`,
 
@@ -312,6 +337,14 @@ async function createCharacter() {
 function abilityMod(score: number) {
   const m = Math.floor((score - 10) / 2)
   return m >= 0 ? `+${m}` : `${m}`
+}
+
+/** "Walk 30ft, Fly 30ft" — only the speeds an entry actually names. */
+function speedSummary(speeds: Partial<Record<string, number>>) {
+  return Object.entries(speeds)
+    .filter(([, v]) => typeof v === 'number')
+    .map(([k, v]) => `${k[0]!.toUpperCase()}${k.slice(1)} ${v}ft`)
+    .join(', ')
 }
 
 /** Wildemount's goblin lowers Strength, so a bonus is not always an increase. */
@@ -393,8 +426,19 @@ function signed(n: number | undefined) {
 
         <!-- Subrace picker -->
         <template v-if="selectedRace?.subraces?.length">
-          <p class="section-header mt-2">Choose a {{ selectedRace.name }} subrace</p>
+          <p class="section-header mt-2">
+            Choose a {{ selectedRace.name }} subrace<span v-if="!subraceRequired"> (optional)</span>
+          </p>
           <div class="grid grid-cols-2 gap-3">
+            <button
+              v-if="!subraceRequired"
+              class="card text-left transition-colors hover:border-primary-500/50"
+              :class="draft.subraceId === '' ? 'border-primary-500 bg-primary-900/20' : ''"
+              @click="draft.subraceId = ''"
+            >
+              <p class="font-semibold text-white text-sm">None</p>
+              <p class="text-xs text-slate-500 mt-0.5">The {{ selectedRace.name }} as printed, with no variant</p>
+            </button>
             <button
               v-for="sub in selectedRace.subraces"
               :key="sub.id"
@@ -403,6 +447,7 @@ function signed(n: number | undefined) {
               @click="draft.subraceId = sub.id"
             >
               <p class="font-semibold text-white text-sm">{{ sub.name }}</p>
+              <p v-if="sub.speedOverrides" class="text-[10px] text-slate-500 mt-0.5">{{ speedSummary(sub.speedOverrides) }}</p>
               <div class="flex flex-wrap gap-1 mt-1">
                 <span
                   v-for="[k, v] in Object.entries(sub.abilityScoreBonuses)"
@@ -425,7 +470,7 @@ function signed(n: number | undefined) {
         <!-- Trait preview -->
         <div v-if="selectedRace" class="card space-y-2">
           <p class="section-header">Racial Traits</p>
-          <div v-for="trait in selectedRace.traits" :key="trait.name" class="space-y-0.5">
+          <div v-for="trait in raceTraits" :key="trait.name" class="space-y-0.5">
             <p class="text-sm font-medium text-white">{{ trait.name }}</p>
             <p class="text-xs text-slate-400">{{ trait.description }}</p>
           </div>

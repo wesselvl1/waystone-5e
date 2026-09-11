@@ -32,6 +32,11 @@ export interface RaceSpeeds {
 export interface SourceLevelEvents {
   level: number
   levelUpEvents: LevelUpEventDef[]
+  /**
+   * The trait these events belong to, e.g. "Infernal Legacy". Only needed on a race whose
+   * subraces may replace that trait — the events are skipped along with it.
+   */
+  trait?: string
 }
 
 /**
@@ -65,6 +70,15 @@ export interface Race {
   abilityScoreChoice?: AbilityScoreChoice
   /** Events fired at a given total character level (tiefling spells, dragonborn ancestry). */
   levelUpEvents?: SourceLevelEvents[]
+  /**
+   * The race is playable without picking a subrace, so the wizard offers "None".
+   *
+   * Set on the races the SRD prints whole — a half-elf, a human, a tiefling. Their
+   * subraces only exist because a sourcebook adds variants, and forcing one of those on
+   * a player who wants the plain race is wrong. A dwarf or an elf, whose subrace the SRD
+   * requires, leaves this unset.
+   */
+  subraceOptional?: true
   subraces?: Subrace[]
 }
 
@@ -88,6 +102,13 @@ export interface Subrace {
    * half-elf gets the mark's pick instead of the half-elf's, not both.
    */
   replacesRaceAbilityBonuses?: true
+  /**
+   * Race traits this subrace replaces, by name — "This trait replaces the Infernal Legacy
+   * trait", or the half-elf descents trading Skill Versatility for a heritage feature.
+   * The named trait is dropped from the sheet and the race's level-up events tagged with
+   * that `trait` never fire, so the subrace's own version is the only one that applies.
+   */
+  replacesRaceTraits?: string[]
   /** Speed values this subrace grants or overrides (e.g. fly: 30 for Winged Tiefling). */
   speedOverrides?: Partial<RaceSpeeds>
   /** Events fired at a given total character level (high elf's cantrip). */
@@ -283,6 +304,21 @@ export type LevelUpEventDef =
     }
   | { type: 'SET_WILD_SHAPE_LIMITS'; maxCR: number; allowSwim?: boolean; allowFly?: boolean; types?: CreatureType[] }
   | { type: 'CHOOSE_EXPERTISE'; label: string; options: SkillKey[]; count: number }
+  /**
+   * Skill proficiencies the player picks — the half-elf's Skill Versatility, a feat's
+   * "three skills of your choice". `from` narrows the list; omitted, every skill is on
+   * offer. Ones the character already has are shown but not pickable.
+   */
+  | {
+    type: 'CHOOSE_SKILL'
+    count: number
+    from?: SkillKey[]
+    /**
+     * Ask only when a `CHOOSE_OPTION` was answered this way — the Skill Versatility arm
+     * of a half-elf descent's variant feature. Gated the same way a `GRANT_SPELLS` is.
+     */
+    whenOption?: { choiceId: string; optionId: string }
+  }
   | { type: 'CHOOSE_FEAT' }
   | { type: 'ABILITY_SCORE_IMPROVEMENT'; points: number }
   | { type: 'CHOOSE_SUBCLASS'; label: string }

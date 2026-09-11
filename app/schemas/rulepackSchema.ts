@@ -196,6 +196,17 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     count: z.number().int().min(1),
   }),
   z.object({
+    type: z.literal('CHOOSE_SKILL'),
+    count: z.number().int().min(1),
+    // Omitted means every skill, which is what "two skills of your choice" prints.
+    from: z.array(SkillKeySchema).min(1).optional(),
+    // Asked only when an option was picked, e.g. the Skill Versatility arm of a variant.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+  }),
+  z.object({
     type: z.literal('GRANT_SPELLS'),
     addTo: z.string(),
     spellIds: z.array(z.string()).min(1),
@@ -267,6 +278,9 @@ const MulticlassingRulesSchema = z.object({
 const SourceLevelEventsSchema = z.object({
   level: z.number().int().min(1).max(20),
   levelUpEvents: z.array(LevelUpEventDefSchema),
+  // Names the trait these events come from, so a subrace replacing that trait replaces
+  // its events too.
+  trait: z.string().optional(),
 })
 const SubraceSchema = z.object({
   id: z.string(),
@@ -277,6 +291,9 @@ const SubraceSchema = z.object({
   abilityScoreChoice: AbilityScoreChoiceSchema.optional(),
   // Set when the subrace restates the whole ability line instead of adding to the race's.
   replacesRaceAbilityBonuses: z.literal(true).optional(),
+  // Race traits this subrace supersedes, by name — the SCAG tiefling bloodlines replace
+  // Infernal Legacy, the half-elf descents replace Skill Versatility.
+  replacesRaceTraits: z.array(z.string()).optional(),
   traits: z.array(RaceTraitSchema),
   speedOverrides: RaceSpeedsSchema.partial().optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
@@ -292,6 +309,8 @@ const RaceSchema = z.object({
   languages: z.array(z.string()),
   abilityScoreChoice: AbilityScoreChoiceSchema.optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
+  // The race stands on its own; any subraces are sourcebook variants, so "None" is offered.
+  subraceOptional: z.literal(true).optional(),
   subraces: z.array(SubraceSchema).optional(),
 })
 

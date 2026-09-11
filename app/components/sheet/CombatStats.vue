@@ -47,6 +47,13 @@ function commitSpeedEdit() {
   editingSpeed.value = false
 }
 
+/** Fly, swim and climb, in the order a sheet prints them; walking has its own box. */
+const otherSpeeds = computed(() => ([
+  { label: 'Fly', value: props.character.speeds.fly },
+  { label: 'Swim', value: props.character.speeds.swim },
+  { label: 'Climb', value: props.character.speeds.climb },
+].filter((s): s is { label: string; value: number } => typeof s.value === 'number' && s.value > 0)))
+
 const hpPercent = computed(() => {
   const max = props.character.hp.max
   return max > 0 ? Math.max(0, Math.min(100, (props.character.hp.current / max) * 100)) : 0
@@ -227,6 +234,16 @@ function applyHpChange() {
         <span class="stat-label">Passive</span>
         <span class="stat-value">{{ stats.passivePerception.value }}</span>
       </div>
+    </div>
+
+    <!-- Only the speeds beyond walking, which the grid above already shows. A winged
+         tiefling's fly speed was stored and never rendered anywhere. -->
+    <div v-if="otherSpeeds.length" class="flex flex-wrap gap-2">
+      <span
+        v-for="speed in otherSpeeds"
+        :key="speed.label"
+        class="text-xs text-slate-400 bg-surface-800/60 border border-surface-700/60 rounded px-2 py-1"
+      >{{ speed.label }} <span class="text-white">{{ speed.value }}</span> ft</span>
     </div>
 
     <!-- Hit Dice: one pool per class, since a fighter/wizard spends d10s and d6s apart -->

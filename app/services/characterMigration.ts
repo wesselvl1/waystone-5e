@@ -32,8 +32,33 @@ export function migrateCharacterShape<T extends object>(raw: T): T {
     src.classes,
     src.spellcastingAbility,
   )
+  out.features = dedupeFeatures(src.features)
 
   return out as T
+}
+
+/**
+ * Drop a feature the sheet would print twice.
+ *
+ * Feature ids are derived from the name within a source, so two entries sharing both id
+ * and name are the same feature listed twice — the SRD half-elf shipped Skill Versatility
+ * as two traits, and every character built while it did carries both. Matching on name as
+ * well as id keeps this from swallowing a genuinely repeated feature should some path ever
+ * mint a colliding id for different content. The first copy wins, since that is the one
+ * whose uses the player has been tracking.
+ */
+function dedupeFeatures(value: unknown): unknown {
+  if (!Array.isArray(value)) return value
+  const seen = new Set<string>()
+  return value.filter((f) => {
+    if (typeof f !== 'object' || f === null) return true
+    const { id, name } = f as { id?: unknown; name?: unknown }
+    if (typeof id !== 'string' || typeof name !== 'string') return true
+    const key = `${id} :: ${name}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 /**
