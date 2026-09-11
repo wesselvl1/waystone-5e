@@ -16,6 +16,9 @@ const draftHP = ref(0)
 const acModalOpen = ref(false)
 const editingSpeed = ref(false)
 const draftSpeed = ref(30)
+/** Initiative is derived like AC now, so it gets the same modal: its working, and the
+    three bonus slots for what no rulepack models. */
+const initiativeModalOpen = ref(false)
 
 function startHPEdit(field: 'current' | 'max' | 'temp') {
   editingHP.value = field
@@ -30,6 +33,11 @@ function commitHPEdit(field: 'current' | 'max' | 'temp') {
 function saveArmorClass(patch: Pick<Character, 'armorClass' | 'armorClassConfig'>) {
   emit('update', patch)
   acModalOpen.value = false
+}
+
+function saveInitiative(patch: Pick<Character, 'initiative' | 'initiativeBonuses'>) {
+  emit('update', patch)
+  initiativeModalOpen.value = false
 }
 
 function startSpeedEdit() {
@@ -211,7 +219,7 @@ function applyHpChange() {
         <span class="stat-label">AC</span>
         <span class="stat-value">{{ stats.armorClass.value }}</span>
       </div>
-      <div class="stat-box col-span-1">
+      <div class="stat-box cursor-pointer col-span-1" @click="initiativeModalOpen = true">
         <span class="stat-label">Init</span>
         <span class="stat-value">{{ stats.initiative.value >= 0 ? '+' : '' }}{{ stats.initiative.value }}</span>
       </div>
@@ -426,6 +434,13 @@ function applyHpChange() {
     :character="character"
     @save="saveArmorClass"
     @close="acModalOpen = false"
+  />
+
+  <SheetInitiativeModal
+    :open="initiativeModalOpen"
+    :character="character"
+    @save="saveInitiative"
+    @close="initiativeModalOpen = false"
   />
 
   <!-- Damage / Heal modal -->

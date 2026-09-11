@@ -53,6 +53,15 @@ export interface AttackBonusSet {
 export type ArmorClassBonuses = AttackBonusSet
 
 /**
+ * And again on the initiative roll: a headband of intellect is not the Alert feat is not
+ * whatever the table ruled tonight, and they leave independently. What the character's
+ * features already add — a Chronurgy wizard's Intelligence, Alert's +5 — is derived from
+ * the features themselves and does not belong here; these three are for what no rulepack
+ * models.
+ */
+export type InitiativeBonuses = AttackBonusSet
+
+/**
  * A shield, held apart from the bonus slots because it is a thing carried rather than a
  * number: `equipped` lets a sword-and-board character drop it for a round without losing
  * what it was worth. `bonus` is its whole contribution — 2 for the equipment table's, 3
@@ -331,7 +340,9 @@ export interface Character {
    */
   armorClassConfig?: ArmorClassConfig
   speeds: { walk: number; climb?: number; swim?: number; fly?: number }
-  initiative: number | null             // null = use dex modifier
+  initiative: number | null             // null = derive from Dex, features and the slots below
+  /** Hand-entered additions to the derived roll, kept apart the way an attack's are. */
+  initiativeBonuses?: InitiativeBonuses
   /**
    * One pool per class. A fighter/wizard spends d10s and d6s separately, so a single
    * pool cannot represent them. Ordered to match `classes`.
