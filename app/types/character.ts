@@ -197,6 +197,26 @@ export type SkillKey =
 
 export type ProficiencyLevel = 0 | 1 | 2    // 0 = none, 1 = proficient, 2 = expertise
 
+/**
+ * A picture of the character, carried inline as a base64 data URL.
+ *
+ * There is no backend and no file store, so the image has to travel with the character
+ * or it is not really stored at all: a data URL is what survives the JSON export, an
+ * import into another browser, and the deep clone every write to IndexedDB goes through.
+ * Uploads are downscaled and re-encoded first (`app/services/characterArt.ts`) so a phone
+ * photo does not put several megabytes into the record and into every export after it.
+ *
+ * It is a list rather than one portrait because a character is not one picture: in armor
+ * and out of it, a druid's wild shapes, a portrait beside a token.
+ */
+export interface CharacterImage {
+  id: string
+  /** The player's own caption — "In plate", "Bear form". May be empty. */
+  label: string
+  /** `data:image/webp;base64,...` — see `isImageDataUrl` for what is accepted. */
+  data: string
+}
+
 export interface EquipmentEntry {
   id: string
   name: string
@@ -304,6 +324,8 @@ export interface Character {
 
   notes: string
   appearance?: string
+  /** Character art, in the order the player added it. Absent until they upload one. */
+  images?: CharacterImage[]
 
   // Metadata
   createdAt: string                     // ISO date

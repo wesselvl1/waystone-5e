@@ -151,6 +151,15 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   written into it. Weapons are rulepack data (`app/data/srd/weapons.json`), so the
   picker in `AttackEditModal.vue` lists a book's weapons beside the SRD's; `properties`
   are lowercased by the schema because `finesse` and `thrown` pick the default ability.
+- **Character art is stored in the character**, as a list of base64 data URLs
+  (`Character.images`), shown on the Notes tab. There is no file store to point at, so a
+  picture that does not travel inside the record does not survive an export or a move to
+  another browser. `app/services/characterArt.ts` downscales and re-encodes every upload
+  before storing it (WebP where the browser has it, JPEG otherwise) — it is what keeps a
+  phone photo from putting megabytes into IndexedDB and into every export after it, and it
+  drops the EXIF GPS tag on the way. `CharacterSchema` checks the data URL against the
+  raster types that pipeline writes, since an imported file otherwise decides what the
+  sheet puts in an `<img src>`.
 - Tailwind's `capitalize` title-cases *every* word, so it belongs only on values the
   schema stores lowercase — a damage type, a weapon property. Over a range or free text it
   produces "150/600 Ft." and re-cases whatever the player typed.
