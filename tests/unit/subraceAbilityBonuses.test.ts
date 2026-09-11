@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
-import { raceAbilityBonuses } from '~/services/multiclass'
+import { raceAbilityBonuses, raceSpeeds } from '~/services/multiclass'
 import type { Race, Subrace } from '~/types/rulepack'
 
 const DWARF: Pick<Race, 'abilityScoreBonuses' | 'abilityScoreChoice'> = {
@@ -108,5 +108,29 @@ describe('schema', () => {
     const r = parse({ abilityScoreBonuses: { str: 2 } })
     expect(r.success && r.data.subraces[0]!.abilityScoreChoice).toBeUndefined()
     expect(r.success && r.data.subraces[0]!.replacesRaceAbilityBonuses).toBeUndefined()
+  })
+})
+
+describe('speeds a subrace overrides', () => {
+  it('adds a movement mode the race does not have', () => {
+    const speeds = raceSpeeds({ speeds: { walk: 30 } }, { speedOverrides: { walk: 30, fly: 30 } })
+    expect(speeds).toEqual({ walk: 30, fly: 30 })
+  })
+
+  it('leaves the modes the subrace does not name alone', () => {
+    const speeds = raceSpeeds({ speeds: { walk: 30, climb: 30 } }, { speedOverrides: { swim: 30 } })
+    expect(speeds).toEqual({ walk: 30, climb: 30, swim: 30 })
+  })
+
+  it('overrides a mode the race already had', () => {
+    expect(raceSpeeds({ speeds: { walk: 25 } }, { speedOverrides: { walk: 35 } }).walk).toBe(35)
+  })
+
+  it('is the race own speeds without a subrace', () => {
+    expect(raceSpeeds({ speeds: { walk: 25 } }, undefined)).toEqual({ walk: 25 })
+  })
+
+  it('falls back to 30ft walking when there is no race either', () => {
+    expect(raceSpeeds(undefined, undefined)).toEqual({ walk: 30 })
   })
 })

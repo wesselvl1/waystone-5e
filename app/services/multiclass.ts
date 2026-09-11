@@ -3,6 +3,7 @@ import type {
   AbilityScoreChoice,
   ClassDefinition,
   Race,
+  RaceSpeeds,
   Rulepack,
   Subrace,
 } from '~/types/rulepack'
@@ -104,6 +105,21 @@ export function effectiveScores(
   character: Pick<Character, 'abilityScores' | 'abilityScoreOverrides'>,
 ): AbilityScores {
   return { ...character.abilityScores, ...character.abilityScoreOverrides }
+}
+
+/**
+ * The speeds a race and subrace together grant.
+ *
+ * A subrace's `speedOverrides` sit on top of the race's, key by key: a Winged Tiefling
+ * keeps the tiefling's 30ft walk and adds a 30ft fly, an Aquatic Elf Descent half-elf
+ * gains a swim speed. Only the keys the subrace names are touched, so an override for
+ * one movement mode never silently drops another.
+ */
+export function raceSpeeds(
+  race: Pick<Race, 'speeds'> | undefined,
+  subrace: Pick<Subrace, 'speedOverrides'> | undefined,
+): RaceSpeeds {
+  return { ...(race?.speeds ?? { walk: 30 }), ...(subrace?.speedOverrides ?? {}) }
 }
 
 /**

@@ -2,7 +2,7 @@
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { resolveLevelUpEvents, getChoiceEvents } from '~/services/levelUpService'
-import { raceAbilityBonuses } from '~/services/multiclass'
+import { raceAbilityBonuses, raceSpeeds } from '~/services/multiclass'
 import {
   choiceSummary,
   isChoiceSatisfied,
@@ -82,6 +82,13 @@ const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id ==
  * Skill Versatility for a heritage feature. Showing both would claim the character has
  * each, and the replaced trait's level-up events are skipped for the same reason.
  */
+/**
+ * The race's speeds with the subrace's overrides on top — a Winged Tiefling flies, an
+ * Aquatic Elf Descent half-elf swims. Declared on Subrace all along and read nowhere, so
+ * every one of those characters was stored walking and nothing else.
+ */
+const speeds = computed(() => raceSpeeds(selectedRace.value, selectedSubrace.value))
+
 /** Whether step 1 may not continue until a subrace is picked. */
 const subraceRequired = computed(() =>
   (selectedRace.value?.subraces?.length ?? 0) > 0 && selectedRace.value?.subraceOptional !== true)
@@ -243,7 +250,7 @@ async function createCharacter() {
           temp: 0,
         },
     armorClass: null,
-    speeds: selectedRace.value?.speeds ?? { walk: 30 },
+    speeds: speeds.value,
     initiative: null,
     hitDice: startingLevel > 0
       ? [{ classId: draft.classId, die: cls?.hitDie ?? 'd8', total: startingLevel, remaining: startingLevel }]
@@ -330,6 +337,14 @@ async function createCharacter() {
 function abilityMod(score: number) {
   const m = Math.floor((score - 10) / 2)
   return m >= 0 ? `+${m}` : `${m}`
+}
+
+/** "Walk 30ft, Fly 30ft" — only the speeds an entry actually names. */
+function speedSummary(speeds: Partial<Record<string, number>>) {
+  return Object.entries(speeds)
+    .filter(([, v]) => typeof v === 'number')
+    .map(([k, v]) => `${k[0]!.toUpperCase()}${k.slice(1)} ${v}ft`)
+    .join(', ')
 }
 
 /** Wildemount's goblin lowers Strength, so a bonus is not always an increase. */
@@ -432,6 +447,7 @@ function signed(n: number | undefined) {
               @click="draft.subraceId = sub.id"
             >
               <p class="font-semibold text-white text-sm">{{ sub.name }}</p>
+              <p v-if="sub.speedOverrides" class="text-[10px] text-slate-500 mt-0.5">{{ speedSummary(sub.speedOverrides) }}</p>
               <div class="flex flex-wrap gap-1 mt-1">
                 <span
                   v-for="[k, v] in Object.entries(sub.abilityScoreBonuses)"
