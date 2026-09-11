@@ -210,3 +210,101 @@ describe('free casts on the character schema', () => {
     for (const spell of parsed.spells) expect(spell.uses).toBeUndefined()
   })
 })
+
+describe('half-elf Skill Versatility', () => {
+  it('asks for two skills at 1st level, from the whole list', () => {
+    const before = char({ race: 'half-elf' })
+    const events = resolveLevelUpEvents(before, 'fighter', 1, rulepack)
+    const choice = getChoiceEvents(events).find(e => e.type === 'CHOOSE_SKILL')
+    expect(choice).toBeDefined()
+    expect(choice).toMatchObject({ count: 2 })
+    // No `from` in the JSON means every skill is on offer
+    expect((choice as { from: string[] }).from).toHaveLength(18)
+  })
+
+  it('applies both picks as proficiencies', () => {
+    const before = char({ race: 'half-elf', skillProficiencies: {} })
+    const events = resolveLevelUpEvents(before, 'fighter', 1, rulepack)
+    const applied = applyResolvedChoices(
+      applyAutomaticEvents(before, getAutomaticEvents(events), 'average'),
+      [{ type: 'RESOLVED_SKILL', skills: ['arcana', 'stealth'] }],
+      rulepack,
+      'fighter',
+    )
+    expect(applied.skillProficiencies.arcana).toBe(1)
+    expect(applied.skillProficiencies.stealth).toBe(1)
+  })
+
+  it('does not ask again on later levels', () => {
+    const before = char({ race: 'half-elf', classes: [{ classId: 'fighter', level: 1 }] })
+    const events = resolveLevelUpEvents(before, 'fighter', 2, rulepack)
+    expect(events.filter(e => e.type === 'CHOOSE_SKILL')).toHaveLength(0)
+  })
+
+  it('lists Skill Versatility once', () => {
+    const halfElf = rulepack.races.find(r => r.id === 'half-elf')!
+    const names = halfElf.traits.map(t => t.name)
+    expect(names.filter(n => n === 'Skill Versatility')).toHaveLength(1)
+  })
+})
+
+describe('a subrace that replaces a race trait', () => {
+  /** The SCAG-style variants live in a gitignored pack, so build one here. */
+  function packWithVariants(): Rulepack {
+    const built = structuredClone(rulepack) as Rulepack
+    const tiefling = built.races.find(r => r.id === 'tiefling')!
+    tiefling.subraces = [{
+      id: 'hellfire-tiefling',
+      name: 'Hellfire Tiefling',
+      abilityScoreBonuses: {},
+      replacesRaceTraits: ['Infernal Legacy'],
+      traits: [{ name: 'Hellfire', description: 'You know thaumaturgy…' }],
+      levelUpEvents: [{
+        level: 3,
+        levelUpEvents: [{
+          type: 'GRANT_SPELLS', addTo: 'hellfire-tiefling', spellIds: ['burning-hands'],
+          alwaysPrepared: true, ability: 'cha', origin: 'race', label: 'Hellfire',
+          uses: { max: 1, recharge: 'long' },
+        }],
+      }],
+    }]
+    const halfElf = built.races.find(r => r.id === 'half-elf')!
+    halfElf.subraces = [{
+      id: 'drow-descent-half-elf',
+      name: 'Drow Descent Half-Elf',
+      abilityScoreBonuses: {},
+      replacesRaceTraits: ['Skill Versatility'],
+      traits: [{ name: 'Drow Magic', description: 'You know dancing lights…' }],
+    }]
+    return built
+  }
+
+  const variants = packWithVariants()
+
+  it('drops the replaced trait spell grant', () => {
+    const before = char({ race: 'tiefling', subrace: 'hellfire-tiefling', classes: [{ classId: 'fighter', level: 2 }] })
+    const events = resolveLevelUpEvents(before, 'fighter', 3, variants)
+    const applied = applyAutomaticEvents(before, getAutomaticEvents(events), 'average')
+    // Burning hands from the bloodline, no hellish rebuke from Infernal Legacy
+    expect(applied.spells.map(s => s.spellId)).toEqual(['burning-hands'])
+  })
+
+  it('keeps the race trait for a character without that subrace', () => {
+    const before = char({ race: 'tiefling', classes: [{ classId: 'fighter', level: 2 }] })
+    const events = resolveLevelUpEvents(before, 'fighter', 3, variants)
+    const applied = applyAutomaticEvents(before, getAutomaticEvents(events), 'average')
+    expect(applied.spells.map(s => s.spellId)).toEqual(['hellish-rebuke'])
+  })
+
+  it('drops the replaced trait skill choice', () => {
+    const before = char({ race: 'half-elf', subrace: 'drow-descent-half-elf' })
+    const events = resolveLevelUpEvents(before, 'fighter', 1, variants)
+    expect(events.filter(e => e.type === 'CHOOSE_SKILL')).toHaveLength(0)
+  })
+
+  it('still asks a half-elf with no descent chosen', () => {
+    const before = char({ race: 'half-elf' })
+    const events = resolveLevelUpEvents(before, 'fighter', 1, variants)
+    expect(events.filter(e => e.type === 'CHOOSE_SKILL')).toHaveLength(1)
+  })
+})

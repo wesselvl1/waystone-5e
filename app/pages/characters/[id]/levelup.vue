@@ -1472,6 +1472,12 @@ watch(isFirstCharacterLevel, (val) => {
               <span v-else-if="choice.type === 'RESOLVED_OPTION_REPLACEMENT'">
                 {{ replacementSummary(choice) }}
               </span>
+              <span v-else-if="choice.type === 'RESOLVED_SKILL'">
+                Skills: {{ choice.skills.map(s => SKILL_LABELS[s] ?? s).join(', ') }}
+              </span>
+              <span v-else-if="choice.type === 'RESOLVED_EXPERTISE'">
+                Expertise: {{ choice.skills.map(s => SKILL_LABELS[s] ?? s).join(', ') }}
+              </span>
               <span v-else-if="choice.type === 'RESOLVED_OPTIONAL_FEATURES' && choice.taken.length > 0">
                 Optional features: {{ choice.taken.map(f => f.name).join(', ') }}
               </span>

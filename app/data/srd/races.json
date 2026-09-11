@@ -216,10 +216,6 @@
         {
           "name": "Skill Versatility",
           "description": "You gain proficiency in two skills of your choice."
-        },
-        {
-          "name": "Skill Versatility",
-          "description": "You gain proficiency in two skills of your choice. Choose them on the Skills panel — this is not applied automatically."
         }
       ],
       "languages": [
@@ -241,7 +237,19 @@
             1
           ]
         ]
-      }
+      },
+      "levelUpEvents": [
+        {
+          "level": 1,
+          "trait": "Skill Versatility",
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SKILL",
+              "count": 2
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "half-orc",
@@ -359,6 +367,7 @@
       "levelUpEvents": [
         {
           "level": 1,
+          "trait": "Infernal Legacy",
           "levelUpEvents": [
             {
               "type": "GRANT_SPELLS",
@@ -375,6 +384,7 @@
         },
         {
           "level": 3,
+          "trait": "Infernal Legacy",
           "levelUpEvents": [
             {
               "type": "GRANT_SPELLS",
@@ -396,6 +406,7 @@
         },
         {
           "level": 5,
+          "trait": "Infernal Legacy",
           "levelUpEvents": [
             {
               "type": "GRANT_SPELLS",

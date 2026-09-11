@@ -1,4 +1,4 @@
-import type { Character, AbilityKey, Feature, SpellcastingOrigin, SpellSlotLevel } from '~/types/character'
+import type { Character, AbilityKey, Feature, SkillKey, SpellcastingOrigin, SpellSlotLevel } from '~/types/character'
 import type {
   Rulepack,
   OptionalClassFeature,
@@ -20,6 +20,7 @@ import type {
   UpdateHitDieEvent,
   SetSpellcastingAbilityEvent,
   ChooseExpertiseEvent,
+  ChooseSkillEvent,
   ChooseOptionEvent,
   PoolOption,
   ReplaceOptionEvent,
@@ -32,6 +33,24 @@ import type {
   SetWildShapeLimitsEvent,
   ResolvedChoice,
 } from '~/types/events'
+
+/**
+ * Every skill, the fallback for a `CHOOSE_SKILL` that names no list: "two skills of your
+ * choice" is the printed wording for the half-elf, Skilled and most race grants, and
+ * restating all eighteen in every pack that says it would be noise.
+ */
+const ALL_SKILL_KEYS: SkillKey[] = [
+  'acrobatics', 'animalHandling', 'arcana', 'athletics',
+  'deception', 'history', 'insight', 'intimidation',
+  'investigation', 'medicine', 'nature', 'perception',
+  'performance', 'persuasion', 'religion', 'sleightOfHand',
+  'stealth', 'survival',
+]
+
+/** Copied, not aliased: the runtime event is stored, and ALL_SKILL_KEYS is shared. */
+function chooseSkillEvent(def: { count: number; from?: SkillKey[] }): ChooseSkillEvent {
+  return { type: 'CHOOSE_SKILL', count: def.count, from: [...(def.from ?? ALL_SKILL_KEYS)] }
+}
 
 function rollDie(sides: number): number {
   return Math.floor(Math.random() * sides) + 1
@@ -782,6 +801,9 @@ export function resolveLevelUpEvents(
           count: eventDef.count,
         } satisfies ChooseExpertiseEvent)
         break
+      case 'CHOOSE_SKILL':
+        events.push(chooseSkillEvent(eventDef))
+        break
       case 'CHOOSE_FEAT':
         events.push({ type: 'CHOOSE_FEAT' })
         break
@@ -890,48 +912,62 @@ export function resolveLevelUpEvents(
   const subrace = race?.subraces?.find(sr => sr.id === character.subrace)
   const background = rulepack.backgrounds.find(b => b.id === character.background)
 
+  // A subrace may supersede one of the race's traits — the SCAG tiefling bloodlines
+  // replace Infernal Legacy, a half-elf descent replaces Skill Versatility. The trait's
+  // events go with it, or the character would get both the race's version and the
+  // subrace's.
+  const replacedTraits = subrace?.replacesRaceTraits ?? []
+
   for (const source of [race, subrace, background]) {
-    const atLevel = source?.levelUpEvents?.find(e => e.level === newTotalLevel)
-    for (const eventDef of atLevel?.levelUpEvents ?? []) {
-      switch (eventDef.type) {
-        case 'GRANT_SPELLS': {
-          const grant = grantSpellsEvent(eventDef, character, rulepack, { label: source?.name })
-          if (grant) events.push(grant)
-          break
-        }
-        case 'CHOOSE_SPELL': {
-          const choice = chooseSpellEvent(eventDef, character)
-          if (choice) events.push(choice)
-          break
-        }
-        case 'CHOOSE_SPELLCASTING_ABILITY': {
-          const choice = resolveSpellcastingAbilityChoice(eventDef, character, source?.name)
-          if (choice) events.push(choice)
-          break
-        }
-        case 'GRANT_SPELLCASTING':
-          events.push(grantSpellcastingEvent(eventDef, source?.name))
-          break
-        case 'EXPAND_SPELL_LIST': {
-          const expand = expandSpellListEvent(eventDef, character, source?.name)
-          if (expand) events.push(expand)
-          break
-        }
-        case 'CHOOSE_OPTION': {
-          // Skip a choice already answered, so it is not asked again on a later level
-          if (character.chosenOptions?.[eventDef.id] === undefined) {
-            const choice = resolveOptionChoice(eventDef, character, rulepack)
-            if (choice) events.push(choice)
+    // Every group at this level, not just the first: tagging events by trait means a
+    // source can legitimately declare more than one group per level.
+    const groups = (source?.levelUpEvents ?? []).filter(e => e.level === newTotalLevel)
+    for (const group of groups) {
+      if (source === race && group.trait && replacedTraits.includes(group.trait)) continue
+      for (const eventDef of group.levelUpEvents) {
+        switch (eventDef.type) {
+          case 'GRANT_SPELLS': {
+            const grant = grantSpellsEvent(eventDef, character, rulepack, { label: source?.name })
+            if (grant) events.push(grant)
+            break
           }
-          break
+          case 'CHOOSE_SPELL': {
+            const choice = chooseSpellEvent(eventDef, character)
+            if (choice) events.push(choice)
+            break
+          }
+          case 'CHOOSE_SPELLCASTING_ABILITY': {
+            const choice = resolveSpellcastingAbilityChoice(eventDef, character, source?.name)
+            if (choice) events.push(choice)
+            break
+          }
+          case 'GRANT_SPELLCASTING':
+            events.push(grantSpellcastingEvent(eventDef, source?.name))
+            break
+          case 'EXPAND_SPELL_LIST': {
+            const expand = expandSpellListEvent(eventDef, character, source?.name)
+            if (expand) events.push(expand)
+            break
+          }
+          case 'CHOOSE_OPTION': {
+            // Skip a choice already answered, so it is not asked again on a later level
+            if (character.chosenOptions?.[eventDef.id] === undefined) {
+              const choice = resolveOptionChoice(eventDef, character, rulepack)
+              if (choice) events.push(choice)
+            }
+            break
+          }
+          case 'GAIN_PROFICIENCY':
+            events.push({
+              type: 'GAIN_PROFICIENCY',
+              proficiency: eventDef.proficiency,
+              category: 'skill',
+            } satisfies GainProficiencyEvent)
+            break
+          case 'CHOOSE_SKILL':
+            events.push(chooseSkillEvent(eventDef))
+            break
         }
-        case 'GAIN_PROFICIENCY':
-          events.push({
-            type: 'GAIN_PROFICIENCY',
-            proficiency: eventDef.proficiency,
-            category: 'skill',
-          } satisfies GainProficiencyEvent)
-          break
       }
     }
   }
@@ -1032,6 +1068,9 @@ export function resolveFeatEvents(
           count: eventDef.count,
         } satisfies ChooseExpertiseEvent)
         break
+      case 'CHOOSE_SKILL':
+        events.push(chooseSkillEvent(eventDef))
+        break
       case 'CHOOSE_OPTION': {
         // Skip a choice already answered, so retaking a repeatable feat does not re-ask
         if (character.chosenOptions?.[eventDef.id] === undefined) {
@@ -1114,9 +1153,12 @@ export function resolveUnlockedChoices(
   const race = rulepack.races.find(r => r.id === character.race)
   const subrace = race?.subraces?.find(sr => sr.id === character.subrace)
   const background = rulepack.backgrounds.find(b => b.id === character.background)
+  const replacedTraits = subrace?.replacesRaceTraits ?? []
   for (const source of [race, subrace, background]) {
-    const atLevel = source?.levelUpEvents?.find(e => e.level === totalLevel)
-    take(atLevel?.levelUpEvents, { label: source?.name })
+    for (const group of (source?.levelUpEvents ?? []).filter(e => e.level === totalLevel)) {
+      if (source === race && group.trait && replacedTraits.includes(group.trait)) continue
+      take(group.levelUpEvents, { label: source?.name })
+    }
   }
 
   for (const feat of opts.feats ?? []) {

@@ -32,6 +32,11 @@ export interface RaceSpeeds {
 export interface SourceLevelEvents {
   level: number
   levelUpEvents: LevelUpEventDef[]
+  /**
+   * The trait these events belong to, e.g. "Infernal Legacy". Only needed on a race whose
+   * subraces may replace that trait — the events are skipped along with it.
+   */
+  trait?: string
 }
 
 /**
@@ -88,6 +93,13 @@ export interface Subrace {
    * half-elf gets the mark's pick instead of the half-elf's, not both.
    */
   replacesRaceAbilityBonuses?: true
+  /**
+   * Race traits this subrace replaces, by name — "This trait replaces the Infernal Legacy
+   * trait", or the half-elf descents trading Skill Versatility for a heritage feature.
+   * The named trait is dropped from the sheet and the race's level-up events tagged with
+   * that `trait` never fire, so the subrace's own version is the only one that applies.
+   */
+  replacesRaceTraits?: string[]
   /** Speed values this subrace grants or overrides (e.g. fly: 30 for Winged Tiefling). */
   speedOverrides?: Partial<RaceSpeeds>
   /** Events fired at a given total character level (high elf's cantrip). */
@@ -283,6 +295,12 @@ export type LevelUpEventDef =
     }
   | { type: 'SET_WILD_SHAPE_LIMITS'; maxCR: number; allowSwim?: boolean; allowFly?: boolean; types?: CreatureType[] }
   | { type: 'CHOOSE_EXPERTISE'; label: string; options: SkillKey[]; count: number }
+  /**
+   * Skill proficiencies the player picks — the half-elf's Skill Versatility, a feat's
+   * "three skills of your choice". `from` narrows the list; omitted, every skill is on
+   * offer. Ones the character already has are shown but not pickable.
+   */
+  | { type: 'CHOOSE_SKILL'; count: number; from?: SkillKey[] }
   | { type: 'CHOOSE_FEAT' }
   | { type: 'ABILITY_SCORE_IMPROVEMENT'; points: number }
   | { type: 'CHOOSE_SUBCLASS'; label: string }

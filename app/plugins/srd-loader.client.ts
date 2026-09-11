@@ -43,7 +43,7 @@ const nonSrdFragments = import.meta.glob<{ default: unknown }>([
  * Increment this when bundled SRD data changes in a way that requires re-seeding,
  * without changing the official SRD version number.
  */
-const SRD_SEED_REVISION = 14
+const SRD_SEED_REVISION = 15
 
 function fragmentName(path: string): string {
   return path.split('/').pop()!.replace(/\.json$/, '')

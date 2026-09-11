@@ -76,6 +76,17 @@ const selectedSubrace = computed(() => selectedRace.value?.subraces?.find(s => s
 const selectedClass = computed(() => rulepackStore.getClass(draft.classId))
 const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id === draft.backgroundId))
 
+/**
+ * The race's traits minus any the chosen subrace supersedes: a SCAG tiefling bloodline
+ * prints "This trait replaces the Infernal Legacy trait", and a half-elf descent trades
+ * Skill Versatility for a heritage feature. Showing both would claim the character has
+ * each, and the replaced trait's level-up events are skipped for the same reason.
+ */
+const raceTraits = computed(() => {
+  const replaced = selectedSubrace.value?.replacesRaceTraits ?? []
+  return (selectedRace.value?.traits ?? []).filter(t => !replaced.includes(t.name))
+})
+
 // ── Effective abilities (base + race ASI + subrace ASI) ────────────────────────
 // Through raceAbilityBonuses so a subrace that restates the whole ability line replaces
 // the race's rather than stacking on it — a Draconblood dragonborn is INT +2 / CHA +1,
@@ -248,13 +259,13 @@ async function createCharacter() {
     attacks: [],
 
     features: [
-      ...(selectedRace.value?.traits.map(t => ({
+      ...raceTraits.value.map(t => ({
         id: `race-${t.name.toLowerCase().replaceAll(' ', '-')}`,
 
         name: t.name,
         source: selectedRace.value?.name ?? 'Race',
         description: t.description,
-      })) ?? []),
+      })),
       ...(selectedSubrace.value?.traits.map(t => ({
         id: `subrace-${t.name.toLowerCase().replaceAll(' ', '-')}`,
 
@@ -425,7 +436,7 @@ function signed(n: number | undefined) {
         <!-- Trait preview -->
         <div v-if="selectedRace" class="card space-y-2">
           <p class="section-header">Racial Traits</p>
-          <div v-for="trait in selectedRace.traits" :key="trait.name" class="space-y-0.5">
+          <div v-for="trait in raceTraits" :key="trait.name" class="space-y-0.5">
             <p class="text-sm font-medium text-white">{{ trait.name }}</p>
             <p class="text-xs text-slate-400">{{ trait.description }}</p>
           </div>

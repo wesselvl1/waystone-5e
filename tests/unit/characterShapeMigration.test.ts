@@ -40,3 +40,28 @@ describe('the proficiency list is guaranteed', () => {
     expect(() => migrateCharacterShape({})).not.toThrow()
   })
 })
+
+describe('duplicate features', () => {
+  it('drops a feature stored twice under the same id and name', () => {
+    const raw = {
+      features: [
+        { id: 'race-skill-versatility', name: 'Skill Versatility', source: 'Half-Elf', description: 'a' },
+        { id: 'race-skill-versatility', name: 'Skill Versatility', source: 'Half-Elf', description: 'b' },
+      ],
+    }
+    const out = migrateCharacterShape(raw) as { features: Array<{ description?: string }> }
+    expect(out.features).toHaveLength(1)
+    // The first copy wins: its uses are the ones being tracked
+    expect(out.features[0]!.description).toBe('a')
+  })
+
+  it('keeps features that only share a name', () => {
+    const raw = {
+      features: [
+        { id: 'race-darkvision', name: 'Darkvision', source: 'Half-Elf' },
+        { id: 'subrace-darkvision', name: 'Darkvision', source: 'Half-Elf (Drow Descent)' },
+      ],
+    }
+    expect((migrateCharacterShape(raw) as { features: unknown[] }).features).toHaveLength(2)
+  })
+})
