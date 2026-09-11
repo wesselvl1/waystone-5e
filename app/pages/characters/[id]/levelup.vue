@@ -693,6 +693,53 @@ const filteredFeats = computed(() => filterBySearch(allFeats.value, featSearch.v
 const filteredSpells = computed(() => filterBySearch(availableSpells.value, spellSearch.value,
   s => [s.name, s.school, s.castingTime, s.sourceName, s.level === 0 ? 'cantrip' : `level ${s.level}`]))
 
+/**
+ * The pick list runs long once a class can learn more than one spell level, so it is cut
+ * into one collapsible section per level. `getAllSpells` already sorts level-then-name,
+ * but the grouping does not rely on that.
+ */
+const spellsByLevel = computed(() => {
+  const groups = new Map<number, typeof filteredSpells.value>()
+  for (const spell of filteredSpells.value) {
+    const list = groups.get(spell.level)
+    if (list) list.push(spell)
+    else groups.set(spell.level, [spell])
+  }
+  return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([level, spells]) => ({ level, spells }))
+})
+
+/**
+ * Only the highest level is open to begin with — the spells this level-up just unlocked
+ * are what the question is about, and the lower levels are a long scroll past them.
+ * Taken from the whole list rather than the grouping, so a search cannot move it.
+ */
+const highestAvailableSpellLevel = computed(() =>
+  availableSpells.value.reduce((max, s) => Math.max(max, s.level), 0))
+
+/** Levels the player has opened or closed by hand, overriding that default. */
+const spellLevelOverrides = ref<Map<number, boolean>>(new Map())
+
+function spellLevelOpenByDefault(level: number) {
+  return level === highestAvailableSpellLevel.value
+}
+
+function toggleSpellLevel(level: number) {
+  const open = spellLevelOverrides.value.get(level) ?? spellLevelOpenByDefault(level)
+  spellLevelOverrides.value.set(level, !open)
+}
+
+/** A search reopens every section — otherwise it would hide its own matches. */
+function spellLevelOpen(level: number) {
+  if (spellSearch.value.trim().length > 0) return true
+  return spellLevelOverrides.value.get(level) ?? spellLevelOpenByDefault(level)
+}
+
+/** Shown on the header so a collapsed section still says what is picked inside it. */
+function selectedInSpellLevel(level: number) {
+  return availableSpells.value
+    .filter(s => s.level === level && spellSelections.value.includes(s.id)).length
+}
+
 const filteredSubclasses = computed(() => filterBySearch(availableSubclasses.value, subclassSearch.value,
   sub => [sub.name, sub.description]))
 
@@ -724,6 +771,7 @@ watch(currentChoiceIdx, () => {
   optionSearch.value = ''
   replacementSearch.value = ''
   optionalFeatureSearch.value = ''
+  spellLevelOverrides.value = new Map()
 })
 
 function confirmSubclass() {
@@ -1016,17 +1064,39 @@ watch(isFirstCharacterLevel, (val) => {
             :matches="filteredSpells.length"
             :total="availableSpells.length"
           />
-          <div class="space-y-1.5 max-h-80 overflow-y-auto">
-            <button
-              v-for="spell in filteredSpells"
-              :key="spell.id"
-              class="card w-full text-left text-sm py-2 hover:border-primary-500/50 transition-colors"
-              :class="spellSelections.includes(spell.id) ? 'border-primary-500 bg-primary-900/20' : ''"
-              @click="toggleSpell(spell.id)"
-            >
-              <span class="font-medium text-white">{{ spell.name }}</span>
-              <span class="text-slate-500 ml-2 text-xs">{{ spell.school }} · {{ spell.castingTime }} · {{ spell.sourceName }}</span>
-            </button>
+          <div class="space-y-2 max-h-80 overflow-y-auto">
+            <div v-for="group in spellsByLevel" :key="group.level">
+              <button
+                class="w-full flex items-center gap-2 py-1 text-left"
+                @click="toggleSpellLevel(group.level)"
+              >
+                <svg
+                  class="w-4 h-4 text-slate-500 flex-shrink-0 transition-transform"
+                  :class="{ 'rotate-90': spellLevelOpen(group.level) }"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+                <span class="section-header mb-0">{{ group.level === 0 ? 'Cantrips' : `Level ${group.level}` }}</span>
+                <span class="text-xs text-slate-500">{{ group.spells.length }}</span>
+                <span
+                  v-if="selectedInSpellLevel(group.level) > 0"
+                  class="text-xs text-primary-400 ml-auto"
+                >{{ selectedInSpellLevel(group.level) }} selected</span>
+              </button>
+              <div v-if="spellLevelOpen(group.level)" class="space-y-1.5 mt-1">
+                <button
+                  v-for="spell in group.spells"
+                  :key="spell.id"
+                  class="card w-full text-left text-sm py-2 hover:border-primary-500/50 transition-colors"
+                  :class="spellSelections.includes(spell.id) ? 'border-primary-500 bg-primary-900/20' : ''"
+                  @click="toggleSpell(spell.id)"
+                >
+                  <span class="font-medium text-white">{{ spell.name }}</span>
+                  <span class="text-slate-500 ml-2 text-xs">{{ spell.school }} · {{ spell.castingTime }} · {{ spell.sourceName }}</span>
+                </button>
+              </div>
+            </div>
             <p v-if="filteredSpells.length === 0" class="text-slate-500 text-sm text-center py-4">Nothing matches “{{ spellSearch }}”.</p>
           </div>
           <div class="flex gap-2 mt-2">
