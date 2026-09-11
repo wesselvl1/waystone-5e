@@ -156,7 +156,26 @@ export type LevelUpEventDef =
   | { type: 'UPDATE_FEATURE_USES'; featureName: string; usesMax: number | null }
   | { type: 'UPDATE_SPELL_SLOTS'; slots: Partial<Record<SpellSlotLevel, number>> }
   | { type: 'UPDATE_WARLOCK_SLOTS'; slotLevel: SpellSlotLevel; max: number }
-  | { type: 'GAIN_PROFICIENCY'; proficiency: string }
+  | {
+    /**
+     * Sets one movement mode outright. A subrace that simply has the speed declares
+     * `speedOverrides` instead; this is for a speed hanging off a choice, like the Fleet
+     * of Foot arm of a half-elf's Versatility.
+     */
+    type: 'SET_SPEED'
+    mode: 'walk' | 'climb' | 'swim' | 'fly'
+    speed: number
+    whenOption?: { choiceId: string; optionId: string }
+  }
+  | {
+    type: 'GAIN_PROFICIENCY'
+    proficiency: string
+    /**
+     * Granted only when a `CHOOSE_OPTION` was answered this way — the Elf Weapon
+     * Training arm of a half-elf descent's variant feature. Gated like a `GRANT_SPELLS`.
+     */
+    whenOption?: { choiceId: string; optionId: string }
+  }
   | {
       type: 'CHOOSE_SPELL'
       addTo: string

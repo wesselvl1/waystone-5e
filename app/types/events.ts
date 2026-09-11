@@ -350,6 +350,13 @@ export interface ResolvedOptionalFeatures {
 
 // ─── Union types ───────────────────────────────────────────────────────────────
 
+/** A movement mode set to a fixed value — Fleet of Foot's 35ft walk, a 30ft swim. */
+export interface SetSpeedEvent {
+  type: 'SET_SPEED'
+  mode: 'walk' | 'climb' | 'swim' | 'fly'
+  speed: number
+}
+
 export type AutomaticLevelUpEvent =
   | AddHpEvent
   | GrantSpellcastingEvent
@@ -363,6 +370,7 @@ export type AutomaticLevelUpEvent =
   | GrantSpellsEvent
   | SetWildShapeLimitsEvent
   | SetSpellcastingAbilityEvent
+  | SetSpeedEvent
 
 export type ChoiceLevelUpEvent =
   | ChooseSpellEvent
