@@ -4,7 +4,7 @@ export default defineNuxtConfig({
   typescript: { strict: true },
   modules: [
     '@nuxtjs/tailwindcss',
-    ['@pinia/nuxt', { autoImports: ['defineStore'] }],
+    '@pinia/nuxt',
     ['@vite-pwa/nuxt', {
       registerType: 'autoUpdate',
       manifest: {
