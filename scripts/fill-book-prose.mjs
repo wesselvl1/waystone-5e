@@ -393,9 +393,16 @@ const bump = (kind, field) => {
 
 const empty = s => typeof s !== 'string' || s.trim() === ''
 
-/** Fill `holder.description` if empty. Returns true when anything was written. */
+/**
+ * Fill `holder.description` if empty. Returns true when anything was written.
+ *
+ * `_summary: true` marks a description that is a short paraphrase written to keep an
+ * entry usable rather than text transcribed from the book — so it is treated as empty
+ * here and the book's own wording replaces it, marker and all. Hand-written text without
+ * the marker still survives, which is the guarantee that makes re-running safe.
+ */
 function fill(holder, text, kind, label) {
-  if (!holder || !empty(holder.description)) return false
+  if (!holder || (!empty(holder.description) && !holder._summary)) return false
   const body = (text ?? '').trim()
   if (!body) {
     bump(kind, 'missed')
@@ -403,6 +410,7 @@ function fill(holder, text, kind, label) {
     return false
   }
   holder.description = body
+  delete holder._summary
   bump(kind, 'filled')
   return true
 }
@@ -418,7 +426,7 @@ function remainingEmpty(entry) {
   const walk = (o) => {
     if (Array.isArray(o)) return o.forEach(walk)
     if (!o || typeof o !== 'object') return
-    if ('description' in o && empty(o.description)) n += 1
+    if ('description' in o && (empty(o.description) || o._summary)) n += 1
     for (const [k, v] of Object.entries(o)) {
       if (k === 'levelUpEvents') continue // options carry their own prose; not book text
       walk(v)
@@ -447,9 +455,12 @@ function fillOptions(entry, book, name) {
     if (Array.isArray(o)) return o.forEach(walk)
     if (!o || typeof o !== 'object' || seen.has(o)) return
     seen.add(o)
-    if (o.type === 'CHOOSE_OPTION') {
+    // A CHOOSE_OPTION event, or a top-level option-pool patch — a book's Eldritch
+    // Invocations are a bare `{ group, options }` with no event wrapped around them,
+    // since the pool they widen lives in another pack.
+    if (o.type === 'CHOOSE_OPTION' || ((o.group || o.choiceId) && Array.isArray(o.options))) {
       for (const opt of o.options ?? []) {
-        if (!opt || !empty(opt.description)) continue
+        if (!opt || (!empty(opt.description) && !opt._summary)) continue
         const found = IDX.poolOption.get(opt.name)
         if (!found) {
           bump('option', 'missed')
@@ -591,10 +602,15 @@ for (const book of readdirSync(DATA)) {
         if (entry && typeof entry === 'object') fillOptions(entry, book, entry.name ?? entry.id)
       }
     }
-    // A marker that outlives the work it marks is worse than none.
-    for (const arr of Object.values(json)) {
+    // A marker that outlives the work it marks is worse than none. Pool options carry
+    // their own marker because they are entries in their own right, unlike the options
+    // hanging off a class or a feat, so clear theirs too.
+    for (const [category, arr] of Object.entries(json)) {
       if (!Array.isArray(arr)) continue
-      for (const entry of arr) {
+      const entries = category === 'optionPools'
+        ? arr.flatMap(pool => pool?.options ?? [])
+        : arr
+      for (const entry of entries) {
         if (entry?._todo && remainingEmpty(entry) === 0) delete entry._todo
       }
     }

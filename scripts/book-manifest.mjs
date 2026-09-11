@@ -9,7 +9,13 @@
  *   ['Name', { raceId: 'elf' }]         a subrace
  *   ['Name', { classId, level }]        an optional class feature
  *   ['Name', { prerequisite: '...' }]   a feat with a prerequisite line
+ *   ['Name', { group: 'metamagic' }]    an entry for a pool another pack owns
+ *   ['Name', { choiceId: 'pact-boon' }] the same, for a choice that declares no group
  *   ['Name', { id: 'custom.id' }]       an explicit id, overriding the derived one
+ *
+ * A pool entry may also carry `minLevel`, `requiresOption` and `requiresSpell` — the
+ * gates the book prints in the invocation's prerequisite line. Those are mechanics, not
+ * book text, so they belong here beside classId and level.
  *
  * Ids default to `<abbrev>.<kebab-name>`, e.g. tce.fey-wanderer.
  *
@@ -32,6 +38,14 @@
  * fighter, monk, paladin, ranger, rogue, sorcerer, warlock, wizard — plus artificer,
  * which ERLW introduces.
  */
+
+/** The SRD warlock's invocation pool, and the pact boon answers its options are gated on. */
+const EI = 'eldritch-invocation'
+const PACT_BLADE = { choiceId: 'pact-boon', optionId: 'pact-of-the-blade' }
+const PACT_CHAIN = { choiceId: 'pact-boon', optionId: 'pact-of-the-chain' }
+const PACT_TOME = { choiceId: 'pact-boon', optionId: 'pact-of-the-tome' }
+/** Tasha's own pact boon, so the id is the one this manifest scaffolds for it. */
+const PACT_TALISMAN = { choiceId: 'pact-boon', optionId: 'tce.pact-of-the-talisman' }
 
 export const BOOKS = [
   // ── Player's Handbook ───────────────────────────────────────────────────────
@@ -246,6 +260,25 @@ export const BOOKS = [
       ['The Hexblade', { classId: 'warlock' }],
       ['War Magic', { classId: 'wizard' }],
     ],
+    // Eldritch Invocations, which patch the SRD warlock's pool rather than the class.
+    // `requiresOption` names the SRD's own pact boon ids, since that is the answer the
+    // gate is read against.
+    optionPools: [
+      ['Aspect of the Moon', { group: EI, requiresOption: PACT_TOME }],
+      ['Cloak of Flies', { group: EI, minLevel: 5 }],
+      ['Eldritch Smite', { group: EI, minLevel: 5, requiresOption: PACT_BLADE }],
+      ['Ghostly Gaze', { group: EI, minLevel: 7 }],
+      ['Gift of the Depths', { group: EI, minLevel: 5 }],
+      ['Gift of the Ever-Living Ones', { group: EI, requiresOption: PACT_CHAIN }],
+      ['Grasp of Hadar', { group: EI, requiresSpell: 'eldritch-blast' }],
+      ['Improved Pact Weapon', { group: EI, requiresOption: PACT_BLADE }],
+      ['Lance of Lethargy', { group: EI, requiresSpell: 'eldritch-blast' }],
+      ['Maddening Hex', { group: EI, minLevel: 5 }],
+      ['Relentless Hex', { group: EI, minLevel: 7 }],
+      ['Shroud of Shadow', { group: EI, minLevel: 15 }],
+      ['Tomb of Levistus', { group: EI, minLevel: 5 }],
+      ["Trickster's Escape", { group: EI, minLevel: 7 }],
+    ],
     spells: [
       'Abi-Dalzim’s Horrid Wilting', 'Absorb Elements', 'Aganazzar’s Scorcher',
       'Beast Bond', 'Bones of the Earth', 'Catapult', 'Catnap', 'Cause Fear',
@@ -454,6 +487,19 @@ export const BOOKS = [
       ['Bladesinging', { classId: 'wizard' }],
       ['Order of Scribes', { classId: 'wizard' }],
       ['Armorer', { classId: 'artificer' }],
+    ],
+    // Pact of the Talisman first: three of the invocations below are gated on it, and a
+    // gate pointing at an option no pack defines can never open.
+    optionPools: [
+      ['Pact of the Talisman', { choiceId: 'pact-boon' }],
+      ['Bond of the Talisman', { group: EI, minLevel: 12, requiresOption: PACT_TALISMAN }],
+      ['Eldritch Mind', { group: EI }],
+      ['Far Scribe', { group: EI, minLevel: 5, requiresOption: PACT_TOME }],
+      ['Gift of the Protectors', { group: EI, minLevel: 9, requiresOption: PACT_TOME }],
+      ['Investment of the Chain Master', { group: EI, minLevel: 5, requiresOption: PACT_CHAIN }],
+      ['Protection of the Talisman', { group: EI, minLevel: 7, requiresOption: PACT_TALISMAN }],
+      ['Rebuke of the Talisman', { group: EI, requiresOption: PACT_TALISMAN }],
+      ['Undying Servitude', { group: EI, minLevel: 5 }],
     ],
     feats: [
       'Artificer Initiate', 'Chef', 'Crusher', 'Eldritch Adept', 'Fey Touched',

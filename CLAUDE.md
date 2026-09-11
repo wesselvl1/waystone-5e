@@ -63,6 +63,22 @@ Because ids are the merge key, a custom pack is expected to **prefix its entry i
 
 `tests/unit/srdData.test.ts` validates every SRD JSON file against `RulepackSchema`, so schema-invalid data fails CI.
 
+### Non-SRD books
+
+`scripts/book-manifest.mjs` is a names-only table of contents per sourcebook;
+`scaffold-books.mjs` turns it into empty stubs under `app/data/<abbrev>/`, and
+`fill-book-prose.mjs` fills their `description` fields from a 5etools corpus on your own
+machine (`--five <path>`). Everything under `app/data/` except `srd/` is gitignored by an
+allow-list, so book text never enters the repo; `pnpm pack:rulepacks` is how you move it
+between browsers. Re-running either script is additive — filled-in text is never
+overwritten, and `_todo` clears once an entry has no empty descriptions left.
+
+`optionPools` is the one scaffolded category that is not a flat list: the manifest lists
+options one per line (`['Eldritch Mind', { group: 'eldritch-invocation' }]`, plus any
+`minLevel` / `requiresOption` / `requiresSpell` gate the book prints), and the scaffold
+groups them into one pool entry per target on the way out, flattening again on the way in
+so ids still match.
+
 ### Level-up event pipeline
 
 Level-up is a three-stage pipeline in `app/services/levelUpService.ts`, driven by `levelUpEvents` declared per class-level (and per subclass-level) in rulepack JSON:
@@ -81,6 +97,16 @@ Non-obvious rules encoded in that service:
 - Class level tables contain placeholder feature names for subclass features ("Primal Path Feature", "Martial Archetype"). `isSubclassPlaceholder` regex-filters them out when the character's subclass supplies real features at that level.
 - Changing CON (via ASI or feat) retroactively adjusts `hp.max`/`hp.current` by the modifier delta × total level. Feats with `hpBonusPerLevel` (Tough) apply retroactively *and* set `character.hpBonusPerLevel` for future level-ups.
 - **A `CHOOSE_OPTION` pool gates its own entries.** `ChooseOptionDef` carries `minLevel`, `requiresOption` (another choice's answer — the Pact Boon behind Thirsting Blade) and `requiresSpell` (eldritch blast behind Agonizing Blast); `optionAvailable()` is the single check, and the service applies it against the *stored* character. A gate the same level-up run answers is not stored yet, so the wizard re-answers against a projected character — see `projectedCharacter` in `levelup.vue`.
+- **A pack can widen a pool it does not own.** A book's Eldritch Invocations have nowhere
+  to live otherwise: the SRD prints the whole pool inline on every warlock level that
+  picks from it, and fragments merge by id, so adding one invocation would mean
+  redeclaring the warlock class. A top-level `optionPools` array (`OptionPoolPatch`) names
+  the *pool* instead — `group` for a shared pool (`eldritch-invocation`, `metamagic`,
+  `fighting-style`) or `choiceId` for a choice that declares no group (`pact-boon`, which
+  Tasha's widens with Pact of the Talisman). `poolExtras()` in `levelUpService` unions
+  them in wherever the pool is read: the pick, the `REPLACE_OPTION` offer, and
+  `poolPickFeature`. Nothing distributes them into a class, so they only have to reach
+  `composedPack()`; a book therefore stays a separately removable pack.
 - **`REPLACE_OPTION` trades one pool pick for another** (a warlock swapping an invocation on every level). It is declared per class-level like any other event, and `resolveOptionReplacement()` returns undefined unless there is both something to trade and something to trade it for. The swap overwrites the *same* choice id, so a pool's number of picks cannot drift.
 - **A pick from a grouped pool gets its own feature**, id `option-<choiceId>`, so the sheet names it — `chosenOptions` alone left a warlock showing "Eldritch Invocations" and nothing else. Ungrouped one-off choices (Pact Boon, Totem Spirit) keep the older behavior of renaming the feature that raised them. `backfillPoolPickFeatures()` adds them to characters levelled before this existed.
 - **A subrace can replace one of the race's traits.** `Subrace.replacesRaceTraits` names them, and a race's `levelUpEvents` group carries an optional `trait` tag so the events go with the trait — the SCAG tiefling bloodlines replace Infernal Legacy (spells and all), a half-elf descent replaces Skill Versatility. The creation wizard filters the same names out of the trait list and the stored features.
