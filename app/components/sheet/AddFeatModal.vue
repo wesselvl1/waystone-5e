@@ -160,7 +160,7 @@ watch(() => props.open, (open) => {
             rounded-t-2xl sm:rounded-xl shadow-xl max-h-[88vh] flex flex-col"
         >
           <!-- Header -->
-          <div class="flex items-start gap-3 p-4 pb-3 border-b border-surface-700/60">
+          <div class="flex-shrink-0 flex items-start gap-3 p-4 pb-3 border-b border-surface-700/60">
             <div class="flex-1 min-w-0">
               <p class="text-base font-semibold text-white leading-tight">Add a feat</p>
               <p class="text-xs text-slate-400 mt-0.5">
@@ -178,8 +178,9 @@ watch(() => props.open, (open) => {
             </button>
           </div>
 
-          <!-- Feat list -->
-          <div class="overflow-y-auto p-4 space-y-3">
+          <!-- Feat list — the only part that gives up room, so the panel below it cannot be
+               squeezed to nothing by a long list (flex shrinks siblings in proportion). -->
+          <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
             <SearchBox
               v-if="allFeats.length > 6"
               v-model="query"
@@ -230,7 +231,10 @@ watch(() => props.open, (open) => {
           </div>
 
           <!-- What the pick still needs, and what it cannot finish -->
-          <div v-if="selectedFeat" class="border-t border-surface-700/60 p-4 space-y-3 overflow-y-auto">
+          <div
+            v-if="selectedFeat"
+            class="flex-shrink-0 max-h-[40vh] overflow-y-auto border-t border-surface-700/60 p-4 space-y-3"
+          >
             <AbilityScoreChoicePicker
               v-if="abilityChoice"
               v-model="abilityPicks"
@@ -250,7 +254,7 @@ watch(() => props.open, (open) => {
           </div>
 
           <!-- Footer -->
-          <div class="flex items-center gap-2 p-4 pt-3 border-t border-surface-700/60">
+          <div class="flex-shrink-0 flex items-center gap-2 p-4 pt-3 border-t border-surface-700/60">
             <div class="flex-1" />
             <button class="btn-ghost text-xs" @click="emit('close')">Cancel</button>
             <button class="btn-primary text-xs" :disabled="!canAdd" @click="add">Add feat</button>
