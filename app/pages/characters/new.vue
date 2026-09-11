@@ -10,6 +10,7 @@ import {
   type AbilityPicks,
 } from '~/services/abilityScoreChoice'
 import { filterBySearch } from '~/services/searchFilter'
+import { cleanEquipmentName } from '~/services/equipment'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
 import type { AbilityScoreChoice } from '~/types/rulepack'
 
@@ -298,7 +299,8 @@ async function createCharacter() {
       const match = item.match(/^(\d+)\s+(.+)$/)
       return {
         id: crypto.randomUUID(),
-        name: (match ? match[2] : item) ?? item,
+        // A book may write its list as data references; the sheet wants the name alone.
+        name: cleanEquipmentName((match ? match[2] : item) ?? item),
         quantity: match?.[1] ? Number.parseInt(match[1]) : 1,
       }
     }),
