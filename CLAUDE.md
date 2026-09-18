@@ -194,6 +194,24 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   `Magic (Constitution only)` so two `Magic` rows do not read as a bug, and
   `compactBonusesByAbility()` drops the abilities nobody singled out, so opening the
   editor on all six leaves nothing behind in the record.
+- **Half a proficiency bonus is derived too, and never stored as a proficiency level.**
+  `app/services/halfProficiency.ts` reads a bard's Jack of All Trades off the wording the
+  way an aura is read: the sentence has to name half a proficiency bonus *and* a check, so
+  a half that goes to a saving throw or to damage is not one. The sniff also carries what
+  the sentence scopes it to — a Champion's Remarkable Athlete names Strength, Dexterity
+  and Constitution and rounds *up*, where Jack of All Trades names no ability and rounds
+  down — which is why the abilities and the rounding are read per feature rather than
+  hard-coded; two features covering the same check take the better rounding rather than
+  stacking. `Character.halfProficiencyChecks` overrides it (null = derive, false switches
+  a misread off, true turns it on for all six), the `carryingCapacityMultiplier` idiom.
+  Nothing about it is persisted and `ProficiencyLevel` stays `0 | 1 | 2`: it applies only
+  where there is no proficiency, so it can never stack with the whole, and the skill dot's
+  click cycle stays none → proficient → expertise. The half shows as a diagonally
+  half-filled dot (`.proficiency-dot.half`), since a hollow ring is already the "none"
+  state. Initiative gets it as well — it is a Dexterity check — added in
+  `initiativeBreakdown` rather than by the feature sniff, and suppressed when a part on
+  the roll already carries a whole proficiency bonus (a harengon's trait).
+
 - **Carrying capacity is derived, and what doubles it is found by wording.**
   `app/services/equipment.ts` builds it from Strength × 15, doubled once per feature
   whose text both mentions carrying capacity and says it is doubled or counts you one size

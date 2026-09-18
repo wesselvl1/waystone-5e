@@ -42,6 +42,24 @@ function fmt(n: number) { return n >= 0 ? `+${n}` : `${n}` }
 function profLevel(key: SkillKey): ProficiencyLevel {
   return (props.character.skillProficiencies[key] ?? 0) as ProficiencyLevel
 }
+
+/**
+ * The feature lending this skill half a proficiency bonus, or null.
+ *
+ * Derived, so it is not a fourth stop on the cycle — the dot shows it, the button still
+ * steps none → proficient → expertise, and a bard who takes the proficiency loses the
+ * half on its own.
+ */
+function halfSource(key: SkillKey): string | null {
+  return stats.skillHalfProficiency.value[key] ?? null
+}
+
+function dotTitle(key: SkillKey): string {
+  const half = halfSource(key)
+  return half
+    ? `${half}: half proficiency. Click to cycle (none → prof → expertise)`
+    : 'Cycle proficiency (none → prof → expertise)'
+}
 </script>
 
 <template>
@@ -56,10 +74,11 @@ function profLevel(key: SkillKey): ProficiencyLevel {
         <button
           class="proficiency-dot"
           :class="{
+            'half': halfSource(skill.key) !== null,
             'active': profLevel(skill.key) === 1,
             'expertise': profLevel(skill.key) === 2,
           }"
-          :title="`Cycle proficiency (none → prof → expertise)`"
+          :title="dotTitle(skill.key)"
           @click="cycleProf(skill.key)"
         />
         <span class="flex-1 text-sm text-slate-300">{{ skill.label }}</span>
