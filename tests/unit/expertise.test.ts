@@ -6,8 +6,11 @@ import {
   applyResolvedChoices,
   getAutomaticEvents,
   getChoiceEvents,
+  projectSkillProficiencies,
+  skillsEligibleForExpertise,
 } from '~/services/levelUpService'
 import type { Character, SkillKey } from '~/types/character'
+import type { ResolvedChoice } from '~/types/events'
 import type { Rulepack } from '~/types/rulepack'
 import { validCharacter } from '../fixtures'
 import bardFragment from '~/data/srd/bard.json'
@@ -114,5 +117,62 @@ describe('applying Expertise', () => {
       rulepack,
     )
     expect(applied.skillProficiencies.stealth).toBe(2)
+  })
+
+  it('doubles a skill the same run granted, in the order the run answered', () => {
+    const char = charWith({ arcana: 0 }, 1, 'bard')
+    const applied = applyResolvedChoices(
+      char,
+      [
+        { type: 'RESOLVED_SKILL', skills: ['arcana'] },
+        { type: 'RESOLVED_EXPERTISE', skills: ['arcana'] },
+      ],
+      rulepack,
+    )
+    expect(applied.skillProficiencies.arcana).toBe(2)
+  })
+})
+
+/**
+ * The Knowledge Domain shape: one feature grants two skills and then doubles those same
+ * two, so the expertise question is asked while the skill answers are still in the run.
+ * The wizard's picker calls these two together, against its projected character.
+ */
+describe('the skills offered for Expertise', () => {
+  const KNOWLEDGE_SKILLS: SkillKey[] = ['arcana', 'history', 'nature', 'religion']
+
+  const offered = (char: Character, answered: ResolvedChoice[]) =>
+    skillsEligibleForExpertise(KNOWLEDGE_SKILLS, projectSkillProficiencies(char, answered))
+
+  it('includes a skill granted earlier in the same run', () => {
+    // Regression: the picker read the stored character, where a CHOOSE_SKILL answered
+    // moments ago does not exist yet, so a cleric was told no skill was eligible.
+    const char = charWith({ arcana: 0, history: 0, nature: 0, religion: 0 }, 1, 'bard')
+    expect(offered(char, [{ type: 'RESOLVED_SKILL', skills: ['arcana', 'history'] }]))
+      .toEqual(['arcana', 'history'])
+  })
+
+  it('excludes a skill nothing has granted', () => {
+    const char = charWith({ arcana: 0, history: 0, nature: 0, religion: 0 }, 1, 'bard')
+    expect(offered(char, [{ type: 'RESOLVED_SKILL', skills: ['arcana'] }]))
+      .not.toContain('nature')
+  })
+
+  it('does not offer a skill the character already has expertise in', () => {
+    const char = charWith({ history: 2 }, 1, 'bard')
+    expect(offered(char, [{ type: 'RESOLVED_SKILL', skills: ['history'] }]))
+      .not.toContain('history')
+  })
+
+  it('still offers a stored proficiency, which is all a rogue ever had', () => {
+    const char = charWith({ arcana: 1 }, 6, 'rogue')
+    expect(offered(char, [])).toEqual(['arcana'])
+  })
+
+  it('does not see a skill picked later in the run', () => {
+    // The wizard asks in declaration order, and Blessings of Knowledge declares its
+    // CHOOSE_SKILL first. An answer that has not been given yet cannot count.
+    const char = charWith({ arcana: 0, history: 0, nature: 0, religion: 0 }, 1, 'bard')
+    expect(offered(char, [])).toEqual([])
   })
 })

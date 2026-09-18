@@ -21,6 +21,8 @@ import {
   getChoiceEvents,
   getAutomaticEvents,
   checkFeatPrerequisite,
+  projectSkillProficiencies,
+  skillsEligibleForExpertise,
 } from '~/services/levelUpService'
 import type { Character, AbilityKey, SkillKey } from '~/types/character'
 import type { FeatDefinition, LevelUpEventDef } from '~/types/rulepack'
@@ -421,11 +423,15 @@ const selectedExpertise = ref<SkillKey[]>([])
 /**
  * Expertise doubles an existing proficiency, so only skills the character is already
  * proficient in are eligible, and ones already at expertise are excluded.
+ *
+ * "Already" counts a CHOOSE_SKILL answered moments ago in this run: Blessings of Knowledge
+ * grants two skills and then doubles those same two, and nothing is stored until the run
+ * is applied, so reading the stored character told a Knowledge cleric there was nothing
+ * eligible. The projection is the same one the option gates re-answer against.
  */
 function expertiseCandidates(options: SkillKey[]): SkillKey[] {
-  const profs = character.value?.skillProficiencies
-  if (!profs) return []
-  return options.filter(s => (profs[s] ?? 0) === 1)
+  if (!character.value) return []
+  return skillsEligibleForExpertise(options, projectedCharacter.value.skillProficiencies)
 }
 
 function toggleExpertise(skill: SkillKey, count: number) {
@@ -472,8 +478,8 @@ const pendingPicks = computed(() => {
 /**
  * The character as this run will leave them, so the resolvers can answer against picks
  * that are not stored yet. Only what a prerequisite reads is projected — the run's
- * option answers, its spell ids and the new class level; the stub spell entries carry
- * nothing but `spellId`, which is the only field `optionAvailable` looks at.
+ * option answers, its skill picks, its spell ids and the new class level; the stub spell
+ * entries carry nothing but `spellId`, which is the only field `optionAvailable` looks at.
  */
 const projectedCharacter = computed<Character>(() => {
   const stored = toRaw(character.value!)
@@ -482,6 +488,7 @@ const projectedCharacter = computed<Character>(() => {
     ...stored,
     classes: projectedClasses.value,
     chosenOptions: { ...stored.chosenOptions, ...options },
+    skillProficiencies: projectSkillProficiencies(stored, resolvedChoices.value),
     spells: [
       ...stored.spells,
       ...spellIds.map(spellId => ({

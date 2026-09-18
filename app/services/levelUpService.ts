@@ -336,6 +336,44 @@ export function optionAvailable(
   return true
 }
 
+/**
+ * Skill proficiencies as this run's answers will leave them.
+ *
+ * A CHOOSE_SKILL answered moments ago is not written to the character until the run is
+ * applied, so anything later in the same run that reads the character has to be told
+ * about it — the Knowledge Domain's Blessings of Knowledge grants two skills and then
+ * doubles those same two. Never downgrades, which is the rule RESOLVED_SKILL itself
+ * applies: a skill already at expertise stays there.
+ */
+export function projectSkillProficiencies(
+  character: Character,
+  choices: ResolvedChoice[],
+): Character['skillProficiencies'] {
+  const projected = { ...character.skillProficiencies }
+  for (const choice of choices) {
+    if (choice.type !== 'RESOLVED_SKILL') continue
+    for (const skill of choice.skills) {
+      if ((projected[skill] ?? 0) === 0) projected[skill] = 1
+    }
+  }
+  return projected
+}
+
+/**
+ * The skills a CHOOSE_EXPERTISE may be answered with.
+ *
+ * Expertise doubles an existing proficiency, so a skill the character is not proficient
+ * in is not eligible, and one already doubled is not offered a second time. The caller
+ * passes the proficiencies *including* this run's own picks, since the wizard asks the
+ * question before any of them is stored.
+ */
+export function skillsEligibleForExpertise(
+  options: SkillKey[],
+  skillProficiencies: Character['skillProficiencies'],
+): SkillKey[] {
+  return options.filter(s => (skillProficiencies[s] ?? 0) === 1)
+}
+
 /** Total level across every class, the yardstick for a race's or feat's own pools. */
 function totalLevel(character: Character): number {
   return character.classes.reduce((sum, c) => sum + c.level, 0)
@@ -457,7 +495,7 @@ function poolFeatureId(choiceId: string): string {
 
 /**
  * The feature a pool pick is worth on its own, or undefined when the choice is not a
- * class-level pool pick.
+ * grouped pool pick.
  *
  * A pick from a shared pool was recorded in `chosenOptions` and nowhere else, so the sheet
  * — which renders `features` — showed a warlock "Eldritch Invocations" without ever saying
@@ -471,19 +509,26 @@ function poolPickFeature(
   optionId: string,
 ): Feature | undefined {
   for (const cls of rulepack.classes) {
-    for (const level of cls.levels) {
-      for (const def of level.levelUpEvents ?? []) {
-        if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId || !def.group) continue
-        // Patched-in options too, or a sourcebook invocation would be picked and then
-        // named nothing on the sheet.
-        const option = def.options.find(o => o.id === optionId)
-          ?? poolExtras(rulepack, def.group, def.id).find(o => o.id === optionId)
-        if (!option) return undefined
-        return {
-          id: poolFeatureId(choiceId),
-          name: option.name,
-          source: cls.name,
-          description: option.description,
+    // Subclass levels declare pools of their own — a Battle Master's manoeuvres, a Four
+    // Elements monk's disciplines — and looking only at the class's own levels left those
+    // picks with no feature at all, the very thing this function exists to prevent.
+    // `allOptionChoices` already walks both; the source names whichever owns the pool,
+    // since a sheet reader looking for Trip Attack is looking under Battle Master.
+    for (const owner of [cls, ...(cls.subclasses ?? [])]) {
+      for (const level of owner.levels) {
+        for (const def of level.levelUpEvents ?? []) {
+          if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId || !def.group) continue
+          // Patched-in options too, or a sourcebook invocation would be picked and then
+          // named nothing on the sheet.
+          const option = def.options.find(o => o.id === optionId)
+            ?? poolExtras(rulepack, def.group, def.id).find(o => o.id === optionId)
+          if (!option) return undefined
+          return {
+            id: poolFeatureId(choiceId),
+            name: option.name,
+            source: owner.name,
+            description: option.description,
+          }
         }
       }
     }
