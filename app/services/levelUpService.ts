@@ -32,6 +32,7 @@ import type {
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
   SetSpeedEvent,
+  SetSenseEvent,
   GrantFeatEvent,
   ChooseFeatAbilityEvent,
   ResolvedChoice,
@@ -97,6 +98,18 @@ function setSpeedEvent(
     return undefined
   }
   return { type: 'SET_SPEED', mode: def.mode, speed: def.speed }
+}
+
+/** The sense, unless an option the character has not picked guards it. Mirrors setSpeedEvent. */
+function setSenseEvent(
+  def: Extract<LevelUpEventDef, { type: 'SET_SENSE' }>,
+  character: Character,
+): SetSenseEvent | undefined {
+  if (def.whenOption
+    && character.chosenOptions?.[def.whenOption.choiceId] !== def.whenOption.optionId) {
+    return undefined
+  }
+  return { type: 'SET_SENSE', mode: def.mode, range: def.range }
 }
 
 function rollDie(sides: number): number {
@@ -923,6 +936,11 @@ export function resolveLevelUpEvents(
         if (speed) events.push(speed)
         break
       }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
+        break
+      }
       case 'CHOOSE_SPELL': {
         const choice = chooseSpellEvent(eventDef, character)
         if (choice) events.push(choice)
@@ -1064,6 +1082,11 @@ export function resolveLevelUpEvents(
         if (speed) events.push(speed)
         break
       }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
+        break
+      }
       case 'SET_WILD_SHAPE_LIMITS':
         events.push({
           type: 'SET_WILD_SHAPE_LIMITS',
@@ -1148,6 +1171,11 @@ export function resolveLevelUpEvents(
           case 'SET_SPEED': {
             const speed = setSpeedEvent(eventDef, character)
             if (speed) events.push(speed)
+            break
+          }
+          case 'SET_SENSE': {
+            const sense = setSenseEvent(eventDef, character)
+            if (sense) events.push(sense)
             break
           }
           case 'CHOOSE_SKILL': {
@@ -1255,6 +1283,11 @@ export function resolveFeatEvents(
       case 'SET_SPEED': {
         const speed = setSpeedEvent(eventDef, character)
         if (speed) events.push(speed)
+        break
+      }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
         break
       }
       case 'CHOOSE_EXPERTISE':
@@ -1677,6 +1710,10 @@ export function applyAutomaticEvents(
         updated.speeds = { ...updated.speeds, [event.mode]: event.speed }
         break
       }
+      case 'SET_SENSE': {
+        updated.senses = { ...updated.senses, [event.mode]: event.range }
+        break
+      }
       case 'SET_SPELLCASTING_ABILITY': {
         // Recorded per source so a cleric/sorcerer has two DCs. The deprecated
         // character.spellcastingAbility is left alone: feat prerequisites still read it.
@@ -1996,7 +2033,7 @@ export function applyResolvedChoices(
             if (group.level > totalLevel(updated)) continue
             for (const evt of group.levelUpEvents) {
               if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY'
-                && evt.type !== 'SET_SPEED') continue
+                && evt.type !== 'SET_SPEED' && evt.type !== 'SET_SENSE') continue
               if (evt.whenOption?.choiceId !== choice.choiceId) continue
               if (evt.whenOption.optionId !== choice.optionId) continue
               // Elf Weapon Training and Fleet of Foot: the arm grants a proficiency or a
@@ -2009,6 +2046,12 @@ export function applyResolvedChoices(
               }
               if (evt.type === 'SET_SPEED') {
                 updated.speeds = { ...updated.speeds, [evt.mode]: evt.speed }
+                continue
+              }
+              // Custom Lineage's darkvision-or-skill arm: the answer landed in this run,
+              // same as Fleet of Foot's speed above.
+              if (evt.type === 'SET_SENSE') {
+                updated.senses = { ...updated.senses, [evt.mode]: evt.range }
                 continue
               }
               // Through grantSpellsEvent, not by hand: it is what resolves the ability,

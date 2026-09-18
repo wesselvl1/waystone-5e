@@ -2,7 +2,7 @@
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { exportCharacter } from '~/services/characterIO'
-import { backfillRacialBonuses } from '~/services/characterMigration'
+import { backfillRacialBonuses, backfillSensesAndResistances } from '~/services/characterMigration'
 import { backfillPoolPickFeatures, backfillSubclassFeatures } from '~/services/levelUpService'
 import type { Character } from '~/types/character'
 import type { ClassDefinition } from '~/types/rulepack'
@@ -25,6 +25,7 @@ onMounted(async () => {
   character.value = await backfillPoolPicks(character.value)
   character.value = await backfillSubclassFeats(character.value)
   character.value = await backfillSubraceSpeeds(character.value)
+  character.value = await backfillRaceSensesAndResistances(character.value)
   loading.value = false
 })
 
@@ -82,6 +83,21 @@ async function backfillRacialIncreases(char: Character): Promise<Character> {
   const race = rulepackStore.getRace(char.race)
   const subrace = race?.subraces?.find(s => s.id === char.subrace)
   const filled = backfillRacialBonuses(char, race, subrace)
+  if (filled === char) return char
+  await characterStore.save(filled)
+  return filled
+}
+
+/**
+ * Adds the senses and resistances a character's race and subrace grant but never
+ * recorded — darkvision, Hellish Resistance — the same way backfillRacialIncreases adds
+ * ability bonuses. Needs the race out of a loaded pack, so it runs here rather than in
+ * migrateCharacterShape.
+ */
+async function backfillRaceSensesAndResistances(char: Character): Promise<Character> {
+  const race = rulepackStore.getRace(char.race)
+  const subrace = race?.subraces?.find(s => s.id === char.subrace)
+  const filled = backfillSensesAndResistances(char, race, subrace)
   if (filled === char) return char
   await characterStore.save(filled)
   return filled

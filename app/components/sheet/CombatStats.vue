@@ -57,6 +57,14 @@ const otherSpeeds = computed(() => ([
   { label: 'Climb', value: props.character.speeds.climb },
 ].filter((s): s is { label: string; value: number } => typeof s.value === 'number' && s.value > 0)))
 
+/** Darkvision and the rest, read-only here: they come from the race/subrace data the
+    backfill and the creation wizard fill in, not something typed free-form beside speed. */
+const senses = computed(() => (
+  Object.entries(props.character.senses ?? {})
+    .filter((e): e is [string, number] => typeof e[1] === 'number' && e[1] > 0)
+    .map(([mode, range]) => ({ label: mode[0]!.toUpperCase() + mode.slice(1), value: range }))
+))
+
 const hpPercent = computed(() => {
   const max = props.character.hp.max
   return max > 0 ? Math.max(0, Math.min(100, (props.character.hp.current / max) * 100)) : 0
@@ -244,6 +252,16 @@ function applyHpChange() {
         :key="speed.label"
         class="text-xs text-slate-400 bg-surface-800/60 border border-surface-700/60 rounded px-2 py-1"
       >{{ speed.label }} <span class="text-white">{{ speed.value }}</span> ft</span>
+    </div>
+
+    <!-- Senses, beside the speeds they travel with: a dwarf's darkvision, a bat's
+         blindsight. Same read-only chip treatment as the extra speeds above. -->
+    <div v-if="senses.length" class="flex flex-wrap gap-2">
+      <span
+        v-for="sense in senses"
+        :key="sense.label"
+        class="text-xs text-slate-400 bg-surface-800/60 border border-surface-700/60 rounded px-2 py-1"
+      >{{ sense.label }} <span class="text-white">{{ sense.value }}</span> ft</span>
     </div>
 
     <!-- Hit Dice: one pool per class, since a fighter/wizard spends d10s and d6s apart -->

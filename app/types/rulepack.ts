@@ -1,4 +1,4 @@
-import type { AbilityKey, AbilityScores, SkillKey, SpellcastingOrigin, SpellSlotLevel } from './character'
+import type { AbilityKey, AbilityScores, CharacterSenses, SkillKey, SpellcastingOrigin, SpellSlotLevel } from './character'
 
 /**
  * Which ability a granted or chosen spell casts with.
@@ -63,9 +63,18 @@ export interface Race {
   name: string
   size: 'tiny' | 'small' | 'medium' | 'large'
   speeds: RaceSpeeds
+  /** Darkvision and the like, before a subrace's own are merged in — see `raceSenses()`. */
+  senses?: CharacterSenses
   abilityScoreBonuses: Partial<Record<AbilityKey, number>>
   traits: RaceTrait[]
   languages: string[]
+  /**
+   * Hellish Resistance, Dwarven Resilience — before a subrace's own are unioned in, see
+   * `raceResistances()`.
+   */
+  damageResistances?: string[]
+  damageImmunities?: string[]
+  conditionImmunities?: string[]
   /** Bonuses the player distributes, e.g. half-elf's +1 to two abilities of choice. */
   abilityScoreChoice?: AbilityScoreChoice
   /** Events fired at a given total character level (tiefling spells, dragonborn ancestry). */
@@ -111,6 +120,16 @@ export interface Subrace {
   replacesRaceTraits?: string[]
   /** Speed values this subrace grants or overrides (e.g. fly: 30 for Winged Tiefling). */
   speedOverrides?: Partial<RaceSpeeds>
+  /**
+   * Senses this subrace grants on top of the race's own — `raceSenses()` takes the
+   * larger range per mode, since a subrace's darkvision should not blind out a race
+   * that already sees further.
+   */
+  senses?: CharacterSenses
+  /** Unioned with the race's own by `raceResistances()`, not replaced. */
+  damageResistances?: string[]
+  damageImmunities?: string[]
+  conditionImmunities?: string[]
   /** Events fired at a given total character level (high elf's cantrip). */
   levelUpEvents?: SourceLevelEvents[]
 }
@@ -165,6 +184,19 @@ export type LevelUpEventDef =
     type: 'SET_SPEED'
     mode: 'walk' | 'climb' | 'swim' | 'fly'
     speed: number
+    whenOption?: { choiceId: string; optionId: string }
+  }
+  | {
+    /**
+     * Sets one sense outright, for a sense hanging off a choice rather than one the race
+     * simply has. Tasha's Custom Lineage offers 60ft darkvision *or* a skill — an "or"
+     * a static `Race.senses` field cannot express — so the darkvision arm is this
+     * instead. A race or subrace that just has the sense declares it on its own
+     * `senses` field, the way `Race.speeds` and `Subrace.speedOverrides` do for a speed.
+     */
+    type: 'SET_SENSE'
+    mode: 'darkvision' | 'blindsight' | 'tremorsense' | 'truesight'
+    range: number
     whenOption?: { choiceId: string; optionId: string }
   }
   | {

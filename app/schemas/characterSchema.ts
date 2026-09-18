@@ -187,6 +187,13 @@ export const CharacterSchema = z.object({
     swim: z.number().int().min(0).optional(),
     fly: z.number().int().min(0).optional(),
   }),
+  // Darkvision and the like, merged from the character's race and subrace.
+  senses: z.object({
+    darkvision: z.number().int().min(0).optional(),
+    blindsight: z.number().int().min(0).optional(),
+    tremorsense: z.number().int().min(0).optional(),
+    truesight: z.number().int().min(0).optional(),
+  }).optional(),
   initiative: z.number().nullable(),
   initiativeBonuses: AttackBonusSetSchema.optional(),
   // Either the pre-multiclass single pool or the per-class array; normalised below.
@@ -207,6 +214,11 @@ export const CharacterSchema = z.object({
     failures: z.number().int().min(0).max(3),
   }),
   conditions: z.array(z.string()),
+  // Merged from race and subrace by raceResistances(), which unions rather than
+  // overrides. Absent, not empty, is what marks a character not yet migrated.
+  damageResistances: z.array(z.string()).optional(),
+  damageImmunities: z.array(z.string()).optional(),
+  conditionImmunities: z.array(z.string()).optional(),
 
   savingThrowProficiencies: z.array(z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha'])),
   savingThrowBonuses: AttackBonusSetSchema.optional(),

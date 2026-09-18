@@ -400,6 +400,13 @@ export interface SetSpeedEvent {
   speed: number
 }
 
+/** A sense set to a fixed range — the darkvision arm of Tasha's Custom Lineage. */
+export interface SetSenseEvent {
+  type: 'SET_SENSE'
+  mode: 'darkvision' | 'blindsight' | 'tremorsense' | 'truesight'
+  range: number
+}
+
 export type AutomaticLevelUpEvent =
   | AddHpEvent
   | GrantSpellcastingEvent
@@ -414,6 +421,7 @@ export type AutomaticLevelUpEvent =
   | SetWildShapeLimitsEvent
   | SetSpellcastingAbilityEvent
   | SetSpeedEvent
+  | SetSenseEvent
   | GrantFeatEvent
 
 export type ChoiceLevelUpEvent =

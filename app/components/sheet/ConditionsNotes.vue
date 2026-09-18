@@ -23,6 +23,13 @@ function isActive(condition: string) {
   return props.character.conditions.includes(condition.toLowerCase())
 }
 
+/** Whether there is anything to show in the resistances card at all, so an empty card
+    does not sit between Conditions and Proficiencies for a character with none. */
+const hasResistances = computed(() =>
+  (props.character.damageResistances?.length ?? 0) > 0
+  || (props.character.damageImmunities?.length ?? 0) > 0
+  || (props.character.conditionImmunities?.length ?? 0) > 0)
+
 const draftNotes = ref(props.character.notes)
 watch(() => props.character.notes, v => { draftNotes.value = v })
 
@@ -55,6 +62,43 @@ function saveAppearance() {
         >
           {{ condition }}
         </button>
+      </div>
+    </div>
+
+    <!-- Resistances & immunities granted by race, subrace or a feature that says so —
+         Hellish Resistance, Dwarven Resilience. Read-only: they come from rulepack data
+         (backfilled or set at creation), not something typed free-form on this tab. -->
+    <div v-if="hasResistances" class="card space-y-2">
+      <p class="section-header">Resistances &amp; Immunities</p>
+      <div v-if="character.damageResistances?.length" class="space-y-1">
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Damage Resistance</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="r in character.damageResistances"
+            :key="r"
+            class="text-xs px-2.5 py-1 rounded-full border border-surface-600 bg-surface-700 text-slate-300 capitalize"
+          >{{ r }}</span>
+        </div>
+      </div>
+      <div v-if="character.damageImmunities?.length" class="space-y-1">
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Damage Immunity</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="r in character.damageImmunities"
+            :key="r"
+            class="text-xs px-2.5 py-1 rounded-full border border-surface-600 bg-surface-700 text-slate-300 capitalize"
+          >{{ r }}</span>
+        </div>
+      </div>
+      <div v-if="character.conditionImmunities?.length" class="space-y-1">
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Condition Immunity</p>
+        <div class="flex flex-wrap gap-2">
+          <span
+            v-for="r in character.conditionImmunities"
+            :key="r"
+            class="text-xs px-2.5 py-1 rounded-full border border-surface-600 bg-surface-700 text-slate-300 capitalize"
+          >{{ r }}</span>
+        </div>
       </div>
     </div>
 

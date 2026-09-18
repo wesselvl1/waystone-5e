@@ -45,6 +45,14 @@ const RaceSpeedsSchema = z.object({
   fly: z.number().int().min(0).optional(),
 })
 
+// Mirrors CharacterSenses: every mode optional, absent means "sees as anyone does".
+const CharacterSensesSchema = z.object({
+  darkvision: z.number().int().min(0).optional(),
+  blindsight: z.number().int().min(0).optional(),
+  tremorsense: z.number().int().min(0).optional(),
+  truesight: z.number().int().min(0).optional(),
+})
+
 const SpellSlotLevelSchema = z.union([
   z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5),
   z.literal(6), z.literal(7), z.literal(8), z.literal(9),
@@ -125,6 +133,16 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     mode: z.enum(['walk', 'climb', 'swim', 'fly']),
     speed: z.number().int().min(0),
     // Set only when an option was picked, e.g. the Fleet of Foot arm.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+  }),
+  z.object({
+    type: z.literal('SET_SENSE'),
+    mode: z.enum(['darkvision', 'blindsight', 'tremorsense', 'truesight']),
+    range: z.number().int().min(0),
+    // Set only when an option was picked, e.g. Custom Lineage's darkvision arm.
     whenOption: z.object({
       choiceId: z.string(),
       optionId: z.string(),
@@ -326,6 +344,12 @@ const SubraceSchema = z.object({
   replacesRaceTraits: z.array(z.string()).optional(),
   traits: z.array(RaceTraitSchema),
   speedOverrides: RaceSpeedsSchema.partial().optional(),
+  // Merged over the race's own by raceSenses()/raceResistances() — senses take the
+  // larger range per mode, the resistance lists union.
+  senses: CharacterSensesSchema.optional(),
+  damageResistances: z.array(z.string()).optional(),
+  damageImmunities: z.array(z.string()).optional(),
+  conditionImmunities: z.array(z.string()).optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
 })
 
@@ -334,9 +358,13 @@ const RaceSchema = z.object({
   name: z.string(),
   size: z.enum(['tiny', 'small', 'medium', 'large']),
   speeds: RaceSpeedsSchema,
+  senses: CharacterSensesSchema.optional(),
   abilityScoreBonuses: z.partialRecord(AbilityKeySchema, z.number()),
   traits: z.array(RaceTraitSchema),
   languages: z.array(z.string()),
+  damageResistances: z.array(z.string()).optional(),
+  damageImmunities: z.array(z.string()).optional(),
+  conditionImmunities: z.array(z.string()).optional(),
   abilityScoreChoice: AbilityScoreChoiceSchema.optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
   // The race stands on its own; any subraces are sourcebook variants, so "None" is offered.

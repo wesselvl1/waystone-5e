@@ -3,10 +3,10 @@ import {
   sumBonuses,
   type AbilityPicks,
 } from '~/services/abilityScoreChoice'
-import { raceAbilityBonuses } from '~/services/multiclass'
+import { raceAbilityBonuses, raceResistances, raceSenses } from '~/services/multiclass'
 import { abilityMod } from '~/composables/useCharacterStats'
 import { cleanEquipmentName } from '~/services/equipment'
-import type { AbilityKey, AttackEntry, Character, HitDicePool, SpellSlots } from '~/types/character'
+import type { AbilityKey, AttackEntry, Character, CharacterSenses, HitDicePool, SpellSlots } from '~/types/character'
 import type { AbilityScoreChoice, Race, Subrace } from '~/types/rulepack'
 
 /**
@@ -309,4 +309,52 @@ export function racialChoicePatch(character: Character, picks: AbilityPicks): Pa
     abilityScores,
     appliedRacialBonuses: sumBonuses([character.appliedRacialBonuses, picks]),
   }
+}
+
+/**
+ * Adds the senses and resistances a character's race and subrace grant, for a character
+ * built before `Character` carried those fields — every one of them, since this landed
+ * after darkvision and Hellish Resistance were already prose-only. Needs the race out of
+ * a loaded pack, the same reason `backfillRacialBonuses` does, so it runs alongside it
+ * from the sheet rather than here in the shape migration.
+ *
+ * Fills only what is missing, mode by mode and list by list: a value the player has
+ * since edited on the sheet — down to an empty list, meaning "resists nothing" — is left
+ * alone rather than reinstated on every load. Absence is the only signal that a field was
+ * never backfilled, which is why an already-present empty list is not touched again.
+ *
+ * Returns the character unchanged when there is nothing to add, so the caller can skip
+ * the save.
+ */
+export function backfillSensesAndResistances(
+  character: Character,
+  race: Race | undefined,
+  subrace: Subrace | undefined,
+): Character {
+  if (!race) return character
+
+  const grantedSenses = raceSenses(race, subrace)
+  const missingSenses = Object.fromEntries(
+    Object.entries(grantedSenses)
+      .filter(([mode]) => character.senses?.[mode as keyof CharacterSenses] === undefined),
+  )
+
+  const grantedResistances = raceResistances(race, subrace)
+  const patch: Partial<Character> = {}
+
+  if (Object.keys(missingSenses).length > 0) {
+    patch.senses = { ...character.senses, ...missingSenses }
+  }
+  if (character.damageResistances === undefined && grantedResistances.damageResistances.length > 0) {
+    patch.damageResistances = grantedResistances.damageResistances
+  }
+  if (character.damageImmunities === undefined && grantedResistances.damageImmunities.length > 0) {
+    patch.damageImmunities = grantedResistances.damageImmunities
+  }
+  if (character.conditionImmunities === undefined && grantedResistances.conditionImmunities.length > 0) {
+    patch.conditionImmunities = grantedResistances.conditionImmunities
+  }
+
+  if (Object.keys(patch).length === 0) return character
+  return { ...character, ...patch }
 }

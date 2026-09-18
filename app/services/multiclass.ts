@@ -1,4 +1,4 @@
-import type { AbilityKey, AbilityScores, Character, ClassEntry, HitDicePool } from '~/types/character'
+import type { AbilityKey, AbilityScores, Character, CharacterSenses, ClassEntry, HitDicePool } from '~/types/character'
 import type {
   AbilityScoreChoice,
   ClassDefinition,
@@ -120,6 +120,47 @@ export function raceSpeeds(
   subrace: Pick<Subrace, 'speedOverrides'> | undefined,
 ): RaceSpeeds {
   return { ...(race?.speeds ?? { walk: 30 }), ...(subrace?.speedOverrides ?? {}) }
+}
+
+const SENSE_MODES = ['darkvision', 'blindsight', 'tremorsense', 'truesight'] as const
+
+/**
+ * The senses a race and subrace together grant.
+ *
+ * Unlike a speed, a subrace's own sense does not simply replace the race's: taking the
+ * larger range per mode is what a variant granting *less* darkvision than the race
+ * already has should do, rather than blinding a character down to the subrace's number.
+ * A speed override can afford to overwrite because a race rarely prints two conflicting
+ * speeds for the same mode; two conflicting senses are exactly what a subrace widening
+ * an existing one looks like.
+ */
+export function raceSenses(
+  race: Pick<Race, 'senses'> | undefined,
+  subrace: Pick<Subrace, 'senses'> | undefined,
+): CharacterSenses {
+  const out: CharacterSenses = {}
+  for (const mode of SENSE_MODES) {
+    const largest = Math.max(race?.senses?.[mode] ?? 0, subrace?.senses?.[mode] ?? 0)
+    if (largest > 0) out[mode] = largest
+  }
+  return out
+}
+
+/**
+ * The damage resistance, damage immunity and condition immunity lists a race and
+ * subrace together grant, unioned rather than overridden — Hellish Resistance and a
+ * subrace's own resistance both apply to a variant that carries each.
+ */
+export function raceResistances(
+  race: Pick<Race, 'damageResistances' | 'damageImmunities' | 'conditionImmunities'> | undefined,
+  subrace: Pick<Subrace, 'damageResistances' | 'damageImmunities' | 'conditionImmunities'> | undefined,
+): { damageResistances: string[]; damageImmunities: string[]; conditionImmunities: string[] } {
+  const union = (a?: string[], b?: string[]) => [...new Set([...(a ?? []), ...(b ?? [])])]
+  return {
+    damageResistances: union(race?.damageResistances, subrace?.damageResistances),
+    damageImmunities: union(race?.damageImmunities, subrace?.damageImmunities),
+    conditionImmunities: union(race?.conditionImmunities, subrace?.conditionImmunities),
+  }
 }
 
 /**

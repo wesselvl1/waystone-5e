@@ -2,7 +2,7 @@
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { resolveLevelUpEvents, getChoiceEvents } from '~/services/levelUpService'
-import { raceAbilityBonuses, raceSpeeds } from '~/services/multiclass'
+import { raceAbilityBonuses, raceResistances, raceSenses, raceSpeeds } from '~/services/multiclass'
 import {
   choiceSummary,
   isChoiceSatisfied,
@@ -90,6 +90,11 @@ const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id ==
  * every one of those characters was stored walking and nothing else.
  */
 const speeds = computed(() => raceSpeeds(selectedRace.value, selectedSubrace.value))
+
+/** Darkvision and the like, race and subrace merged the same way speeds are. */
+const senses = computed(() => raceSenses(selectedRace.value, selectedSubrace.value))
+/** Damage resistance, damage immunity and condition immunity, race and subrace unioned. */
+const resistances = computed(() => raceResistances(selectedRace.value, selectedSubrace.value))
 
 /** Whether step 1 may not continue until a subrace is picked. */
 const subraceRequired = computed(() =>
@@ -287,12 +292,16 @@ async function createCharacter() {
         },
     armorClass: null,
     speeds: speeds.value,
+    senses: senses.value,
     initiative: null,
     hitDice: startingLevel > 0
       ? [{ classId: draft.classId, die: cls?.hitDie ?? 'd8', total: startingLevel, remaining: startingLevel }]
       : [],
     deathSaves: { successes: 0, failures: 0 },
     conditions: [],
+    damageResistances: resistances.value.damageResistances,
+    damageImmunities: resistances.value.damageImmunities,
+    conditionImmunities: resistances.value.conditionImmunities,
 
     savingThrowProficiencies: cls?.savingThrowProficiencies ?? [],
     skillProficiencies: skillProfs,
