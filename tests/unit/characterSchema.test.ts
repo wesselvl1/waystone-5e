@@ -95,6 +95,24 @@ describe('saving throw bonuses survive the import boundary', () => {
     expect(result.data?.savingThrowAbilityBonus).toEqual({ ability: 'cha', minimum: 1 })
   })
 
+  it('keeps the slots that single out one save', () => {
+    const result = CharacterSchema.safeParse({
+      ...validCharacter,
+      savingThrowBonusesByAbility: { con: { magic: 2 }, wis: { misc: -1 } },
+    })
+    expect(result.success).toBe(true)
+    expect(result.data?.savingThrowBonusesByAbility)
+      .toEqual({ con: { magic: 2 }, wis: { misc: -1 } })
+  })
+
+  it('drops a per-save slot keyed by something that is not an ability', () => {
+    const result = CharacterSchema.safeParse({
+      ...validCharacter,
+      savingThrowBonusesByAbility: { luck: { magic: 2 } },
+    })
+    expect(result.data?.savingThrowBonusesByAbility).toEqual({})
+  })
+
   it("keeps 'none', which is how a misread aura is switched off", () => {
     const result = CharacterSchema.safeParse({
       ...validCharacter,

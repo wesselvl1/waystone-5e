@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Character, AbilityKey } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
-import { savingThrowBonusTotal } from '~/services/savingThrows'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -27,7 +26,8 @@ function toggleSave(key: AbilityKey) {
   emit('update', { savingThrowProficiencies: updated })
 }
 
-function saveBonuses(patch: Pick<Character, 'savingThrowBonuses' | 'savingThrowAbilityBonus'>) {
+function saveBonuses(patch: Pick<Character,
+  'savingThrowBonuses' | 'savingThrowBonusesByAbility' | 'savingThrowAbilityBonus'>) {
   emit('update', patch)
   editing.value = null
 }
@@ -35,15 +35,16 @@ function saveBonuses(patch: Pick<Character, 'savingThrowBonuses' | 'savingThrowA
 /**
  * Whether anything beyond the ability and proficiency is in play — the dot on the header
  * that says the numbers below are carrying something, without opening all six.
+ *
+ * Asked of the totals rather than of the stored fields, so it covers every layer at once
+ * — features, both sets of slots, the aura — and stays quiet where a set nets to zero or
+ * the aura has been switched off, neither of which is the sheet carrying anything.
  */
-const hasExtras = computed(() =>
-  savingThrowBonusTotal(props.character) !== 0
-  || !!props.character.savingThrowAbilityBonus
-  || ABILITIES.some(({ key }) => {
-    const base = stats.abilityModifiers.value[key]
-      + (props.character.savingThrowProficiencies.includes(key) ? stats.profBonus.value : 0)
-    return stats.savingThrows.value[key] !== base
-  }))
+const hasExtras = computed(() => ABILITIES.some(({ key }) => {
+  const base = stats.abilityModifiers.value[key]
+    + (props.character.savingThrowProficiencies.includes(key) ? stats.profBonus.value : 0)
+  return stats.savingThrows.value[key] !== base
+}))
 
 function fmt(n: number) { return n >= 0 ? `+${n}` : `${n}` }
 </script>

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  compactBonusesByAbility,
   savingThrowBreakdown,
   savingThrowParts,
   savingThrowTotals,
@@ -192,5 +193,67 @@ describe('the hand-set ability bonus overrides what was read', () => {
   it('derives again once the setting is cleared', () => {
     const c = character({ features: [AURA_OF_PROTECTION], savingThrowAbilityBonus: null })
     expect(savingThrowBreakdown(c, 'wis', ctx).total).toBe(2)
+  })
+})
+
+describe('the slots that single out one save', () => {
+  it('lands on the save it names and no other', () => {
+    const c = character({ savingThrowBonusesByAbility: { con: { magic: 2 } } })
+    const totals = savingThrowTotals(c, ctx)
+    expect(totals.con).toBe(4)
+    expect(totals.str).toBe(3)
+    expect(totals.wis).toBe(1)
+  })
+
+  it('stacks on top of the slots that apply to every save', () => {
+    const c = character({
+      savingThrowBonuses: { magic: 1 },
+      savingThrowBonusesByAbility: { con: { misc: 2 } },
+    })
+    const totals = savingThrowTotals(c, ctx)
+    expect(totals.con).toBe(5)
+    expect(totals.str).toBe(4)
+  })
+
+  it('says which layer each line came from, so two Magics do not read as a bug', () => {
+    const c = character({
+      savingThrowBonuses: { magic: 1 },
+      savingThrowBonusesByAbility: { con: { magic: 2 } },
+    })
+    const { parts } = savingThrowBreakdown(c, 'con', ctx)
+    expect(parts).toContainEqual({ label: 'Magic', value: 1 })
+    expect(parts).toContainEqual({ label: 'Magic (Constitution only)', value: 2 })
+  })
+
+  it('stacks with a derived aura and with proficiency', () => {
+    const c = character({
+      features: [AURA_OF_PROTECTION],
+      savingThrowProficiencies: ['con'],
+      savingThrowBonusesByAbility: { con: { feat: 2 } },
+    })
+    // Constitution 2 + proficiency 3 + aura floor 1 + feat 2
+    expect(savingThrowBreakdown(c, 'con', ctx).total).toBe(8)
+  })
+
+  it('carries a penalty as readily as a bonus', () => {
+    const c = character({ savingThrowBonusesByAbility: { dex: { misc: -2 } } })
+    expect(savingThrowTotals(c, ctx).dex).toBe(0)
+  })
+})
+
+describe('compacting the per-ability slots', () => {
+  it('drops an ability whose slots are all zero', () => {
+    expect(compactBonusesByAbility({ con: { magic: 0 }, wis: { misc: 1 } }))
+      .toEqual({ wis: { misc: 1 } })
+  })
+
+  it('drops the whole record when nobody has been singled out', () => {
+    expect(compactBonusesByAbility({ con: {}, wis: { magic: 0 } })).toBeUndefined()
+    expect(compactBonusesByAbility(undefined)).toBeUndefined()
+  })
+
+  it('keeps only the slots that carry a number', () => {
+    expect(compactBonusesByAbility({ con: { magic: 1, feat: 0, misc: -1 } }))
+      .toEqual({ con: { magic: 1, misc: -1 } })
   })
 })

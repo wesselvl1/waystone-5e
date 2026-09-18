@@ -72,6 +72,16 @@ export type InitiativeBonuses = AttackBonusSet
 export type SavingThrowBonuses = AttackBonusSet
 
 /**
+ * The same three slots again, for the save that does not share them: a periapt of health
+ * on Constitution alone, a ring that turns one school aside.
+ *
+ * These sit on top of the ones that apply to every save rather than replacing them, since
+ * a character wearing both a cloak of protection and a periapt has both. Keyed by ability
+ * and sparse — an ability nobody has singled out is absent, not an empty set.
+ */
+export type SavingThrowBonusesByAbility = Partial<Record<AbilityKey, AttackBonusSet>>
+
+/**
  * An ability modifier added to every saving throw — Aura of Protection's Charisma, and
  * the handful of things worded like it.
  *
@@ -389,6 +399,8 @@ export interface Character {
   savingThrowProficiencies: AbilityKey[]
   /** Hand-entered additions to every save, kept apart the way an attack's are. */
   savingThrowBonuses?: SavingThrowBonuses
+  /** And the same, for one save at a time — added on top of the ones above. */
+  savingThrowBonusesByAbility?: SavingThrowBonusesByAbility
   /**
    * The ability modifier every save gains, when the player would rather say than have it
    * read off their features. Null or absent means derive it — see `savingThrowParts()`.
