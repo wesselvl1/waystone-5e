@@ -532,6 +532,17 @@ const OptionPoolPatchSchema = z.object({
   message: 'An option pool patch needs a group or a choiceId to say which pool it widens',
 })
 
+/**
+ * Where a copied entry came from, so a fork can be told apart from homebrew written from
+ * scratch — and so the app can notice when the book's own version has moved on since.
+ */
+const ForkOriginSchema = z.object({
+  packId: z.string(),
+  packName: z.string(),
+  packVersion: z.string(),
+  hash: z.string(),
+})
+
 export const RulepackSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -557,7 +568,36 @@ export const RulepackSchema = z.object({
   optionalFeatures: z.array(OptionalClassFeatureSchema).optional().default([]),
   /** Top-level option-pool patches: entries for a CHOOSE_OPTION pool another pack owns. */
   optionPools: z.array(OptionPoolPatchSchema).optional().default([]),
+  /**
+   * Provenance for entries copied out of another pack, keyed `<kind>:<id>`. Written by
+   * the in-app editor and carried through export and re-import, so a homebrew pack moved
+   * to another browser still knows which of its entries are copies and of what.
+   */
+  forkedFrom: z.record(z.string(), ForkOriginSchema).optional(),
 }).strip()
+
+/**
+ * One entry of each kind, on its own.
+ *
+ * `RulepackSchema` validates a whole file, which is the wrong unit for an editor: a
+ * player changing a spell's wording should be told what is wrong with that spell, not
+ * handed the issue list of the book around it. The keys are the Rulepack array they
+ * belong to, so one name addresses both the schema and the place the entry is stored.
+ */
+export const EntrySchemas = {
+  races: RaceSchema,
+  classes: ClassDefinitionSchema,
+  backgrounds: BackgroundSchema,
+  feats: FeatDefinitionSchema,
+  spells: SpellDefinitionSchema,
+  creatures: CreatureDefinitionSchema,
+  weapons: WeaponDefinitionSchema,
+  armor: ArmorDefinitionSchema,
+  subclasses: SubclassPatchEntrySchema,
+  subraces: SubracePatchEntrySchema,
+  optionalFeatures: OptionalClassFeatureSchema,
+  optionPools: OptionPoolPatchSchema,
+} as const
 
 export type RulepackInput = z.input<typeof RulepackSchema>
 export type RulepackFragment = z.infer<typeof RulepackSchema>

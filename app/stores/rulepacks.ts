@@ -1,8 +1,22 @@
 import { defineStore } from 'pinia'
 import { db } from '~/db'
-import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, Background, SpellDefinition, FeatDefinition, OptionalClassFeature, CreatureDefinition, CreatureFilter, WeaponDefinition, ArmorDefinition } from '~/types/rulepack'
+import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, Background, SpellDefinition, FeatDefinition, ForkOrigin, OptionalClassFeature, CreatureDefinition, CreatureFilter, WeaponDefinition, ArmorDefinition } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
 import { mergeById, mergeOptionPools, distributeSubclasses, distributeSubraces } from '~/services/rulepackMerge'
+import type { EntryKind, ForkStatus } from '~/services/homebrew'
+import {
+  HOMEBREW_PACK_ID,
+  blankHomebrewPack,
+  claimedIds,
+  deleteEntry,
+  entryId,
+  forkStatuses,
+  hashEntry,
+  inLookupOrder,
+  listEntries,
+  unshadowed,
+  upsertEntry,
+} from '~/services/homebrew'
 
 /** A rulepack entry carrying the name of the pack that defines it, for display. */
 export type WithSource<T> = T & { sourceName: string }
@@ -36,6 +50,9 @@ function applyFragment(existing: Rulepack, fragment: RulepackFragment): Rulepack
     subclasses: mergeById(existing.subclasses ?? [], pendingSubclasses),
     subraces: mergeById(existing.subraces ?? [], pendingSubraces),
     optionPools: mergeOptionPools(existing.optionPools ?? [], fragment.optionPools ?? []),
+    // Carried across a re-import: a pack moved to another browser still knows which of
+    // its entries are copies, and of what.
+    forkedFrom: { ...(existing.forkedFrom ?? {}), ...(fragment.forkedFrom ?? {}) },
   }
 }
 
@@ -65,7 +82,13 @@ function fragmentToRulepack(fragment: RulepackFragment): Rulepack {
     subclasses: pendingSubclasses,
     subraces: pendingSubraces,
     optionPools: mergeOptionPools([], fragment.optionPools ?? []),
+    forkedFrom: fragment.forkedFrom,
   }
+}
+
+/** Dexie cannot structured-clone Vue reactive proxies, and nor can `put`. */
+function plain<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
 }
 
 export const useRulepacksStore = defineStore('rulepacks', () => {
@@ -74,7 +97,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
 
   async function loadAll() {
     loading.value = true
-    rulepacks.value = await db.rulepacks.toArray()
+    rulepacks.value = inLookupOrder(await db.rulepacks.toArray())
     loading.value = false
   }
 
@@ -86,7 +109,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
   async function add(fragment: RulepackFragment): Promise<void> {
     const existingReactive = rulepacks.value.find(r => r.id === fragment.id)
     // Deep-clone to strip Vue reactive proxies — IndexedDB cannot serialize Proxy objects
-    const existing = existingReactive ? JSON.parse(JSON.stringify(existingReactive)) as Rulepack : undefined
+    const existing = existingReactive ? plain(existingReactive) : undefined
     const resolved = existing ? applyFragment(existing, fragment) : fragmentToRulepack(fragment)
 
     await db.rulepacks.put(resolved)
@@ -95,7 +118,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
       rulepacks.value[idx] = resolved
     }
     else {
-      rulepacks.value.push(resolved)
+      rulepacks.value = inLookupOrder([...rulepacks.value, resolved])
     }
   }
 
@@ -118,10 +141,25 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     return rulepacks.value.find(r => r.id === id)
   }
 
+  // -------------------------------------------------------------------------
+  // The player's own pack, and how it shadows the books
+  // -------------------------------------------------------------------------
+
+  /** The pack the in-app editor writes to. Absent until something is written. */
+  function homebrewPack(): Rulepack | undefined {
+    return rulepacks.value.find(r => r.id === HOMEBREW_PACK_ID)
+  }
+
+  /** Ids the player's own pack claims for a kind; see `claimedIds`. */
+  function claimedByHomebrew(kind: EntryKind): Set<string> {
+    return claimedIds(rulepacks.value, kind)
+  }
+
   /** Cross-pack subclass patches aimed at a class, from every loaded pack. */
   function pendingSubclassesFor(classId: string): SubclassDefinition[] {
+    const claimed = claimedByHomebrew('subclasses')
     return rulepacks.value.flatMap(p =>
-      (p.subclasses ?? [])
+      unshadowed(p, 'subclasses', p.subclasses ?? [], claimed)
         .filter(entry => entry.classId === classId)
         .map(({ classId: _classId, ...sub }) => sub),
     )
@@ -129,8 +167,9 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
 
   /** Cross-pack subrace patches aimed at a race, from every loaded pack. */
   function pendingSubracesFor(raceId: string) {
+    const claimed = claimedByHomebrew('subraces')
     return rulepacks.value.flatMap(p =>
-      (p.subraces ?? [])
+      unshadowed(p, 'subraces', p.subraces ?? [], claimed)
         .filter(entry => entry.raceId === raceId)
         .map(({ raceId: _raceId, ...sub }) => sub),
     )
@@ -180,9 +219,13 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
    * the pack it came from. Two packs' takes on the same content are both listed — pack
    * ids are namespaced (`mpmm-satyr`), so a second book's Satyr is a separate entry
    * rather than an override, and `sourceName` is what tells the two apart in a picker.
+   * The one exception is the player's own pack, whose entries shadow the ones they were
+   * copied from; see `claimedByHomebrew`.
    */
-  function withSource<T>(pick: (pack: Rulepack) => T[]): Array<WithSource<T>> {
-    return rulepacks.value.flatMap(p => pick(p).map(entry => ({ ...entry, sourceName: p.name })))
+  function withSource<T>(kind: EntryKind, pick: (pack: Rulepack) => T[]): Array<WithSource<T>> {
+    const claimed = claimedByHomebrew(kind)
+    return rulepacks.value.flatMap(p =>
+      unshadowed(p, kind, pick(p), claimed).map(entry => ({ ...entry, sourceName: p.name })))
   }
 
   /** Sorted the way the pickers list them, so merging a pack in never reshuffles. */
@@ -191,32 +234,38 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
   }
 
   function getAllRaces(): Array<WithSource<Race>> {
-    return withSource(p => p.races).sort(byName)
+    return withSource('races', p => p.races).sort(byName)
   }
 
   function getAllClasses(): Array<WithSource<ClassDefinition>> {
-    return withSource(p => p.classes).sort(byName)
+    return withSource('classes', p => p.classes).sort(byName)
   }
 
   /** By level first: the level-up picker shows several levels at once. */
   function getAllSpells(): Array<WithSource<SpellDefinition>> {
-    return withSource(p => p.spells).sort((a, b) => a.level - b.level || byName(a, b))
+    return withSource('spells', p => p.spells).sort((a, b) => a.level - b.level || byName(a, b))
   }
 
   function getAllFeats(): Array<WithSource<FeatDefinition>> {
-    return withSource(p => p.feats).sort(byName)
+    return withSource('feats', p => p.feats).sort(byName)
   }
 
   /**
    * Every creature statblock across all loaded packs. Later packs win on id, so a user
    * pack can override an SRD statblock without the SRD pack being edited — the same way
-   * custom packs already extend or override classes and spells.
+   * custom packs already extend or override classes and spells. The player's own pack is
+   * read last whatever its position, since it sorts first for the singular getters.
    */
   function getAllCreatures(): CreatureDefinition[] {
     const byId = new Map<string, CreatureDefinition>()
+    const claimed = claimedByHomebrew('creatures')
     for (const pack of rulepacks.value) {
-      for (const creature of pack.creatures ?? []) byId.set(creature.id, creature)
+      if (pack.id === HOMEBREW_PACK_ID) continue
+      for (const creature of unshadowed(pack, 'creatures', pack.creatures ?? [], claimed)) {
+        byId.set(creature.id, creature)
+      }
     }
+    for (const creature of homebrewPack()?.creatures ?? []) byId.set(creature.id, creature)
     return [...byId.values()]
   }
 
@@ -247,14 +296,13 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     })
   }
 
-
   /**
    * Every weapon across all loaded packs, for the sheet's attack picker. Tagged with its
    * source like the other pick-lists, since two books' takes on the same weapon are two
    * entries and the label is what tells them apart.
    */
   function getAllWeapons(): Array<WithSource<WeaponDefinition>> {
-    return withSource(p => p.weapons ?? []).sort(byName)
+    return withSource('weapons', p => p.weapons ?? []).sort(byName)
   }
 
   function getWeapon(weaponId: string): WeaponDefinition | undefined {
@@ -269,7 +317,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
    * calculator's one dropdown. Tagged with its source like the other pick-lists.
    */
   function getAllArmor(): Array<WithSource<ArmorDefinition>> {
-    return withSource(p => p.armor ?? []).sort(byName)
+    return withSource('armor', p => p.armor ?? []).sort(byName)
   }
 
   function getArmor(armorId: string): ArmorDefinition | undefined {
@@ -280,7 +328,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
   }
 
   function getAllBackgrounds(): Array<WithSource<Background>> {
-    return withSource(p => p.backgrounds).sort(byName)
+    return withSource('backgrounds', p => p.backgrounds).sort(byName)
   }
 
   function getBackground(backgroundId: string): Background | undefined {
@@ -312,12 +360,20 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
    * pipeline takes a single Rulepack, so anything spanning packs — a sourcebook subclass
    * on an SRD class, a feature granting an SRD spell — has to be handed this rather than
    * whichever individual pack happened to define the class.
+   *
+   * Shadowed entries are dropped here too. Leaving both in would hand the pipeline two
+   * classes with one id, and which of them it found would depend on array order.
    */
   function composedPack(): Rulepack {
-    const classes = rulepacks.value.flatMap(p => p.classes.map(c => ({ ...c })))
-    const races = rulepacks.value.flatMap(p => p.races.map(r => ({ ...r })))
-    distributeSubclasses(classes, rulepacks.value.flatMap(p => p.subclasses ?? []))
-    distributeSubraces(races, rulepacks.value.flatMap(p => p.subraces ?? []))
+    const composed = <T>(kind: EntryKind, pick: (pack: Rulepack) => T[]): T[] => {
+      const claimed = claimedByHomebrew(kind)
+      return rulepacks.value.flatMap(p => unshadowed(p, kind, pick(p), claimed))
+    }
+
+    const classes = composed('classes', p => p.classes).map(c => ({ ...c }))
+    const races = composed('races', p => p.races).map(r => ({ ...r }))
+    distributeSubclasses(classes, composed('subclasses', p => p.subclasses ?? []))
+    distributeSubraces(races, composed('subraces', p => p.subraces ?? []))
 
     return {
       id: 'composed',
@@ -325,16 +381,16 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
       version: '0',
       races,
       classes,
-      backgrounds: rulepacks.value.flatMap(p => p.backgrounds),
-      feats: rulepacks.value.flatMap(p => p.feats),
-      spells: rulepacks.value.flatMap(p => p.spells),
+      backgrounds: composed('backgrounds', p => p.backgrounds),
+      feats: composed('feats', p => p.feats),
+      spells: composed('spells', p => p.spells),
       creatures: getAllCreatures(),
-      weapons: rulepacks.value.flatMap(p => p.weapons ?? []),
-      armor: rulepacks.value.flatMap(p => p.armor ?? []),
-      optionalFeatures: rulepacks.value.flatMap(p => p.optionalFeatures),
+      weapons: composed('weapons', p => p.weapons ?? []),
+      armor: composed('armor', p => p.armor ?? []),
+      optionalFeatures: composed('optionalFeatures', p => p.optionalFeatures),
       // Not distributed into anything: a pool patch is resolved where the pool is
       // offered, so it only has to reach the composed pack to widen an SRD class's list.
-      optionPools: rulepacks.value.flatMap(p => p.optionPools ?? []),
+      optionPools: composed('optionPools', p => p.optionPools ?? []),
     }
   }
 
@@ -346,15 +402,89 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     classId: string,
     level: number,
   ): Array<WithSource<OptionalClassFeature>> {
-    const results: Array<WithSource<OptionalClassFeature>> = []
-    for (const pack of rulepacks.value) {
-      for (const feat of pack.optionalFeatures) {
-        if (feat.classId === classId && feat.level === level) {
-          results.push({ ...feat, sourceName: pack.name })
-        }
-      }
+    return withSource('optionalFeatures', p => p.optionalFeatures)
+      .filter(feature => feature.classId === classId && feature.level === level)
+  }
+
+  // -------------------------------------------------------------------------
+  // Writing
+  // -------------------------------------------------------------------------
+
+  /** Write a whole pack back to IndexedDB and into the store's list. */
+  async function savePack(pack: Rulepack): Promise<void> {
+    const stored = plain(pack)
+    await db.rulepacks.put(stored)
+    const idx = rulepacks.value.findIndex(p => p.id === stored.id)
+    if (idx >= 0) rulepacks.value[idx] = stored
+    else rulepacks.value = inLookupOrder([...rulepacks.value, stored])
+  }
+
+  /** The player's own pack, created empty the first time something is written to it. */
+  async function ensureHomebrewPack(): Promise<Rulepack> {
+    const existing = homebrewPack()
+    if (existing) return plain(existing)
+    const created = blankHomebrewPack()
+    await savePack(created)
+    return created
+  }
+
+  /**
+   * The entry a copy was made from, as the book has it *now*.
+   *
+   * Read straight off the stored pack rather than through `getRace`/`getClass`, which
+   * fold in patches from other packs: what a copy has to be compared against is the
+   * entry as it was copied, and that is what the copy button had in its hands.
+   */
+  function sourceEntry(packId: string, kind: EntryKind, id: string): unknown {
+    const pack = getById(packId)
+    if (!pack) return undefined
+    return listEntries(pack, kind).find(entry => entryId(kind, entry) === id)
+  }
+
+  /** What to record about the book an entry is being copied out of. */
+  function forkOriginFor(packId: string, kind: EntryKind, id: string): ForkOrigin | undefined {
+    const pack = getById(packId)
+    const entry = sourceEntry(packId, kind, id)
+    if (!pack || entry === undefined) return undefined
+    return {
+      packId: pack.id,
+      packName: pack.name,
+      packVersion: pack.version,
+      hash: hashEntry(entry),
     }
-    return results
+  }
+
+  /**
+   * Save an entry into the player's own pack, creating that pack if this is the first.
+   *
+   * `origin` is passed when the entry came out of a book — on the first copy, and again
+   * whenever the player looks at a changed source and decides to keep their version,
+   * which re-snapshots the hash and quiets the notice until the book moves again.
+   */
+  async function saveHomebrewEntry(
+    kind: EntryKind,
+    entry: Record<string, unknown>,
+    origin?: ForkOrigin,
+  ): Promise<void> {
+    const pack = await ensureHomebrewPack()
+    await savePack(upsertEntry(pack, kind, plain(entry), origin))
+  }
+
+  /**
+   * Drop an entry from the player's own pack. For a copy this is how the book's own
+   * version comes back: nothing was ever written to the book, so removing the copy that
+   * shadowed it is the whole of the undo.
+   */
+  async function removeHomebrewEntry(kind: EntryKind, id: string): Promise<void> {
+    const pack = homebrewPack()
+    if (!pack) return
+    await savePack(deleteEntry(plain(pack), kind, id))
+  }
+
+  /** Which copies have fallen behind the books they were taken from. */
+  function homebrewForkStatuses(): ForkStatus[] {
+    const pack = homebrewPack()
+    return pack ? forkStatuses(pack, sourceEntry) : []
   }
 
   return {
@@ -386,5 +516,13 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     getSubclass,
     composedPack,
     getOptionalFeaturesForClass,
+    homebrewPack,
+    ensureHomebrewPack,
+    savePack,
+    sourceEntry,
+    forkOriginFor,
+    saveHomebrewEntry,
+    removeHomebrewEntry,
+    homebrewForkStatuses,
   }
 })
