@@ -17,6 +17,15 @@
  * gates the book prints in the invocation's prerequisite line. Those are mechanics, not
  * book text, so they belong here beside classId and level.
  *
+ * `armor` is a plain list like `feats` or `spells`: a natural-armour row, shaped like
+ * app/data/srd/armor.json's own `natural-armor` entry (baseAC only, no Dex cap, for a
+ * human to overwrite once the book says what the actual number is) that a race's
+ * Unarmored-Defense-style trait points at. `OptionPoolPatch` and `ArmorDefinitionSchema`
+ * carry no per-class or per-race filter, so a restriction a book's wording implies (a
+ * fighting style that says "if you are a fighter", a natural-armor row that only a
+ * lizardfolk's trait ever references) is not a field here — it lives in the option's or
+ * trait's own description text, and in which trait's events point at which armor id.
+ *
  * Ids default to `<abbrev>.<kebab-name>`, e.g. tce.fey-wanderer.
  *
  * COVERAGE: every name here has been checked against 5etools' own per-source listings,
@@ -41,6 +50,9 @@
 
 /** The SRD warlock's invocation pool, and the pact boon answers its options are gated on. */
 const EI = 'eldritch-invocation'
+/** Shared pools the SRD declares on other classes, widened here by Tasha's own options. */
+const FIGHTING_STYLE = 'fighting-style'
+const METAMAGIC = 'metamagic'
 const PACT_BLADE = { choiceId: 'pact-boon', optionId: 'pact-of-the-blade' }
 const PACT_CHAIN = { choiceId: 'pact-boon', optionId: 'pact-of-the-chain' }
 const PACT_TOME = { choiceId: 'pact-boon', optionId: 'pact-of-the-tome' }
@@ -213,6 +225,8 @@ export const BOOKS = [
       ['Scourge Aasimar', { raceId: 'vgm.aasimar' }],
       ['Fallen Aasimar', { raceId: 'vgm.aasimar' }],
     ],
+    // The lizardfolk's scales, the row its race trait points at.
+    armor: ['Lizardfolk Natural Armor'],
   },
 
   // ── Xanathar's Guide to Everything ──────────────────────────────────────────
@@ -346,6 +360,8 @@ export const BOOKS = [
     // The book's one spell, and the Dimir guild list expands onto it — without an entry
     // that EXPAND_SPELL_LIST has a name it cannot resolve.
     spells: ['Encode Thoughts'],
+    // A loxodon's trunk and hide stand in for armor; the row a race trait points at.
+    armor: ['Loxodon Natural Armor'],
   },
 
   // ── Eberron: Rising from the Last War ───────────────────────────────────────
@@ -410,6 +426,8 @@ export const BOOKS = [
       'Ravenous Void', 'Reality Break', 'Sapping Sting', 'Temporal Shunt',
       'Tether Essence', 'Time Ravage', 'Wristpocket',
     ],
+    // The tortle's shell, the row its race trait points at.
+    armor: ['Tortle Natural Armor'],
   },
 
   // ── Mythic Odysseys of Theros ───────────────────────────────────────────────
@@ -500,6 +518,19 @@ export const BOOKS = [
       ['Protection of the Talisman', { group: EI, minLevel: 7, requiresOption: PACT_TALISMAN }],
       ['Rebuke of the Talisman', { group: EI, requiresOption: PACT_TALISMAN }],
       ['Undying Servitude', { group: EI, minLevel: 5 }],
+      // Tasha's fighting styles and metamagic, widening the SRD's own pools by group name
+      // rather than redeclaring fighter/paladin/ranger or sorcerer. Superior Technique is
+      // fighter-only and Druidic Warrior ranger-only; per the manifest's header comment,
+      // that restriction is not a field here — every class drawing from `fighting-style`
+      // is offered both, and the option's own description text says who it is for.
+      ['Blind Fighting', { group: FIGHTING_STYLE }],
+      ['Druidic Warrior', { group: FIGHTING_STYLE }],
+      ['Interception', { group: FIGHTING_STYLE }],
+      ['Superior Technique', { group: FIGHTING_STYLE }],
+      ['Thrown Weapon Fighting', { group: FIGHTING_STYLE }],
+      ['Unarmed Fighting', { group: FIGHTING_STYLE }],
+      ['Seeking Spell', { group: METAMAGIC }],
+      ['Transmuted Spell', { group: METAMAGIC }],
     ],
     feats: [
       'Artificer Initiate', 'Chef', 'Crusher', 'Eldritch Adept', 'Fey Touched',
@@ -576,6 +607,10 @@ export const BOOKS = [
       'Minotaur', 'Orc', 'Satyr', 'Sea Elf', 'Shadar-kai', 'Shifter', 'Tabaxi',
       'Tortle', 'Triton', 'Yuan-ti',
     ],
+    // This printing's lizardfolk and tortle each keep their own natural-armor row —
+    // reprinted content, so both the vgm/egtw versions and these coexist for a reader who
+    // loads either pack.
+    armor: ['Lizardfolk Natural Armor', 'Tortle Natural Armor'],
   },
 
   // ── The Wild Beyond the Witchlight ──────────────────────────────────────────
@@ -597,6 +632,8 @@ export const BOOKS = [
     ],
     backgrounds: ['Astral Drifter', 'Wildspacer'],
     spells: ['Air Bubble', 'Create Spelljamming Helm'],
+    // An autognome's chassis, the row its race trait points at.
+    armor: ['Autognome Armored Casing'],
   },
 
   // ── Dragonlance: Shadow of the Dragon Queen ─────────────────────────────────

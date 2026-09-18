@@ -126,6 +126,16 @@ const STUBS = {
     ...(requiresSpell ? { requiresSpell } : {}),
     _todo: true,
   }),
+  // A natural-armor row, shaped like app/data/srd/armor.json's own `natural-armor` entry:
+  // unarmored, the category a race's own base armor entry picks from, with a placeholder
+  // baseAC for the human filling this in to overwrite from the book's actual number.
+  armor: ({ name }) => ({
+    name,
+    category: 'unarmored',
+    baseAC: 10,
+    description: '',
+    _todo: true,
+  }),
   spells: ({ name }) => ({
     name,
     level: 0,
@@ -152,6 +162,7 @@ const CATEGORY_FILES = {
   races: 'races.json',
   subraces: 'subraces.json',
   optionPools: 'option-pools.json',
+  armor: 'armor.json',
   spells: 'spells.json',
 }
 
