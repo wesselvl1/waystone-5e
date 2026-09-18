@@ -8,6 +8,7 @@ import type {
   SpellAbilityRef,
 } from '~/types/rulepack'
 import { addHitDieForClass, multiclassProficiencies } from '~/services/multiclass'
+import { matchSkillKey } from '~/services/proficiencies'
 import type {
   LevelUpEvent,
   AutomaticLevelUpEvent,
@@ -86,6 +87,35 @@ function gainProficiencyEvent(
   }
   // The category is 'skill' at every def-driven call site and nothing reads it.
   return { type: 'GAIN_PROFICIENCY', proficiency: def.proficiency, category: 'skill' }
+}
+
+/**
+ * Applies a GAIN_PROFICIENCY grant to the character, at every site that resolves one —
+ * a race, a feat, a class or a guarded `whenOption` arm all go through this so they
+ * behave the same.
+ *
+ * Skills are the one category with their own backing field: `isProficientWithWeapon` /
+ * `isProficientWithArmor` read `otherProficiencies` directly, so a weapon, a tool or an
+ * armour category belongs there, but the Skills panel and `useCharacterStats` read only
+ * `Character.skillProficiencies` and never scan `otherProficiencies` for a skill name —
+ * a "perception" chip in the Proficiencies tab would leave Perception itself unchecked.
+ * `matchSkillKey` tells the two apart by wording, the same way `classifyProficiency`
+ * works out a group, so the entry lands in exactly one of the two lists rather than both
+ * (which would render it twice).
+ */
+function applyGainProficiency(character: Character, proficiency: string): void {
+  const skill = matchSkillKey(proficiency)
+  if (skill) {
+    // Never downgrade: a skill already at expertise (2) stays there, mirroring
+    // RESOLVED_SKILL's own rule for a player-chosen grant.
+    if ((character.skillProficiencies[skill] ?? 0) === 0) {
+      character.skillProficiencies[skill] = 1
+    }
+    return
+  }
+  if (!character.otherProficiencies.includes(proficiency)) {
+    character.otherProficiencies.push(proficiency)
+  }
 }
 
 /** The speed, unless an option the character has not picked guards it. */
@@ -1714,9 +1744,7 @@ function applyFeatAutomaticEvents(character: Character, events: AutomaticLevelUp
         registerSpellcasting(character, event.addTo, event.ability, event)
         break
       case 'GAIN_PROFICIENCY':
-        if (!character.otherProficiencies.includes(event.proficiency)) {
-          character.otherProficiencies.push(event.proficiency)
-        }
+        applyGainProficiency(character, event.proficiency)
         break
       case 'UPDATE_FEATURE_USES': {
         const target = character.features.find(f => f.name === event.featureName)
@@ -1824,9 +1852,7 @@ export function applyAutomaticEvents(
         break
       }
       case 'GAIN_PROFICIENCY': {
-        if (!updated.otherProficiencies.includes(event.proficiency)) {
-          updated.otherProficiencies.push(event.proficiency)
-        }
+        applyGainProficiency(updated, event.proficiency)
         break
       }
       case 'SET_SPEED': {
@@ -2064,9 +2090,7 @@ export function applyResolvedChoices(
                 )
               }
               else if (evt.type === 'GAIN_PROFICIENCY') {
-                if (!updated.otherProficiencies.includes(evt.proficiency)) {
-                  updated.otherProficiencies.push(evt.proficiency)
-                }
+                applyGainProficiency(updated, evt.proficiency)
               }
               else if (evt.type === 'GRANT_SPELLCASTING') {
                 // An Eldritch Knight starts casting at the very level it is chosen, so
@@ -2130,9 +2154,7 @@ export function applyResolvedChoices(
             if (evt.whenOption?.choiceId !== choice.choiceId) continue
             if (evt.whenOption.optionId !== choice.optionId) continue
             if (evt.type === 'GAIN_PROFICIENCY') {
-              if (!updated.otherProficiencies.includes(evt.proficiency)) {
-                updated.otherProficiencies.push(evt.proficiency)
-              }
+              applyGainProficiency(updated, evt.proficiency)
               continue
             }
             grantSpellsTo(
@@ -2162,9 +2184,7 @@ export function applyResolvedChoices(
               // Elf Weapon Training and Fleet of Foot: the arm grants a proficiency or a
               // speed rather than spells, and the answer landed in this very run.
               if (evt.type === 'GAIN_PROFICIENCY') {
-                if (!updated.otherProficiencies.includes(evt.proficiency)) {
-                  updated.otherProficiencies.push(evt.proficiency)
-                }
+                applyGainProficiency(updated, evt.proficiency)
                 continue
               }
               if (evt.type === 'SET_SPEED') {

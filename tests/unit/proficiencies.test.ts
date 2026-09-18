@@ -4,6 +4,7 @@ import {
   dedupeProficiencies,
   groupProficiencies,
   isProficiencyPlaceholder,
+  matchSkillKey,
   proficiencyKey,
   proficiencyLabel,
   proficiencyVocabulary,
@@ -140,6 +141,33 @@ describe('dedupeProficiencies', () => {
 
   it('is empty for an empty list', () => {
     expect(dedupeProficiencies([])).toEqual([])
+  })
+})
+
+describe('matchSkillKey', () => {
+  it('matches the lowercase key a race writes', () => {
+    expect(matchSkillKey('perception')).toBe('perception')
+    expect(matchSkillKey('intimidation')).toBe('intimidation')
+  })
+
+  it('matches a multi-word skill by its printed name, any case', () => {
+    expect(matchSkillKey('Animal Handling')).toBe('animalHandling')
+    expect(matchSkillKey('sleight of hand')).toBe('sleightOfHand')
+  })
+
+  it('matches the bare camelCase key too, for a source that writes it that way', () => {
+    expect(matchSkillKey('animalHandling')).toBe('animalHandling')
+    expect(matchSkillKey('sleightOfHand')).toBe('sleightOfHand')
+  })
+
+  it('does not match a weapon, tool or armor category', () => {
+    for (const name of ['longsword', 'battleaxe', "smith's tools", 'heavy', 'simple'])
+      expect(matchSkillKey(name)).toBeUndefined()
+  })
+
+  it('is undefined for an empty or placeholder string', () => {
+    expect(matchSkillKey('')).toBeUndefined()
+    expect(matchSkillKey('   ')).toBeUndefined()
   })
 })
 

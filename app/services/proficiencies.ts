@@ -13,7 +13,7 @@
  * where the player put it rather than where the wording suggests.
  */
 
-import type { ProficiencyGroup } from '~/types/character'
+import type { ProficiencyGroup, SkillKey } from '~/types/character'
 
 export const PROFICIENCY_GROUPS: { key: ProficiencyGroup; label: string }[] = [
   { key: 'weapons-armor', label: 'Weapons & Armor' },
@@ -73,6 +73,50 @@ export function proficiencyKey(name: string): string {
 /** Words sorted, so "light crossbow" and "Crossbow, Light" are the same weapon. */
 function sortedWords(name: string): string {
   return proficiencyKey(name).split(' ').sort().join(' ')
+}
+
+/**
+ * Every skill's canonical printed name, keyed by its camelCase `SkillKey` — the same
+ * pairs `Skills.vue` and the level-up wizard's own `SKILL_LABELS` print. Gathered here so
+ * a free-text proficiency string can be matched back to a skill regardless of which shape
+ * it arrives in: a race's own lowercase `"perception"`, the bare key `"animalHandling"`,
+ * or a future book's printed `"Animal Handling"`.
+ */
+const SKILL_NAMES: Record<SkillKey, string> = {
+  acrobatics: 'Acrobatics',
+  animalHandling: 'Animal Handling',
+  arcana: 'Arcana',
+  athletics: 'Athletics',
+  deception: 'Deception',
+  history: 'History',
+  insight: 'Insight',
+  intimidation: 'Intimidation',
+  investigation: 'Investigation',
+  medicine: 'Medicine',
+  nature: 'Nature',
+  perception: 'Perception',
+  performance: 'Performance',
+  persuasion: 'Persuasion',
+  religion: 'Religion',
+  sleightOfHand: 'Sleight of Hand',
+  stealth: 'Stealth',
+  survival: 'Survival',
+}
+
+/**
+ * The `SkillKey` a proficiency string names, if any — matched tolerantly by wording, the
+ * same way `classifyProficiency` reads a category. `GAIN_PROFICIENCY` uses this to tell a
+ * skill grant (Keen Senses' Perception, Menacing's Intimidation) apart from everything
+ * else it is also used for (a weapon, a tool, an armour category), so the one grant that
+ * has its own backing field (`Character.skillProficiencies`) lands there instead of in
+ * the flat `otherProficiencies` list, where the Skills panel would never see it.
+ */
+export function matchSkillKey(name: string): SkillKey | undefined {
+  const key = proficiencyKey(name)
+  if (!key) return undefined
+  return (Object.keys(SKILL_NAMES) as SkillKey[]).find(
+    skill => proficiencyKey(skill) === key || proficiencyKey(SKILL_NAMES[skill]) === key,
+  )
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
 import { CharacterSchema } from '~/schemas/characterSchema'
+import { abilityMod, proficiencyBonus } from '~/composables/useCharacterStats'
 import {
   resolveLevelUpEvents,
   applyAutomaticEvents,
@@ -511,5 +512,69 @@ describe('a proficiency an option grants', () => {
       subject({ otherProficiencies: ['Longsword'] }),
       [{ type: 'RESOLVED_OPTION', choiceId: CHOICE, optionId: 'weapons' }], weapons, 'fighter')
     expect(applied.otherProficiencies).toEqual(['Longsword', 'Shortbow'])
+  })
+})
+
+/**
+ * A skill grant (Keen Senses, Menacing) is the one GAIN_PROFICIENCY shape with its own
+ * backing field on the character. Unlike a weapon, tool or armour category — which
+ * `isProficientWithWeapon`/`isProficientWithArmor` match straight out of
+ * `otherProficiencies` — the Skills panel and `useCharacterStats` read only
+ * `Character.skillProficiencies`, so a skill name landing in the flat list instead would
+ * leave the actual skill unchecked. These go through the full
+ * resolveLevelUpEvents → applyAutomaticEvents pipeline, the same path a real level-up
+ * takes, rather than asserting on the raw event def the way srdData.test.ts does.
+ */
+describe('a fixed skill proficiency reaches skillProficiencies, not the flat list', () => {
+  const ZERO_SKILLS: Character['skillProficiencies'] = {
+    acrobatics: 0, animalHandling: 0, arcana: 0, athletics: 0,
+    deception: 0, history: 0, insight: 0, intimidation: 0,
+    investigation: 0, medicine: 0, nature: 0, perception: 0,
+    performance: 0, persuasion: 0, religion: 0, sleightOfHand: 0,
+    stealth: 0, survival: 0,
+  }
+
+  it("grants an elf's Keen Senses as a proficient Perception bonus", () => {
+    const before = char({
+      race: 'elf', classes: [{ classId: 'fighter', level: 0 }],
+      skillProficiencies: { ...ZERO_SKILLS }, otherProficiencies: [],
+    })
+    const events = resolveLevelUpEvents(before, 'fighter', 1, rulepack)
+    const applied = applyAutomaticEvents(before, getAutomaticEvents(events), 'average')
+
+    expect(applied.skillProficiencies.perception).toBe(1)
+    // Not also filed as a flat string — that would render as a second, disconnected
+    // "perception" chip on the Proficiencies tab.
+    expect(applied.otherProficiencies).not.toContain('perception')
+
+    // The bonus a Skills panel would actually show, using the same formula
+    // useCharacterStats.ts's `skills` computed uses: ability modifier + proficiency
+    // bonus × proficiency level. Wis 12 → +1, level 1 → +2 proficiency bonus.
+    const wisMod = abilityMod(applied.abilityScores.wis)
+    const skillBonus = wisMod + applied.skillProficiencies.perception * proficiencyBonus(1)
+    expect(skillBonus).toBe(3)
+  })
+
+  it("does not downgrade a half-orc who already has Intimidation at expertise", () => {
+    const before = char({
+      race: 'half-orc', classes: [{ classId: 'fighter', level: 0 }],
+      skillProficiencies: { ...ZERO_SKILLS, intimidation: 2 }, otherProficiencies: [],
+    })
+    const events = resolveLevelUpEvents(before, 'fighter', 1, rulepack)
+    const applied = applyAutomaticEvents(before, getAutomaticEvents(events), 'average')
+    expect(applied.skillProficiencies.intimidation).toBe(2)
+  })
+
+  it('still files a weapon grant as a flat proficiency string, not a skill', () => {
+    const before = char({
+      race: 'dwarf', classes: [{ classId: 'fighter', level: 0 }],
+      skillProficiencies: { ...ZERO_SKILLS }, otherProficiencies: [],
+    })
+    const events = resolveLevelUpEvents(before, 'fighter', 1, rulepack)
+    const applied = applyAutomaticEvents(before, getAutomaticEvents(events), 'average')
+    expect(applied.otherProficiencies).toEqual(
+      expect.arrayContaining(['battleaxe', 'handaxe', 'light hammer', 'warhammer']),
+    )
+    expect(Object.values(applied.skillProficiencies).every(v => v === 0)).toBe(true)
   })
 })
