@@ -866,6 +866,135 @@ function expandSpellListEvent(
   }
 }
 
+/**
+ * The events a subclass's own level declares — a totem choice, an archetype's spells,
+ * the Knowledge Domain's skills and the expertise that doubles them.
+ *
+ * Split out of `resolveLevelUpEvents` because the wizard needs it on its own: a subclass
+ * picked moments ago is not on the character yet, so nothing that reads the character can
+ * find it, and the page was listing by hand the event types it knew how to raise. A
+ * hand-kept list is a list that goes stale — the page's had three entries where the data
+ * already used six — so both callers read this one switch instead, and a subclass level's
+ * events are raised in the order the book prints them either way.
+ */
+export function resolveSubclassLevelEvents(
+  character: Character,
+  classId: string,
+  subclassId: string,
+  newLevel: number,
+  rulepack: Rulepack,
+): LevelUpEvent[] {
+  const classDef = rulepack.classes.find(c => c.id === classId)
+  const subclassDef = rulepack.classes.flatMap(c => c.subclasses ?? []).find(s => s.id === subclassId)
+  if (!classDef || !subclassDef) return []
+
+  const events: LevelUpEvent[] = []
+  for (const eventDef of subclassDef.levels.find(l => l.level === newLevel)?.levelUpEvents ?? []) {
+    switch (eventDef.type) {
+      case 'CHOOSE_OPTION': {
+        const choice = resolveOptionChoice(eventDef, character, rulepack, newLevel)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'REPLACE_OPTION': {
+        const choice = resolveOptionReplacement(eventDef, character, rulepack, newLevel)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'CHOOSE_SPELL': {
+        // The class the pick is filed under and the subclass that asked for it: a spell
+        // learnt from an archetype still belongs to its class's list, and the answer
+        // carries the label the sheet files it under.
+        const choice = chooseSpellEvent(eventDef, character, {
+          addTo: classId,
+          label: subclassDef.name,
+        })
+        if (choice) events.push(choice)
+        break
+      }
+      case 'CHOOSE_SPELLCASTING_ABILITY': {
+        const choice = resolveSpellcastingAbilityChoice(eventDef, character, classDef.name)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'GRANT_SPELLCASTING':
+        events.push(grantSpellcastingEvent(eventDef, classDef.name))
+        break
+      case 'EXPAND_SPELL_LIST': {
+        const expand = expandSpellListEvent(eventDef, character, subclassDef.name)
+        if (expand) events.push(expand)
+        break
+      }
+      case 'GRANT_SPELLS': {
+        // A guarded grant only fires once the option it depends on has been picked. At
+        // the level the option is chosen the answer is not known yet, so the grant is
+        // skipped and applied by RESOLVED_OPTION or RESOLVED_SUBCLASS instead.
+        const grant = grantSpellsEvent(eventDef, character, rulepack, {
+          origin: 'class',
+          label: subclassDef.name,
+        })
+        if (grant) events.push(grant)
+        break
+      }
+      case 'GAIN_PROFICIENCY': {
+        const proficiency = gainProficiencyEvent(eventDef, character)
+        if (proficiency) events.push(proficiency)
+        break
+      }
+      case 'CHOOSE_SKILL': {
+        const skills = chooseSkillEvent(eventDef, character)
+        if (skills) events.push(skills)
+        break
+      }
+      case 'CHOOSE_EXPERTISE':
+        events.push({
+          type: 'CHOOSE_EXPERTISE',
+          label: eventDef.label,
+          options: eventDef.options,
+          count: eventDef.count,
+        } satisfies ChooseExpertiseEvent)
+        break
+      case 'SET_SPEED': {
+        const speed = setSpeedEvent(eventDef, character)
+        if (speed) events.push(speed)
+        break
+      }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
+        break
+      }
+      case 'SET_WILD_SHAPE_LIMITS':
+        events.push({
+          type: 'SET_WILD_SHAPE_LIMITS',
+          maxCR: eventDef.maxCR,
+          // Unset means unrestricted, so a subclass that widens the limits can simply
+          // omit the gates rather than having to re-state them as true.
+          allowSwim: eventDef.allowSwim ?? true,
+          allowFly: eventDef.allowFly ?? true,
+          // Copy: eventDef belongs to the reactive rulepack store, and a Vue proxy
+          // stored on the character makes the next structuredClone throw.
+          types: eventDef.types ? [...eventDef.types] : undefined,
+        } satisfies SetWildShapeLimitsEvent)
+        break
+      case 'UPDATE_FEATURE_USES':
+        events.push({
+          type: 'UPDATE_FEATURE_USES',
+          featureName: eventDef.featureName,
+          usesMax: eventDef.usesMax,
+        } satisfies UpdateFeatureUsesEvent)
+        break
+      case 'ABILITY_SCORE_IMPROVEMENT':
+        events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
+        break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, subclassDef.name))
+        break
+    }
+  }
+  return events
+}
+
 export function resolveLevelUpEvents(
   character: Character,
   classId: string,
@@ -936,7 +1065,6 @@ export function resolveLevelUpEvents(
     : undefined
   const subclassLevelData = subclassDef?.levels.find(l => l.level === newLevel)
   const subclassLevelFeatures = subclassLevelData?.features ?? []
-  const subclassLevelEvents = subclassLevelData?.levelUpEvents ?? []
   // Track which level-data feature names are placeholders replaced by subclass features
   const hasSubclassFeatures = subclassLevelFeatures.length > 0
 
@@ -1105,83 +1233,10 @@ export function resolveLevelUpEvents(
     }
   }
 
-  // Process levelUpEvents defined on the subclass level (e.g. totem/archetype choices)
-  for (const eventDef of subclassLevelEvents) {
-    switch (eventDef.type) {
-      case 'CHOOSE_OPTION': {
-        const choice = resolveOptionChoice(eventDef, character, rulepack, newLevel)
-        if (choice) events.push(choice)
-        break
-      }
-      case 'REPLACE_OPTION': {
-        const choice = resolveOptionReplacement(eventDef, character, rulepack, newLevel)
-        if (choice) events.push(choice)
-        break
-      }
-      case 'CHOOSE_SPELL': {
-        const choice = chooseSpellEvent(eventDef, character)
-        if (choice) events.push(choice)
-        break
-      }
-      case 'CHOOSE_SPELLCASTING_ABILITY': {
-        const choice = resolveSpellcastingAbilityChoice(eventDef, character, classDef.name)
-        if (choice) events.push(choice)
-        break
-      }
-      case 'GRANT_SPELLCASTING':
-        events.push(grantSpellcastingEvent(eventDef, classDef.name))
-        break
-      case 'EXPAND_SPELL_LIST': {
-        const expand = expandSpellListEvent(eventDef, character, subclassDef?.name ?? classDef.name)
-        if (expand) events.push(expand)
-        break
-      }
-      case 'GRANT_SPELLS': {
-        // A guarded grant only fires once the option it depends on has been picked. At
-        // the level the option is chosen the answer is not known yet, so the grant is
-        // skipped and applied by RESOLVED_OPTION or RESOLVED_SUBCLASS instead.
-        const grant = grantSpellsEvent(eventDef, character, rulepack, {
-          origin: 'class',
-          label: subclassDef?.name ?? classDef.name,
-        })
-        if (grant) events.push(grant)
-        break
-      }
-      case 'GAIN_PROFICIENCY': {
-        const proficiency = gainProficiencyEvent(eventDef, character)
-        if (proficiency) events.push(proficiency)
-        break
-      }
-      case 'SET_SPEED': {
-        const speed = setSpeedEvent(eventDef, character)
-        if (speed) events.push(speed)
-        break
-      }
-      case 'SET_SENSE': {
-        const sense = setSenseEvent(eventDef, character)
-        if (sense) events.push(sense)
-        break
-      }
-      case 'SET_WILD_SHAPE_LIMITS':
-        events.push({
-          type: 'SET_WILD_SHAPE_LIMITS',
-          maxCR: eventDef.maxCR,
-          // Unset means unrestricted, so a subclass that widens the limits can simply
-          // omit the gates rather than having to re-state them as true.
-          allowSwim: eventDef.allowSwim ?? true,
-          allowFly: eventDef.allowFly ?? true,
-          // Copy: eventDef belongs to the reactive rulepack store, and a Vue proxy
-          // stored on the character makes the next structuredClone throw.
-          types: eventDef.types ? [...eventDef.types] : undefined,
-        } satisfies SetWildShapeLimitsEvent)
-        break
-      case 'ABILITY_SCORE_IMPROVEMENT':
-        events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
-        break
-      case 'GRANT_FEAT':
-        events.push(...resolveGrantFeat(eventDef, character, rulepack, subclassDef?.name ?? classDef.name))
-        break
-    }
+  // Events defined on the subclass level (e.g. totem/archetype choices). Shared with the
+  // wizard, which has to ask them the moment a subclass is picked, before it is stored.
+  if (subclassId) {
+    events.push(...resolveSubclassLevelEvents(character, classId, subclassId, newLevel, rulepack))
   }
 
   // Race, subrace and background events fire on TOTAL character level, not class level:

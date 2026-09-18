@@ -8,13 +8,12 @@ import { isChoiceSatisfied, type AbilityPicks } from '~/services/abilityScoreCho
 import { filterBySearch } from '~/services/searchFilter'
 import {
   resolveLevelUpEvents,
-  resolveOptionChoice,
+  resolveSubclassLevelEvents,
   resolveOptionReplacement,
   optionAvailable,
   resolveFeatEvents,
   resolveOptionalFeatureEvents,
   featIncreasedAbility,
-  chooseSpellEvent,
   resolveUnlockedChoices,
   applyAutomaticEvents,
   applyResolvedChoices,
@@ -845,36 +844,16 @@ function confirmSubclass() {
   resolvedChoices.value.push({ type: 'RESOLVED_SUBCLASS', subclassId, classId: targetClassId.value })
   selectedSubclassId.value = ''
 
-  // Inject subclass-level choice events for this level now that we know the subclass
-  const pack = mergedPack()
-  const subclassDef = pack.classes.flatMap(c => c.subclasses ?? []).find(s => s.id === subclassId)
-  const subclassLevelDef = subclassDef?.levels.find(l => l.level === targetLevel.value)
-  const injected: ChoiceLevelUpEvent[] = []
-  for (const eventDef of subclassLevelDef?.levelUpEvents ?? []) {
-    if (eventDef.type === 'CHOOSE_OPTION') {
-      // Through the service, so an option already taken from the same pool is dropped here
-      // too rather than only on the paths that go via resolveLevelUpEvents.
-      const choice = character.value
-        ? resolveOptionChoice(eventDef, toRaw(character.value), pack, targetLevel.value)
-        : undefined
-      if (choice) injected.push(choice)
-    }
-    else if (eventDef.type === 'CHOOSE_SPELL') {
-      // Through the service, like the CHOOSE_OPTION above. Hand-building it here
-      // dropped the whenOption guard — so a subclass shaped like Divine Soul asked
-      // every one of its guarded spell questions at once — along with the free-cast
-      // terms and the source metadata a pick has to carry to the answer.
-      const choice = character.value
-        ? chooseSpellEvent(eventDef, toRaw(character.value), {
-            addTo: eventDef.addTo || targetClassId.value,
-            label: subclassDef?.name,
-          })
-        : undefined
-      if (choice) injected.push(choice)
-    }
-    else if (eventDef.type === 'ABILITY_SCORE_IMPROVEMENT')
-      injected.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
-  }
+  // Ask the subclass's own questions for this level, now that we know which subclass it
+  // is. Through the service's resolution rather than a list of event types kept here: the
+  // list only knew three, so the Knowledge Domain's skill and expertise questions — and
+  // anything a later book declares — were never asked at all. The subclass is not on the
+  // character until the run is applied, which is why this cannot go through
+  // resolveLevelUpEvents; the events still arrive in the order the book prints them.
+  const injected: ChoiceLevelUpEvent[] = character.value
+    ? getChoiceEvents(resolveSubclassLevelEvents(
+        toRaw(character.value), targetClassId.value, subclassId, targetLevel.value, mergedPack()))
+    : []
   if (injected.length > 0)
     choiceEvents.value.splice(currentChoiceIdx.value + 1, 0, ...injected)
 
