@@ -59,12 +59,7 @@ function saveAppearance() {
     </div>
 
     <!-- Proficiencies -->
-    <div class="card">
-      <p class="section-header">Other Proficiencies & Languages</p>
-      <p class="text-sm text-slate-400 whitespace-pre-wrap leading-relaxed">
-        {{ character.otherProficiencies.join(', ') || '—' }}
-      </p>
-    </div>
+    <SheetProficienciesPanel :character="character" @update="emit('update', $event)" />
 
     <!-- Appearance -->
     <div class="card space-y-2">

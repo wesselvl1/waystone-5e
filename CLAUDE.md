@@ -202,6 +202,21 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   entries it skipped. Coins count at fifty to the pound, which `countCoinWeight` turns
   off for a table that ignores it — `coinWeight()` reports the purse either way and only
   the total forgets it, so turning it back on is an informed choice.
+- **A proficiency's group is derived, and the list stays flat strings.**
+  `otherProficiencies` mixes four things — "simple", "light", "Common", "thieves' tools" —
+  because that is the wording `isProficientWithWeapon` and `isProficientWithArmor` match
+  against, and nothing in the data says which is which.
+  `app/services/proficiencies.ts` works the group out from the wording and from the
+  weapon, armour and race-language names the loaded books supply, and `proficiencyLabel`
+  prints the noun a bare category leaves out ("simple" → "Simple Weapons"), re-casing only
+  the names that came out of a data file. A guess is a guess, so
+  `Character.proficiencyGroups` overrides it per entry — the `armorClass` idiom — and the
+  sheet's editor writes one only where it disagrees, so a book that later teaches the
+  sheet that word changes nothing. Creation adds the class's and background's tools and
+  the background's language count, which used to be dropped; a count is stored as the
+  prompt it is, and the panel prints an entry whose wording is still a prompt as a dashed
+  chip.
+
 - **An item name loses the source it was filed under.** Book content names an item the way
   5etools does (`fine clothes|phb`), and the pipe is a corpus disambiguator that was never
   meant to be read. `cleanEquipmentName()` strips it at creation *and* in
