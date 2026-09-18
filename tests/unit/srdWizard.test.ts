@@ -1,9 +1,36 @@
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
+import { resolveLevelUpEvents, getChoiceEvents } from '~/services/levelUpService'
+import type { Rulepack } from '~/types/rulepack'
+import type { Character } from '~/types/character'
+import { validCharacter } from '../fixtures'
 import fragment from '~/data/srd/wizard.json'
+import spells from '~/data/srd/spells.json'
 
 const pack = RulepackSchema.parse(fragment)
 const wizard = pack.classes.find(c => c.id === 'wizard')!
+
+/** Wizard fragment plus the spell list, the way the srd-loader plugin merges them. */
+function srdPack(): Rulepack {
+  const merged = structuredClone(pack) as unknown as Rulepack
+  merged.spells = RulepackSchema.parse(spells).spells as Rulepack['spells']
+  return merged
+}
+
+function wizardChar(level: number): Character {
+  return {
+    ...validCharacter,
+    classes: [{ classId: 'wizard', level, name: 'Wizard' }],
+    spells: [],
+  } as Character
+}
+
+/** Non-cantrip spells the level's events offer, i.e. what goes into the spellbook. */
+function spellbookPicks(level: number): number {
+  return wizard.levels.find(l => l.level === level)!.levelUpEvents
+    .filter(e => e.type === 'CHOOSE_SPELL' && !e.cantrip)
+    .reduce((sum, e) => sum + (e.type === 'CHOOSE_SPELL' ? e.count : 0), 0)
+}
 
 describe('SRD wizard', () => {
   it('validates against RulepackSchema and declares the SRD pack id', () => {
@@ -30,6 +57,26 @@ describe('SRD wizard', () => {
 
   it('declares the Cantrips Known column', () => {
     expect(wizard.levels.map(l => l.cantripsKnown)).toEqual([3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
+  })
+
+  it('fills the spellbook with six spells at 1st level and two at every level after', () => {
+    // A wizard prepares from a spellbook rather than knowing a fixed list, so the class
+    // table names no Spells Known column — the free spells come only from these events.
+    expect(spellbookPicks(1)).toBe(6)
+    for (let level = 2; level <= 20; level++) {
+      expect(spellbookPicks(level), `level ${level}`).toBe(2)
+    }
+  })
+
+  it('draws every spellbook pick from the wizard list alone', () => {
+    const picks = wizard.levels
+      .flatMap(l => l.levelUpEvents)
+      .filter(e => e.type === 'CHOOSE_SPELL' && !e.cantrip)
+    for (const pick of picks) {
+      if (pick.type !== 'CHOOSE_SPELL') continue
+      expect(pick.addTo).toBe('wizard')
+      expect(pick.classes).toEqual(['wizard'])
+    }
   })
 
   it('offers an ASI on the SRD levels', () => {
@@ -71,6 +118,15 @@ describe('SRD wizard', () => {
     for (const f of wizard.featureDefinitions ?? []) {
       expect(f.description.length, f.name).toBeGreaterThan(20)
     }
+  })
+
+  it('raises the spellbook choice on a level that grants nothing else', () => {
+    // Regression: levels 3, 5-7, 9 and so on declared no events at all, so levelling a
+    // wizard through them asked nothing and the spellbook never grew.
+    const events = getChoiceEvents(resolveLevelUpEvents(wizardChar(2), 'wizard', 3, srdPack()))
+    const pick = events.find(e => e.type === 'CHOOSE_SPELL' && !e.cantrip)
+    expect(pick).toBeDefined()
+    expect(pick!.type === 'CHOOSE_SPELL' && pick!.count).toBe(2)
   })
 
   it('points every replaces reference at a real feature', () => {

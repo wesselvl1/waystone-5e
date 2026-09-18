@@ -67,6 +67,15 @@
               "classes": [
                 "wizard"
               ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 6,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
             }
           ]
         },
@@ -83,6 +92,15 @@
             {
               "type": "CHOOSE_SUBCLASS",
               "label": "Arcane Tradition"
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
             }
           ]
         },
@@ -94,7 +112,17 @@
           },
           "cantripsKnown": 3,
           "features": [],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 4,
@@ -117,6 +145,15 @@
               "classes": [
                 "wizard"
               ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
             }
           ]
         },
@@ -129,7 +166,17 @@
           },
           "cantripsKnown": 4,
           "features": [],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 6,
@@ -142,7 +189,17 @@
           "features": [
             "Arcane Tradition Feature"
           ],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 7,
@@ -154,7 +211,17 @@
           },
           "cantripsKnown": 4,
           "features": [],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 8,
@@ -170,6 +237,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
             }
           ]
         },
@@ -184,7 +260,17 @@
           },
           "cantripsKnown": 4,
           "features": [],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 10,
@@ -208,6 +294,15 @@
               "classes": [
                 "wizard"
               ]
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
             }
           ]
         },
@@ -223,7 +318,17 @@
           },
           "cantripsKnown": 5,
           "features": [],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 12,
@@ -241,6 +346,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
             }
           ]
         },
@@ -257,7 +371,17 @@
           },
           "cantripsKnown": 5,
           "features": [],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 14,
@@ -274,7 +398,17 @@
           "features": [
             "Arcane Tradition Feature"
           ],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 15,
@@ -290,7 +424,17 @@
           },
           "cantripsKnown": 5,
           "features": [],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 16,
@@ -310,6 +454,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
             }
           ]
         },
@@ -328,7 +481,17 @@
           },
           "cantripsKnown": 5,
           "features": [],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 18,
@@ -347,7 +510,17 @@
           "features": [
             "Spell Mastery"
           ],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         },
         {
           "level": 19,
@@ -368,6 +541,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
             }
           ]
         },
@@ -388,7 +570,17 @@
           "features": [
             "Signature Spells"
           ],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_SPELL",
+              "addTo": "wizard",
+              "count": 2,
+              "cantrip": false,
+              "classes": [
+                "wizard"
+              ]
+            }
+          ]
         }
       ],
       "featureDefinitions": [
