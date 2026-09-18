@@ -1452,6 +1452,137 @@ export function getAutomaticEvents(events: LevelUpEvent[]): AutomaticLevelUpEven
   return events.filter(e => !isChoiceEvent(e)) as AutomaticLevelUpEvent[]
 }
 
+/**
+ * A flat HP bonus per level (Tough's +2), applied retroactively across every level the
+ * character already has. Shared by the automatic GRANT_FEAT event and RESOLVED_CHOOSE_FEAT
+ * — the same arithmetic whether the feat arrived from a source or from the player.
+ */
+function applyHpBonusPerLevel(character: Character, bonusPerLevel: number): void {
+  const totalLevel = character.classes.reduce((s, c) => s + c.level, 0)
+  const hpGain = bonusPerLevel * totalLevel
+  character.hp.max += hpGain
+  character.hp.current += hpGain
+  character.hpBonusPerLevel = (character.hpBonusPerLevel ?? 0) + bonusPerLevel
+}
+
+/**
+ * Corrects HP for a CON modifier change across everything a batch of events (or resolved
+ * choices) just did, comparing the modifier before the batch ran to the modifier after.
+ * One lump sum rather than a replay, since every level so far was rolled with the old one.
+ * Shared between applyAutomaticEvents (a GRANT_FEAT can carry a flat CON bonus) and
+ * applyResolvedChoices (an ASI or a feat can), so a CON change reads the same either way.
+ */
+function applyRetroactiveConHp(character: Character, oldConMod: number): void {
+  const newConMod = Math.floor((character.abilityScores.con - 10) / 2)
+  if (newConMod === oldConMod) return
+  const totalLevel = character.classes.reduce((s, c) => s + c.level, 0)
+  const hpDelta = (newConMod - oldConMod) * totalLevel
+  character.hp.max = Math.max(character.hp.max + hpDelta, totalLevel)
+  character.hp.current = Math.max(character.hp.current + hpDelta, 1)
+}
+
+/**
+ * Applies everything a GRANT_FEAT event carries on its own: the feature, the flat ability
+ * bonus, the granted spells, the retroactive HP bonus, and — when the source pre-answered
+ * the feat's own question — the recorded answer and the feature's renamed to match.
+ *
+ * Shared between the top-level automatic event (applyAutomaticEvents) and a nested one
+ * reached through another feat's own levelUpEvents (applyFeatAutomaticEvents, below):
+ * both are the exact same denormalized GrantFeatEvent shape, resolved once by
+ * resolveGrantFeat, so there is nothing about "nested" that needs different handling here.
+ * The CON→HP correction is the caller's job: both callers already wrap a whole batch in
+ * applyRetroactiveConHp, and this can be one of several ability-changing events in it.
+ */
+function applyGrantedFeat(character: Character, event: GrantFeatEvent): void {
+  if (character.features.some(f => f.id === event.featId)) return
+
+  character.features.push({ id: event.featId, name: event.name, source: 'Feat', description: event.description })
+
+  if (event.abilityScoreBonus) {
+    for (const [ability, bonus] of Object.entries(event.abilityScoreBonus)) {
+      const key = ability as AbilityKey
+      character.abilityScores[key] = Math.min(20, character.abilityScores[key] + (bonus ?? 0))
+    }
+  }
+  if (event.grantedSpells) {
+    for (const spell of event.grantedSpells) {
+      if (!character.spells.some(s => s.spellId === spell.spellId)) {
+        character.spells.push({
+          id: crypto.randomUUID(), spellId: spell.spellId, name: spell.name,
+          level: spell.level, prepared: spell.level === 0,
+        })
+      }
+    }
+  }
+  if (event.hpBonusPerLevel) applyHpBonusPerLevel(character, event.hpBonusPerLevel)
+  if (event.withOption) {
+    // The source pre-answered the feat's own question, so there is no RESOLVED_OPTION in
+    // this run to record the answer or rename the feature the usual way.
+    character.chosenOptions = { ...character.chosenOptions, [event.withOption.choiceId]: event.withOption.optionId }
+    const feature = character.features.find(f => f.id === event.featId)
+    if (feature) feature.name = `${event.name} (${event.withOption.optionName})`
+  }
+}
+
+/**
+ * Applies the automatic half of a feat's own levelUpEvents — what resolveFeatEvents
+ * produces once the feat, and (if it has one) the ability it left to the player, are both
+ * known. Shared by RESOLVED_CHOOSE_FEAT, which knows both the moment the feat is picked,
+ * and RESOLVED_FEAT_ABILITY, which re-runs this once an ability that was still pending at
+ * grant time is finally answered — a GRANT_FEAT'd feat's own spell keyed to 'increased'
+ * resolves to nothing until then, and replaying is how it gets fixed up. Safe to call more
+ * than once over the same feat: grantSpellsTo and registerSpellcasting both are.
+ *
+ * Includes GRANT_FEAT so a feat that grants another feat outright (rather than asking, as
+ * CHOOSE_FEAT's own list does) is not silently dropped — resolveFeatEvents already
+ * resolved it through resolveGrantFeat, so applying it is the same call every other
+ * GRANT_FEAT goes through.
+ */
+function applyFeatAutomaticEvents(character: Character, events: AutomaticLevelUpEvent[]): void {
+  for (const event of events) {
+    switch (event.type) {
+      case 'GRANT_SPELLS':
+        grantSpellsTo(character, event.addTo, event.spells, event.alwaysPrepared, {
+          ability: event.ability,
+          origin: event.origin,
+          label: event.label,
+          uses: event.uses,
+          cost: event.cost,
+          castAtLevel: event.castAtLevel,
+        })
+        break
+      // A feat can be what makes a character a caster at all. resolveFeatEvents emits
+      // this and feat events never reach applyAutomaticEvents, so without a case here
+      // the feat granted spells with no source behind them.
+      case 'GRANT_SPELLCASTING':
+        registerSpellcasting(character, event.addTo, event.ability, event)
+        break
+      case 'GAIN_PROFICIENCY':
+        if (!character.otherProficiencies.includes(event.proficiency)) {
+          character.otherProficiencies.push(event.proficiency)
+        }
+        break
+      case 'UPDATE_FEATURE_USES': {
+        const target = character.features.find(f => f.name === event.featureName)
+        if (target) {
+          if (event.usesMax === null) {
+            delete target.usesMax
+            delete target.usesRemaining
+          }
+          else {
+            target.usesMax = event.usesMax
+            target.usesRemaining = event.usesMax
+          }
+        }
+        break
+      }
+      case 'GRANT_FEAT':
+        applyGrantedFeat(character, event)
+        break
+    }
+  }
+}
+
 export function applyAutomaticEvents(
   character: Character,
   events: AutomaticLevelUpEvent[],
@@ -1459,6 +1590,11 @@ export function applyAutomaticEvents(
   manualHp?: number,
 ): Character {
   const updated = structuredClone(character)
+  // Nothing here changed CON before GRANT_FEAT existed; kept at batch level rather than
+  // inline in that one case so a second ability-changing automatic event (were one ever
+  // added) is covered the same way, and to match applyResolvedChoices's own batch-level
+  // correction rather than duplicating the arithmetic per event.
+  const oldConMod = Math.floor((updated.abilityScores.con - 10) / 2)
 
   for (const event of events) {
     switch (event.type) {
@@ -1494,58 +1630,9 @@ export function applyAutomaticEvents(
         }
         break
       }
-      case 'GRANT_FEAT': {
-        // resolveGrantFeat already checked the character does not carry the feat, but the
-        // check is cheap and this event has no rulepack to re-derive that from if it were
-        // ever replayed, so it stays defensive rather than trusting the caller.
-        if (updated.features.some(f => f.id === event.featId)) break
-        const oldConMod = Math.floor((updated.abilityScores.con - 10) / 2)
-
-        updated.features.push({ id: event.featId, name: event.name, source: 'Feat', description: event.description })
-
-        if (event.abilityScoreBonus) {
-          for (const [ability, bonus] of Object.entries(event.abilityScoreBonus)) {
-            const key = ability as AbilityKey
-            updated.abilityScores[key] = Math.min(20, updated.abilityScores[key] + (bonus ?? 0))
-          }
-        }
-        if (event.grantedSpells) {
-          for (const spell of event.grantedSpells) {
-            if (!updated.spells.some(s => s.spellId === spell.spellId)) {
-              updated.spells.push({
-                id: crypto.randomUUID(), spellId: spell.spellId, name: spell.name,
-                level: spell.level, prepared: spell.level === 0,
-              })
-            }
-          }
-        }
-        if (event.hpBonusPerLevel) {
-          const totalLevel = updated.classes.reduce((s, c) => s + c.level, 0)
-          const hpGain = event.hpBonusPerLevel * totalLevel
-          updated.hp.max += hpGain
-          updated.hp.current += hpGain
-          updated.hpBonusPerLevel = (updated.hpBonusPerLevel ?? 0) + event.hpBonusPerLevel
-        }
-        if (event.withOption) {
-          // The source pre-answered the feat's own question, so there is no RESOLVED_OPTION
-          // in this run to record the answer or rename the feature the usual way.
-          updated.chosenOptions = { ...updated.chosenOptions, [event.withOption.choiceId]: event.withOption.optionId }
-          const feature = updated.features.find(f => f.id === event.featId)
-          if (feature) feature.name = `${event.name} (${event.withOption.optionName})`
-        }
-
-        // A flat CON bonus needs the same retroactive HP correction a level-up's own ASI
-        // gets. applyResolvedChoices does this once at the end for every resolved choice,
-        // but this event is automatic and never reaches that function.
-        const newConMod = Math.floor((updated.abilityScores.con - 10) / 2)
-        if (newConMod !== oldConMod) {
-          const totalLevel = updated.classes.reduce((s, c) => s + c.level, 0)
-          const hpDelta = (newConMod - oldConMod) * totalLevel
-          updated.hp.max = Math.max(updated.hp.max + hpDelta, totalLevel)
-          updated.hp.current = Math.max(updated.hp.current + hpDelta, 1)
-        }
+      case 'GRANT_FEAT':
+        applyGrantedFeat(updated, event)
         break
-      }
       case 'GRANT_SPELLCASTING':
         registerSpellcasting(updated, event.addTo, event.ability, event)
         break
@@ -1630,6 +1717,7 @@ export function applyAutomaticEvents(
     }
   }
 
+  applyRetroactiveConHp(updated, oldConMod)
   return updated
 }
 
@@ -1656,6 +1744,16 @@ export function applyResolvedChoices(
         for (const [ability, bonus] of Object.entries(choice.bonuses)) {
           const key = ability as AbilityKey
           updated.abilityScores[key] = Math.min(20, updated.abilityScores[key] + (bonus ?? 0))
+        }
+        // GRANT_FEAT resolved the feat's own levelUpEvents before this answer existed, so
+        // anything keyed to 'increased' (a Touched feat's free spell) came back with no
+        // ability at all. Re-running now that it is known fixes that up — grantSpellsTo and
+        // registerSpellcasting are both safe to call again over the same grant, and
+        // whatever did not depend on 'increased' just re-applies to the same effect.
+        const feat = rulepack.feats.find(f => f.id === choice.featId)
+        if (feat) {
+          const increased = featIncreasedAbility(feat, choice.bonuses)
+          applyFeatAutomaticEvents(updated, getAutomaticEvents(resolveFeatEvents(updated, feat, rulepack, increased)))
         }
         break
       }
@@ -1706,60 +1804,16 @@ export function applyResolvedChoices(
             }
           }
           // Extra HP per level (retroactive for all current levels)
-          if (feat.hpBonusPerLevel) {
-            const totalLevel = updated.classes.reduce((s, c) => s + c.level, 0)
-            const hpGain = feat.hpBonusPerLevel * totalLevel
-            updated.hp.max += hpGain
-            updated.hp.current += hpGain
-            updated.hpBonusPerLevel = (updated.hpBonusPerLevel ?? 0) + feat.hpBonusPerLevel
-          }
+          if (feat.hpBonusPerLevel) applyHpBonusPerLevel(updated, feat.hpBonusPerLevel)
           // The feat's own levelUpEvents. Its automatic half is applied here rather than
           // by applyAutomaticEvents, which runs before the feat is even known — the same
           // reason RESOLVED_OPTION applies its deferred grants inline. The choices it
           // raises are collected by the wizard and arrive as later entries in `choices`.
+          // Includes a nested GRANT_FEAT (a feat granting another outright): resolveFeatEvents
+          // already resolved it through resolveGrantFeat, so applyFeatAutomaticEvents's own
+          // GRANT_FEAT case is the same call every other GRANT_FEAT goes through.
           const increased = featIncreasedAbility(feat, choice.abilityBonus)
-          for (const event of getAutomaticEvents(resolveFeatEvents(updated, feat, rulepack, increased))) {
-            switch (event.type) {
-              case 'GRANT_SPELLS':
-                grantSpellsTo(updated, event.addTo, event.spells, event.alwaysPrepared, {
-                  ability: event.ability,
-                  origin: event.origin,
-                  label: event.label,
-                  uses: event.uses,
-                  // Was missing while every other call site forwarded it, so a feat
-                  // granting a resource-metered spell stored no price and the sheet
-                  // offered no way to spend for it.
-                  cost: event.cost,
-                  castAtLevel: event.castAtLevel,
-                })
-                break
-              // A feat can be what makes a character a caster at all. resolveFeatEvents
-              // emits this and feat events never reach applyAutomaticEvents, so without
-              // a case here the feat granted spells with no source behind them.
-              case 'GRANT_SPELLCASTING':
-                registerSpellcasting(updated, event.addTo, event.ability, event)
-                break
-              case 'GAIN_PROFICIENCY':
-                if (!updated.otherProficiencies.includes(event.proficiency)) {
-                  updated.otherProficiencies.push(event.proficiency)
-                }
-                break
-              case 'UPDATE_FEATURE_USES': {
-                const target = updated.features.find(f => f.name === event.featureName)
-                if (target) {
-                  if (event.usesMax === null) {
-                    delete target.usesMax
-                    delete target.usesRemaining
-                  }
-                  else {
-                    target.usesMax = event.usesMax
-                    target.usesRemaining = event.usesMax
-                  }
-                }
-                break
-              }
-            }
-          }
+          applyFeatAutomaticEvents(updated, getAutomaticEvents(resolveFeatEvents(updated, feat, rulepack, increased)))
         }
         break
       }
@@ -2080,15 +2134,8 @@ export function applyResolvedChoices(
     }
   }
 
-  // If the CON modifier changed (from ASI or feat), adjust HP for all existing levels.
-  // Each level's HP was calculated with the old modifier, so we compensate the delta.
-  const newConMod = Math.floor((updated.abilityScores.con - 10) / 2)
-  if (newConMod !== oldConMod) {
-    const totalLevel = updated.classes.reduce((s, c) => s + c.level, 0)
-    const hpDelta = (newConMod - oldConMod) * totalLevel
-    updated.hp.max = Math.max(updated.hp.max + hpDelta, totalLevel)
-    updated.hp.current = Math.max(updated.hp.current + hpDelta, 1)
-  }
+  // If the CON modifier changed (from an ASI or a feat), adjust HP for all existing levels.
+  applyRetroactiveConHp(updated, oldConMod)
 
   return updated
 }

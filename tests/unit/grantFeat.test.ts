@@ -99,6 +99,25 @@ const ABILITY_CHOICE_FEAT: FeatDefinition = {
   abilityScoreChoice: { from: ['str', 'dex'], distributions: [[1]] },
 }
 
+/**
+ * The "Touched" shape (Fey Touched, Shadow Touched, Gift of the Chromatic/Metallic
+ * Dragon): a free spell whose casting ability is whichever ability the feat's own
+ * abilityScoreChoice increased, not known until the player answers that choice.
+ */
+const TOUCHED_FEAT: FeatDefinition = {
+  id: 'test.touched',
+  name: 'Test Touched',
+  description: '',
+  abilityScoreChoice: { from: ['int', 'wis', 'cha'], distributions: [[1]] },
+  levelUpEvents: [{
+    type: 'GRANT_SPELLS',
+    addTo: 'test.touched',
+    spellIds: ['sacred-flame'],
+    alwaysPrepared: true,
+    ability: 'increased',
+  }],
+}
+
 function pack(): Rulepack {
   const built = RulepackSchema.parse(fighter) as unknown as Rulepack
   built.feats = [
@@ -108,6 +127,7 @@ function pack(): Rulepack {
     SCION,
     GRANTS_ANOTHER_FEAT,
     ABILITY_CHOICE_FEAT,
+    TOUCHED_FEAT,
   ]
   // Only what SCION's guarded GRANT_SPELLS needs to resolve to something real.
   built.spells = [{
@@ -281,5 +301,47 @@ describe('GRANT_FEAT — an ability score choice the feat itself leaves to the p
       rulepack,
     )
     expect(updated.abilityScores.dex).toBe(char().abilityScores.dex + 1)
+  })
+
+  it('a spell keyed to \'increased\' resolves with no ability until the choice is answered, then gets fixed up', () => {
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('test.touched')] }
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+
+    // Resolved before anyone has answered the ability choice: the grant is there, but
+    // nothing says which ability it casts with yet.
+    const spellGrant = events.find(e => e.type === 'GRANT_SPELLS')
+    expect(spellGrant).toMatchObject({ addTo: 'test.touched', spells: [{ spellId: 'sacred-flame' }] })
+    expect(spellGrant && 'ability' in spellGrant ? spellGrant.ability : undefined).toBeUndefined()
+
+    let updated = applyAutomaticEvents(char(), getAutomaticEvents(events), 'average')
+    expect(updated.spells.map(s => s.spellId)).toEqual(['sacred-flame'])
+    // Nothing to register a DC against yet — the point of this test.
+    expect(updated.classSpellcasting?.['test.touched']).toBeUndefined()
+
+    // The wizard asks CHOOSE_FEAT_ABILITY, the player picks Wisdom, and that answer has to
+    // reach back into the grant that already landed.
+    updated = applyResolvedChoices(
+      updated,
+      [{ type: 'RESOLVED_FEAT_ABILITY', featId: 'test.touched', bonuses: { wis: 1 } }],
+      packWithBg,
+    )
+    expect(updated.classSpellcasting?.['test.touched']).toMatchObject({ ability: 'wis', origin: 'feat' })
+    // Fixed up in place — not granted a second time.
+    expect(updated.spells.map(s => s.spellId)).toEqual(['sacred-flame'])
+  })
+})
+
+describe('GRANT_FEAT — a nested grant survives the CHOOSE_FEAT path too', () => {
+  it('applies a feat picked at ASI that itself grants another feat outright', () => {
+    const result = applyResolvedChoices(
+      char(),
+      [{ type: 'RESOLVED_CHOOSE_FEAT', featId: 'test.grants-another' }],
+      rulepack,
+    )
+    expect(result.features.some(f => f.id === 'test.grants-another')).toBe(true)
+    // The nested grant — dropped before this fix, silently, with no error.
+    const nested = result.features.find(f => f.id === 'test.flat-bonus')
+    expect(nested).toMatchObject({ name: 'Flat Bonus Feat', source: 'Feat' })
+    expect(result.abilityScores.str).toBe(char().abilityScores.str + 1)
   })
 })
