@@ -118,3 +118,51 @@ describe('a hand-entered initiative still overrides the lot', () => {
     expect(initiativeBreakdown(withFeatures([], { initiative: 0 }), ctx).total).toBe(0)
   })
 })
+
+describe('half a proficiency bonus, because initiative is a Dexterity check', () => {
+  const JACK_OF_ALL_TRADES = feature(
+    'Jack of All Trades',
+    'Starting at 2nd level, you can add half your proficiency bonus, rounded down, to any'
+      + ' ability check you make that does not already include your proficiency bonus.',
+  )
+
+  it('adds half the bonus, rounded down', () => {
+    const result = initiativeBreakdown(withFeatures([JACK_OF_ALL_TRADES]), ctx)
+    expect(result.total).toBe(3)
+    expect(result.parts).toContainEqual({
+      label: 'Jack of All Trades (half proficiency)',
+      value: 1,
+    })
+  })
+
+  it('adds nothing on top of a whole proficiency bonus the roll already has', () => {
+    const hare = feature(
+      'Hare-Trigger',
+      'You can add your proficiency bonus to your initiative rolls.',
+    )
+    expect(initiativeBreakdown(withFeatures([hare, JACK_OF_ALL_TRADES]), ctx).total).toBe(5)
+  })
+
+  it('rounds up for a feature that says so, and reaches Dexterity because it names it', () => {
+    const athlete = feature(
+      'Remarkable Athlete',
+      'Starting at 3rd level, you can add half your proficiency bonus, round up, to any'
+        + ' Strength, Dexterity, or Constitution check you make that does not already use'
+        + ' your proficiency bonus.',
+    )
+    expect(initiativeBreakdown(withFeatures([athlete]), ctx).total).toBe(4)
+  })
+
+  it('stays off a roll a scoped feature does not cover', () => {
+    const scholar = feature(
+      'Scholarly Recall',
+      'You add half your proficiency bonus to any Intelligence check you make.',
+    )
+    expect(initiativeBreakdown(withFeatures([scholar]), ctx).total).toBe(2)
+  })
+
+  it('stacks with the hand-entered slots', () => {
+    const both = withFeatures([JACK_OF_ALL_TRADES], { initiativeBonuses: { magic: 2 } })
+    expect(initiativeBreakdown(both, ctx).total).toBe(5)
+  })
+})

@@ -2,6 +2,7 @@ import type { Character, AbilityKey, AbilityScores, SkillKey } from '~/types/cha
 import { characterArmorClass } from '~/services/armorClass'
 import { initiativeBreakdown } from '~/services/initiative'
 import { savingThrowTotals } from '~/services/savingThrows'
+import { halfProficiency, halfProficiencyBonus } from '~/services/halfProficiency'
 
 const SKILL_ABILITY: Record<SkillKey, AbilityKey> = {
   acrobatics: 'dex',
@@ -68,6 +69,34 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     { modifiers: abilityModifiers.value, proficiencyBonus: profBonus.value },
   ))
 
+  // Jack of All Trades and anything worded like it, read off the features once rather
+  // than once per skill.
+  const halfProf = computed(() => halfProficiency(characterRef.value))
+
+  /**
+   * The feature lending each unproficient skill half a proficiency bonus, or null.
+   *
+   * Only the skills the character has no proficiency in appear: "that doesn't already
+   * include your proficiency bonus" is the rule, so a proficient skill is never half.
+   */
+  const skillHalfProficiency = computed<Record<SkillKey, string | null>>(() => {
+    const c = characterRef.value
+    const prof = profBonus.value
+    const skillProfs = c?.skillProficiencies ?? {}
+
+    const result = {} as Record<SkillKey, string | null>
+    for (const [skill, ability] of Object.entries(SKILL_ABILITY) as [SkillKey, AbilityKey][]) {
+      const profLevel = (skillProfs as Record<string, number>)[skill] ?? 0
+      if (profLevel > 0) {
+        result[skill] = null
+        continue
+      }
+      const half = halfProficiencyBonus(halfProf.value, ability, prof)
+      result[skill] = half.value ? half.source : null
+    }
+    return result
+  })
+
   const skills = computed<Record<SkillKey, number>>(() => {
     const c = characterRef.value
     const mods = abilityModifiers.value
@@ -77,7 +106,8 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     const result = {} as Record<SkillKey, number>
     for (const [skill, ability] of Object.entries(SKILL_ABILITY) as [SkillKey, AbilityKey][]) {
       const profLevel = ((skillProfs as Record<string, number>)[skill] ?? 0) as 0 | 1 | 2
-      result[skill] = mods[ability] + profLevel * prof
+      const half = profLevel === 0 ? halfProficiencyBonus(halfProf.value, ability, prof).value : 0
+      result[skill] = mods[ability] + profLevel * prof + half
     }
     return result
   })
@@ -135,6 +165,7 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     abilityModifiers,
     savingThrows,
     skills,
+    skillHalfProficiency,
     passivePerception,
     initiative,
     armorClass,
