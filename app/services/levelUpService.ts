@@ -32,6 +32,8 @@ import type {
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
   SetSpeedEvent,
+  GrantFeatEvent,
+  ChooseFeatAbilityEvent,
   ResolvedChoice,
 } from '~/types/events'
 
@@ -979,6 +981,9 @@ export function resolveLevelUpEvents(
       case 'CHOOSE_FEAT':
         events.push({ type: 'CHOOSE_FEAT' })
         break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, classDef.name))
+        break
       case 'ABILITY_SCORE_IMPROVEMENT':
         events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
         break
@@ -1075,6 +1080,9 @@ export function resolveLevelUpEvents(
       case 'ABILITY_SCORE_IMPROVEMENT':
         events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
         break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, subclassDef?.name ?? classDef.name))
+        break
     }
   }
 
@@ -1147,6 +1155,12 @@ export function resolveLevelUpEvents(
             if (skills) events.push(skills)
             break
           }
+          case 'GRANT_FEAT': {
+            // resolveGrantFeat already skips a feat the character carries, which is what
+            // keeps a background from re-granting it on every later level.
+            events.push(...resolveGrantFeat(eventDef, character, rulepack, source?.name))
+            break
+          }
         }
       }
     }
@@ -1169,7 +1183,9 @@ export function resolveLevelUpEvents(
  * letting it borrow whichever class happened to come first.
  *
  * Event types that presuppose a class — CHOOSE_SUBCLASS, UPDATE_HIT_DIE, spell slots,
- * a nested CHOOSE_FEAT — are ignored rather than half-applied.
+ * a nested CHOOSE_FEAT — are ignored rather than half-applied. A nested GRANT_FEAT is not
+ * one of those: a feat naming another outright (rather than asking) needs no class to
+ * resolve against, so it recurses through resolveGrantFeat like any other source does.
  */
 export function resolveFeatEvents(
   character: Character,
@@ -1272,7 +1288,75 @@ export function resolveFeatEvents(
       case 'ABILITY_SCORE_IMPROVEMENT':
         events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
         break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, feat.name))
+        break
     }
+  }
+
+  return events
+}
+
+/**
+ * Translate a GRANT_FEAT definition into the events that take the feat.
+ *
+ * Everything the feat does without the player is denormalized into one automatic
+ * GRANT_FEAT event, the same way GRANT_SPELLS is: applyAutomaticEvents has no rulepack to
+ * look the feat back up in. `withOption` pre-answers the feat's own CHOOSE_OPTION (Magic
+ * Initiate's class), so the character view passed to resolveFeatEvents already carries
+ * that answer — its guarded CHOOSE_SPELLs come back unlocked, its CHOOSE_OPTION is skipped
+ * because resolveFeatEvents finds an answer already recorded, and everything either
+ * produces (automatic or choice alike) is simply appended: it needs no different handling
+ * than a class or race's own events do, since resolveFeatEvents already denormalized it.
+ *
+ * A feat id the pack does not have, or a feat the character already carries, produces no
+ * events at all — a feat is not gained twice, and an unresolvable grant should not break
+ * the level-up around it.
+ */
+function resolveGrantFeat(
+  eventDef: Extract<LevelUpEventDef, { type: 'GRANT_FEAT' }>,
+  character: Character,
+  rulepack: Rulepack,
+  fallbackLabel?: string,
+): LevelUpEvent[] {
+  const feat = rulepack.feats.find(f => f.id === eventDef.featId)
+  if (!feat) return []
+  if (character.features.some(f => f.id === feat.id)) return []
+
+  const withOption = eventDef.withOption
+  const optionName = withOption && (feat.levelUpEvents ?? [])
+    .find((d): d is Extract<LevelUpEventDef, { type: 'CHOOSE_OPTION' }> =>
+      d.type === 'CHOOSE_OPTION' && d.id === withOption.choiceId)
+    ?.options.find(o => o.id === withOption.optionId)?.name
+
+  const answered: Character = withOption
+    ? { ...character, chosenOptions: { ...character.chosenOptions, [withOption.choiceId]: withOption.optionId } }
+    : character
+
+  const label = eventDef.label ?? fallbackLabel
+  const events: LevelUpEvent[] = [{
+    type: 'GRANT_FEAT',
+    featId: feat.id,
+    name: feat.name,
+    description: feat.description,
+    ...(feat.abilityScoreBonus ? { abilityScoreBonus: feat.abilityScoreBonus } : {}),
+    ...(feat.grantedSpells ? { grantedSpells: resolveGrantedSpells(feat.grantedSpells, rulepack) } : {}),
+    ...(feat.hpBonusPerLevel ? { hpBonusPerLevel: feat.hpBonusPerLevel } : {}),
+    // Only carried when the option is actually one of the feat's own — an id that named
+    // nothing is dropped rather than recorded as an answer nobody can trace back.
+    ...(withOption && optionName ? { withOption: { ...withOption, optionName } } : {}),
+    ...(label ? { label } : {}),
+  } satisfies GrantFeatEvent]
+
+  events.push(...resolveFeatEvents(answered, feat, rulepack))
+
+  if (feat.abilityScoreChoice) {
+    events.push({
+      type: 'CHOOSE_FEAT_ABILITY',
+      featId: feat.id,
+      label: label ?? feat.name,
+      choice: feat.abilityScoreChoice,
+    } satisfies ChooseFeatAbilityEvent)
   }
 
   return events
@@ -1357,7 +1441,7 @@ export function resolveUnlockedChoices(
 }
 
 export function isChoiceEvent(event: LevelUpEvent): event is ChoiceLevelUpEvent {
-  return ['CHOOSE_SPELL', 'CHOOSE_SPELLCASTING_ABILITY', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'REPLACE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
+  return ['CHOOSE_SPELL', 'CHOOSE_SPELLCASTING_ABILITY', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'CHOOSE_FEAT_ABILITY', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'REPLACE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
 }
 
 export function getChoiceEvents(events: LevelUpEvent[]): ChoiceLevelUpEvent[] {
@@ -1407,6 +1491,58 @@ export function applyAutomaticEvents(
             ...event.feature,
             usesRemaining: event.feature.usesMax,
           })
+        }
+        break
+      }
+      case 'GRANT_FEAT': {
+        // resolveGrantFeat already checked the character does not carry the feat, but the
+        // check is cheap and this event has no rulepack to re-derive that from if it were
+        // ever replayed, so it stays defensive rather than trusting the caller.
+        if (updated.features.some(f => f.id === event.featId)) break
+        const oldConMod = Math.floor((updated.abilityScores.con - 10) / 2)
+
+        updated.features.push({ id: event.featId, name: event.name, source: 'Feat', description: event.description })
+
+        if (event.abilityScoreBonus) {
+          for (const [ability, bonus] of Object.entries(event.abilityScoreBonus)) {
+            const key = ability as AbilityKey
+            updated.abilityScores[key] = Math.min(20, updated.abilityScores[key] + (bonus ?? 0))
+          }
+        }
+        if (event.grantedSpells) {
+          for (const spell of event.grantedSpells) {
+            if (!updated.spells.some(s => s.spellId === spell.spellId)) {
+              updated.spells.push({
+                id: crypto.randomUUID(), spellId: spell.spellId, name: spell.name,
+                level: spell.level, prepared: spell.level === 0,
+              })
+            }
+          }
+        }
+        if (event.hpBonusPerLevel) {
+          const totalLevel = updated.classes.reduce((s, c) => s + c.level, 0)
+          const hpGain = event.hpBonusPerLevel * totalLevel
+          updated.hp.max += hpGain
+          updated.hp.current += hpGain
+          updated.hpBonusPerLevel = (updated.hpBonusPerLevel ?? 0) + event.hpBonusPerLevel
+        }
+        if (event.withOption) {
+          // The source pre-answered the feat's own question, so there is no RESOLVED_OPTION
+          // in this run to record the answer or rename the feature the usual way.
+          updated.chosenOptions = { ...updated.chosenOptions, [event.withOption.choiceId]: event.withOption.optionId }
+          const feature = updated.features.find(f => f.id === event.featId)
+          if (feature) feature.name = `${event.name} (${event.withOption.optionName})`
+        }
+
+        // A flat CON bonus needs the same retroactive HP correction a level-up's own ASI
+        // gets. applyResolvedChoices does this once at the end for every resolved choice,
+        // but this event is automatic and never reaches that function.
+        const newConMod = Math.floor((updated.abilityScores.con - 10) / 2)
+        if (newConMod !== oldConMod) {
+          const totalLevel = updated.classes.reduce((s, c) => s + c.level, 0)
+          const hpDelta = (newConMod - oldConMod) * totalLevel
+          updated.hp.max = Math.max(updated.hp.max + hpDelta, totalLevel)
+          updated.hp.current = Math.max(updated.hp.current + hpDelta, 1)
         }
         break
       }
@@ -1508,6 +1644,15 @@ export function applyResolvedChoices(
   for (const choice of choices) {
     switch (choice.type) {
       case 'RESOLVED_ASI': {
+        for (const [ability, bonus] of Object.entries(choice.bonuses)) {
+          const key = ability as AbilityKey
+          updated.abilityScores[key] = Math.min(20, updated.abilityScores[key] + (bonus ?? 0))
+        }
+        break
+      }
+      case 'RESOLVED_FEAT_ABILITY': {
+        // The feat itself was already applied by the automatic GRANT_FEAT event; this is
+        // only the ability increase it left to the player, e.g. Resilient's one of choice.
         for (const [ability, bonus] of Object.entries(choice.bonuses)) {
           const key = ability as AbilityKey
           updated.abilityScores[key] = Math.min(20, updated.abilityScores[key] + (bonus ?? 0))

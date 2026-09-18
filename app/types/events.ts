@@ -1,4 +1,5 @@
 import type { AbilityKey, SkillKey, SpellcastingOrigin, SpellSlotLevel } from './character'
+import type { AbilityScoreChoice } from './rulepack'
 
 // ─── Automatic events (applied without player input) ──────────────────────────
 
@@ -33,6 +34,29 @@ export interface AddFeatureEvent {
     recharge?: 'short' | 'long' | 'dawn'
     replaces?: string    // Name of an existing feature to remove when this one is added
   }
+}
+
+/**
+ * A specific feat handed out by a source, rather than picked from CHOOSE_FEAT's list.
+ * Denormalized like GRANT_SPELLS: everything is resolved against the rulepack up front
+ * (resolveLevelUpEvents / resolveFeatEvents run with a rulepack, applyAutomaticEvents does
+ * not), so applying this needs no lookup and cannot forget a field the two would drift on.
+ *
+ * `withOption`, when set, is the feat's own CHOOSE_OPTION already answered by the source —
+ * `optionName` is carried along so applying this can rename the feature the same way
+ * answering the question by hand would (see the RESOLVED_OPTION handling in
+ * applyResolvedChoices, which this mirrors for the pre-answered case).
+ */
+export interface GrantFeatEvent {
+  type: 'GRANT_FEAT'
+  featId: string
+  name: string
+  description: string
+  abilityScoreBonus?: Partial<Record<AbilityKey, number>>
+  grantedSpells?: Array<{ spellId: string; name: string; level: number }>
+  hpBonusPerLevel?: number
+  withOption?: { choiceId: string; optionId: string; optionName: string }
+  label?: string
 }
 
 export interface GainProficiencyEvent {
@@ -200,6 +224,18 @@ export interface ChooseFeatEvent {
   type: 'CHOOSE_FEAT'
 }
 
+/**
+ * The ability increase left over by a feat GRANT_FEAT handed out — Resilient's "one
+ * ability score of your choice" — when the feat came from a source rather than from
+ * CHOOSE_FEAT's own picker, which asks the same question inline instead.
+ */
+export interface ChooseFeatAbilityEvent {
+  type: 'CHOOSE_FEAT_ABILITY'
+  featId: string
+  label: string
+  choice: AbilityScoreChoice
+}
+
 export interface AbilityScoreImprovementEvent {
   type: 'ABILITY_SCORE_IMPROVEMENT'
   points: number        // Usually 2 (can go +2 one / +1+1)
@@ -294,6 +330,13 @@ export interface ResolvedChoiceFeat {
   abilityBonus?: Partial<Record<AbilityKey, number>>
 }
 
+/** Answers a CHOOSE_FEAT_ABILITY: the feat itself was already applied by GRANT_FEAT. */
+export interface ResolvedFeatAbility {
+  type: 'RESOLVED_FEAT_ABILITY'
+  featId: string
+  bonuses: Partial<Record<AbilityKey, number>>
+}
+
 /** The ability the player picked to cast a source's spells with. */
 export interface ResolvedSpellcastingAbility {
   type: 'RESOLVED_SPELLCASTING_ABILITY'
@@ -371,6 +414,7 @@ export type AutomaticLevelUpEvent =
   | SetWildShapeLimitsEvent
   | SetSpellcastingAbilityEvent
   | SetSpeedEvent
+  | GrantFeatEvent
 
 export type ChoiceLevelUpEvent =
   | ChooseSpellEvent
@@ -378,6 +422,7 @@ export type ChoiceLevelUpEvent =
   | ChangeSpellEvent
   | ChooseExpertiseEvent
   | ChooseFeatEvent
+  | ChooseFeatAbilityEvent
   | AbilityScoreImprovementEvent
   | ChooseSubclassEvent
   | ChooseSkillEvent
@@ -402,6 +447,7 @@ export interface ResolvedSkill {
 export type ResolvedChoice =  | ResolvedChoiceSpell
   | ResolvedSpellcastingAbility
   | ResolvedChoiceFeat
+  | ResolvedFeatAbility
   | ResolvedASI
   | ResolvedSubclass
   | ResolvedOption

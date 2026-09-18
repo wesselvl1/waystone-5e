@@ -339,6 +339,19 @@ export type LevelUpEventDef =
     whenOption?: { choiceId: string; optionId: string }
   }
   | { type: 'CHOOSE_FEAT' }
+  | {
+    /**
+     * A source hands the character a specific feat — "You gain the Tough feat", as a
+     * dozen backgrounds and two races are written. Distinct from CHOOSE_FEAT, which
+     * asks the player; this one names it.
+     */
+    type: 'GRANT_FEAT'
+    featId: string
+    /** Pre-answered arm of a feat that asks a question, e.g. Magic Initiate's class. */
+    withOption?: { choiceId: string; optionId: string }
+    /** Display label for the granting source, e.g. "Wildspace Adaptation". */
+    label?: string
+  }
   | { type: 'ABILITY_SCORE_IMPROVEMENT'; points: number }
   | { type: 'CHOOSE_SUBCLASS'; label: string }
   | { type: 'UPDATE_HIT_DIE'; die: string }

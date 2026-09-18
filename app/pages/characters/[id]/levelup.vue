@@ -37,6 +37,8 @@ import type {
   ChooseSkillEvent,
   ChooseExpertiseEvent,
   ChooseSpellcastingAbilityEvent,
+  ChooseFeatAbilityEvent,
+  GrantFeatEvent,
 } from '~/types/events'
 
 const route = useRoute()
@@ -370,6 +372,22 @@ function confirmFeat() {
   nextChoice()
 }
 
+// The ability increase left over by a feat a source granted outright (GRANT_FEAT) rather
+// than one the player picked from CHOOSE_FEAT's list — the feat itself is already applied,
+// this is only the one question it still asks.
+const grantedFeatAbilityPicks = ref<AbilityPicks>({})
+
+function confirmGrantedFeatAbility() {
+  const choiceEvent = currentChoice.value as ChooseFeatAbilityEvent
+  resolvedChoices.value.push({
+    type: 'RESOLVED_FEAT_ABILITY',
+    featId: choiceEvent.featId,
+    bonuses: { ...grantedFeatAbilityPicks.value },
+  })
+  grantedFeatAbilityPicks.value = {}
+  nextChoice()
+}
+
 // Choose option (e.g. totem spirit)
 const selectedOptionId = ref('')
 
@@ -631,10 +649,19 @@ function queueUnlockedChoices(choiceId: string, optionId: string) {
     .find((c): c is Extract<ResolvedChoice, { type: 'RESOLVED_SUBCLASS' }> =>
       c.type === 'RESOLVED_SUBCLASS' && c.classId === targetClassId.value)
     ?.subclassId
-  const feats = resolvedChoices.value
-    .filter((c): c is Extract<ResolvedChoice, { type: 'RESOLVED_CHOOSE_FEAT' }> =>
-      c.type === 'RESOLVED_CHOOSE_FEAT')
-    .map(c => rulepackStore.getFeat(c.featId) as FeatDefinition | undefined)
+  // A feat picked via CHOOSE_FEAT lives in resolvedChoices; one a source granted outright
+  // (GRANT_FEAT) is an automatic event instead — its own CHOOSE_OPTION, left unanswered
+  // (no withOption), can still be sitting among this run's choiceEvents right now.
+  const feats = [
+    ...resolvedChoices.value
+      .filter((c): c is Extract<ResolvedChoice, { type: 'RESOLVED_CHOOSE_FEAT' }> =>
+        c.type === 'RESOLVED_CHOOSE_FEAT')
+      .map(c => c.featId),
+    ...automaticEvents.value
+      .filter((e): e is GrantFeatEvent => e.type === 'GRANT_FEAT')
+      .map(e => e.featId),
+  ]
+    .map(featId => rulepackStore.getFeat(featId) as FeatDefinition | undefined)
     .filter((f): f is FeatDefinition => !!f)
 
   const unlocked = resolveUnlockedChoices(
@@ -677,6 +704,9 @@ watch(currentChoice, (choice) => {
   if (choice?.type === 'REPLACE_OPTION') {
     replaceFromChoiceId.value = ''
     replaceToOptionId.value = ''
+  }
+  if (choice?.type === 'CHOOSE_FEAT_ABILITY') {
+    grantedFeatAbilityPicks.value = {}
   }
 })
 
@@ -868,6 +898,8 @@ async function applyLevelUp() {
 
 const addHpEvent = computed(() => automaticEvents.value.find(e => e.type === 'ADD_HP') as { type: 'ADD_HP'; roll: number; average: number; max: number; conBonus: number; hpFlatBonus: number } | undefined)
 const newFeatures = computed(() => automaticEvents.value.filter(e => e.type === 'ADD_FEATURE'))
+const grantedFeats = computed(() =>
+  automaticEvents.value.filter((e): e is GrantFeatEvent => e.type === 'GRANT_FEAT'))
 const newSpellSlots = computed(() => automaticEvents.value.find(e => e.type === 'UPDATE_SPELL_SLOTS') as { type: 'UPDATE_SPELL_SLOTS'; slots: Record<number, number> } | undefined)
 
 const targetLevel = computed(() => {
@@ -1178,6 +1210,25 @@ watch(isFirstCharacterLevel, (val) => {
               class="btn-primary flex-1 text-sm"
               :disabled="!selectedFeatId || !isChoiceSatisfied(selectedFeatChoice, featAsiChoice)"
               @click="confirmFeat"
+            >Confirm</button>
+          </div>
+        </template>
+
+        <!-- A granted feat's own ability choice (Resilient's "one ability of your choice") -->
+        <template v-else-if="currentChoice.type === 'CHOOSE_FEAT_ABILITY'">
+          <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ChooseFeatAbilityEvent).label }}</h2>
+          <AbilityScoreChoicePicker
+            v-model="grantedFeatAbilityPicks"
+            class="mt-2"
+            :choice="(currentChoice as ChooseFeatAbilityEvent).choice"
+            :base-scores="character!.abilityScores"
+          />
+          <div class="flex gap-2 mt-2">
+            <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
+            <button
+              class="btn-primary flex-1 text-sm"
+              :disabled="!isChoiceSatisfied((currentChoice as ChooseFeatAbilityEvent).choice, grantedFeatAbilityPicks)"
+              @click="confirmGrantedFeatAbility"
             >Confirm</button>
           </div>
         </template>
@@ -1535,6 +1586,19 @@ watch(isFirstCharacterLevel, (val) => {
           </div>
         </div>
 
+        <!-- Feats granted outright (GRANT_FEAT), as opposed to one picked at ASI -->
+        <div v-if="grantedFeats.length" class="card">
+          <p class="section-header">Feat Gained</p>
+          <div class="space-y-1">
+            <div v-for="f in grantedFeats" :key="f.featId" class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-success-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span class="text-sm text-white">{{ f.withOption ? `${f.name} (${f.withOption.optionName})` : f.name }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Spell slots -->
         <div v-if="newSpellSlots" class="card">
           <p class="section-header">Spell Slots Updated</p>
@@ -1559,6 +1623,10 @@ watch(isFirstCharacterLevel, (val) => {
               </span>
               <span v-else-if="choice.type === 'RESOLVED_CHOOSE_FEAT'">
                 Feat: {{ rulepackStore.getFeat(choice.featId)?.name ?? choice.featId }}
+              </span>
+              <span v-else-if="choice.type === 'RESOLVED_FEAT_ABILITY'">
+                {{ rulepackStore.getFeat(choice.featId)?.name ?? choice.featId }} ability:
+                {{ Object.entries(choice.bonuses).map(([k, v]) => `+${v} ${k.toUpperCase()}`).join(', ') }}
               </span>
               <span v-else-if="choice.type === 'RESOLVED_CHOOSE_SPELL'">
                 Spells: {{ choice.spellIds.map(id => rulepackStore.getSpell(id)?.name ?? id).join(', ') }}

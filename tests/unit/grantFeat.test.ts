@@ -1,0 +1,285 @@
+import { describe, it, expect } from 'vitest'
+import { RulepackSchema } from '~/schemas/rulepackSchema'
+import {
+  resolveLevelUpEvents,
+  resolveFeatEvents,
+  applyAutomaticEvents,
+  applyResolvedChoices,
+  getAutomaticEvents,
+  getChoiceEvents,
+  isChoiceEvent,
+} from '~/services/levelUpService'
+import type { Character } from '~/types/character'
+import type { Rulepack, FeatDefinition, Background } from '~/types/rulepack'
+import { validCharacter } from '../fixtures'
+import fighter from '~/data/srd/fighter.json'
+import phbFeats from '~/data/phb/feats.json'
+
+/**
+ * A dozen backgrounds and two races say "you gain the X feat" and grant nothing today —
+ * GRANT_FEAT is the event that lets them. These feats stand in for the shapes the real
+ * books use: a flat bonus, a real hpBonusPerLevel feat (phb.tough, unedited), and a feat
+ * that asks its own question the way Magic Initiate does.
+ */
+const FLAT_BONUS_FEAT: FeatDefinition = {
+  id: 'test.flat-bonus',
+  name: 'Flat Bonus Feat',
+  description: '',
+  abilityScoreBonus: { str: 1 },
+}
+
+const CLASS_OPTION = 'test.magic-initiate-option'
+
+/** Magic Initiate's shape: pick a class, then that class's cantrips and a 1st-level spell. */
+const MAGIC_INITIATE: FeatDefinition = {
+  id: 'test.magic-initiate',
+  name: 'Magic Initiate',
+  description: '',
+  levelUpEvents: [
+    {
+      type: 'CHOOSE_OPTION',
+      id: CLASS_OPTION,
+      label: 'Magic Initiate',
+      options: [
+        { id: 'wizard-spells', name: 'Wizard Spells', description: '' },
+        { id: 'cleric-spells', name: 'Cleric Spells', description: '' },
+      ],
+    },
+    {
+      type: 'CHOOSE_SPELL',
+      addTo: 'test.magic-initiate',
+      count: 2,
+      cantrip: true,
+      classes: ['wizard'],
+      maxLevel: 0,
+      whenOption: { choiceId: CLASS_OPTION, optionId: 'wizard-spells' },
+    },
+  ],
+}
+
+/** A feat gated on its own CHOOSE_OPTION, but with an automatic grant behind the guard. */
+const PLANE_OPTION = 'test.plane-option'
+const SCION: FeatDefinition = {
+  id: 'test.scion',
+  name: 'Scion of the Outer Planes',
+  description: '',
+  levelUpEvents: [
+    {
+      type: 'CHOOSE_OPTION',
+      id: PLANE_OPTION,
+      label: 'Scion of the Outer Planes',
+      options: [
+        { id: 'good-outer-plane', name: 'Good', description: '' },
+        { id: 'evil-outer-plane', name: 'Evil', description: '' },
+      ],
+    },
+    {
+      type: 'GRANT_SPELLS',
+      addTo: 'test.scion',
+      spellIds: ['sacred-flame'],
+      alwaysPrepared: true,
+      whenOption: { choiceId: PLANE_OPTION, optionId: 'good-outer-plane' },
+      ability: 'cha',
+    },
+  ],
+}
+
+/** A feat that itself grants another feat outright — recursion two levels deep. */
+const GRANTS_ANOTHER_FEAT: FeatDefinition = {
+  id: 'test.grants-another',
+  name: 'Grants Another',
+  description: '',
+  levelUpEvents: [{ type: 'GRANT_FEAT', featId: 'test.flat-bonus' }],
+}
+
+const ABILITY_CHOICE_FEAT: FeatDefinition = {
+  id: 'test.ability-choice',
+  name: 'Ability Choice Feat',
+  description: '',
+  abilityScoreChoice: { from: ['str', 'dex'], distributions: [[1]] },
+}
+
+function pack(): Rulepack {
+  const built = RulepackSchema.parse(fighter) as unknown as Rulepack
+  built.feats = [
+    ...(RulepackSchema.parse(phbFeats).feats as Rulepack['feats']),
+    FLAT_BONUS_FEAT,
+    MAGIC_INITIATE,
+    SCION,
+    GRANTS_ANOTHER_FEAT,
+    ABILITY_CHOICE_FEAT,
+  ]
+  // Only what SCION's guarded GRANT_SPELLS needs to resolve to something real.
+  built.spells = [{
+    id: 'sacred-flame', name: 'Sacred Flame', level: 0, school: 'evocation',
+    castingTime: '1 action', range: '60 feet', components: 'V, S', duration: 'Instantaneous',
+    concentration: false, ritual: false, description: '', classes: ['cleric'],
+  }]
+  return built
+}
+
+const rulepack = pack()
+
+/** A background whose only job is to name a feat at total level 1 — the real shape. */
+function backgroundGranting(featId: string, withOption?: { choiceId: string; optionId: string }): Background {
+  return {
+    id: 'test-bg',
+    name: 'Test Background',
+    description: '',
+    skillProficiencies: [],
+    toolProficiencies: [],
+    languages: 0,
+    equipment: [],
+    feature: { name: '', description: '' },
+    levelUpEvents: [{ level: 1, levelUpEvents: [{ type: 'GRANT_FEAT', featId, ...(withOption ? { withOption } : {}) }] }],
+  }
+}
+
+function char(over: Partial<Character> = {}): Character {
+  return {
+    ...validCharacter,
+    classes: [{ classId: 'fighter', level: 0 }],
+    background: 'test-bg',
+    spells: [],
+    features: [],
+    chosenOptions: {},
+    ...over,
+  } as Character
+}
+
+describe('GRANT_FEAT — resolving a background\'s feat grant', () => {
+  it('emits an automatic GRANT_FEAT event with the flat ability bonus denormalized', () => {
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('test.flat-bonus')] }
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+    const grant = events.find(e => e.type === 'GRANT_FEAT')
+    expect(grant).toMatchObject({
+      type: 'GRANT_FEAT',
+      featId: 'test.flat-bonus',
+      name: 'Flat Bonus Feat',
+      abilityScoreBonus: { str: 1 },
+    })
+    expect(getAutomaticEvents(events)).toContainEqual(grant)
+  })
+
+  it('skips the grant entirely when the character already has the feat', () => {
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('test.flat-bonus')] }
+    const already = char({ features: [{ id: 'test.flat-bonus', name: 'Flat Bonus Feat', source: 'Feat', description: '' }] })
+    const events = resolveLevelUpEvents(already, 'fighter', 1, packWithBg)
+    expect(events.some(e => e.type === 'GRANT_FEAT')).toBe(false)
+  })
+
+  it('degrades without throwing for a featId the pack does not have', () => {
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('test.does-not-exist')] }
+    expect(() => resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)).not.toThrow()
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+    expect(events.some(e => e.type === 'GRANT_FEAT')).toBe(false)
+  })
+})
+
+describe('GRANT_FEAT — applying the flat ability bonus', () => {
+  it('adds the feature under the feat\'s own name and applies the bonus', () => {
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('test.flat-bonus')] }
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+    const updated = applyAutomaticEvents(char(), getAutomaticEvents(events), 'average')
+    expect(updated.features.some(f => f.id === 'test.flat-bonus' && f.name === 'Flat Bonus Feat')).toBe(true)
+    expect(updated.abilityScores.str).toBe(char().abilityScores.str + 1)
+  })
+})
+
+describe('GRANT_FEAT — phb.tough (real data), HP applies retroactively', () => {
+  it('adds twice the character\'s total level to max HP, not just +2', () => {
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('phb.tough')] }
+    // Already 4 levels in when the grant lands, so the retroactive math has something to prove.
+    const veteran = char({ classes: [{ classId: 'fighter', level: 4 }] })
+    const events = resolveLevelUpEvents(veteran, 'fighter', 1, packWithBg)
+    const grant = events.find(e => e.type === 'GRANT_FEAT')
+    expect(grant).toMatchObject({ featId: 'phb.tough', hpBonusPerLevel: 2 })
+
+    // Isolate the feat's own effect from this level's ADD_HP by applying it alone.
+    const updated = applyAutomaticEvents(veteran, [grant!], 'average')
+    expect(updated.hp.max).toBe(veteran.hp.max + 2 * 4)
+    expect(updated.hp.current).toBe(veteran.hp.current + 2 * 4)
+    expect(updated.hpBonusPerLevel).toBe(2)
+  })
+})
+
+describe('GRANT_FEAT — a feat carrying its own levelUpEvents (Magic Initiate\'s shape)', () => {
+  it('with withOption pre-answering the class, unlocks the gated CHOOSE_SPELL immediately', () => {
+    const packWithBg = {
+      ...rulepack,
+      backgrounds: [backgroundGranting('test.magic-initiate', { choiceId: CLASS_OPTION, optionId: 'wizard-spells' })],
+    }
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+
+    const grant = events.find(e => e.type === 'GRANT_FEAT')
+    expect(grant).toMatchObject({
+      featId: 'test.magic-initiate',
+      withOption: { choiceId: CLASS_OPTION, optionId: 'wizard-spells', optionName: 'Wizard Spells' },
+    })
+
+    // The feat's own CHOOSE_OPTION is answered already, so it never reaches the wizard —
+    // fighter 1 still asks its own Fighting Style, but the feat's question is gone from
+    // the list — while the CHOOSE_SPELL it was gating does, because the answer unlocked it.
+    const choices = getChoiceEvents(events)
+    expect(choices.some(c => c.type === 'CHOOSE_OPTION' && c.id === CLASS_OPTION)).toBe(false)
+    const spellChoice = choices.find(c => c.type === 'CHOOSE_SPELL')
+    expect(spellChoice).toMatchObject({ addTo: 'test.magic-initiate', count: 2, cantrip: true, classes: ['wizard'] })
+  })
+
+  it('without withOption, the CHOOSE_OPTION itself is the choice event', () => {
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('test.magic-initiate')] }
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+    const choices = getChoiceEvents(events)
+    expect(choices.some(c => c.type === 'CHOOSE_OPTION' && c.id === CLASS_OPTION)).toBe(true)
+    // No answer yet, so the gated CHOOSE_SPELL cannot appear until the wizard's second stage.
+    expect(choices.some(c => c.type === 'CHOOSE_SPELL' && c.addTo === 'test.magic-initiate')).toBe(false)
+  })
+
+  it('recursively unlocks an automatic guarded grant too, not just a guarded question', () => {
+    const packWithBg = {
+      ...rulepack,
+      backgrounds: [backgroundGranting('test.scion', { choiceId: PLANE_OPTION, optionId: 'good-outer-plane' })],
+    }
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+    const spellGrant = events.find(e => e.type === 'GRANT_SPELLS')
+    expect(spellGrant).toMatchObject({ addTo: 'test.scion', spells: [{ spellId: 'sacred-flame' }] })
+  })
+
+  it('applying the pre-answered feat records the answer and renames the feature', () => {
+    const packWithBg = {
+      ...rulepack,
+      backgrounds: [backgroundGranting('test.magic-initiate', { choiceId: CLASS_OPTION, optionId: 'wizard-spells' })],
+    }
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+    const updated = applyAutomaticEvents(char(), getAutomaticEvents(events), 'average')
+    expect(updated.chosenOptions?.[CLASS_OPTION]).toBe('wizard-spells')
+    expect(updated.features.find(f => f.id === 'test.magic-initiate')?.name)
+      .toBe('Magic Initiate (Wizard Spells)')
+  })
+
+  it('a feat granting another feat resolves the grant two levels deep', () => {
+    const events = resolveFeatEvents(char(), GRANTS_ANOTHER_FEAT, rulepack)
+    const nested = events.find(e => e.type === 'GRANT_FEAT')
+    expect(nested).toMatchObject({ featId: 'test.flat-bonus', abilityScoreBonus: { str: 1 } })
+  })
+})
+
+describe('GRANT_FEAT — an ability score choice the feat itself leaves to the player', () => {
+  it('raises CHOOSE_FEAT_ABILITY alongside the automatic grant', () => {
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('test.ability-choice')] }
+    const events = resolveLevelUpEvents(char(), 'fighter', 1, packWithBg)
+    expect(events.some(e => e.type === 'GRANT_FEAT')).toBe(true)
+    const choice = getChoiceEvents(events).find(c => c.type === 'CHOOSE_FEAT_ABILITY')
+    expect(choice).toMatchObject({ featId: 'test.ability-choice' })
+    expect(isChoiceEvent({ type: 'CHOOSE_FEAT_ABILITY', featId: 'x', label: 'x', choice: { from: ['str'], distributions: [[1]] } })).toBe(true)
+  })
+
+  it('RESOLVED_FEAT_ABILITY applies the bonus the player picked', () => {
+    const updated = applyResolvedChoices(
+      char(),
+      [{ type: 'RESOLVED_FEAT_ABILITY', featId: 'test.ability-choice', bonuses: { dex: 1 } }],
+      rulepack,
+    )
+    expect(updated.abilityScores.dex).toBe(char().abilityScores.dex + 1)
+  })
+})

@@ -251,6 +251,18 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     types: z.array(CreatureTypeSchema).optional(),
   }),
   z.object({ type: z.literal('CHOOSE_FEAT') }),
+  z.object({
+    // Names a specific feat rather than asking the player, e.g. a background's "You gain
+    // the Tough feat".
+    type: z.literal('GRANT_FEAT'),
+    featId: z.string(),
+    // Pre-answers one arm of the feat's own CHOOSE_OPTION, e.g. Magic Initiate's class.
+    withOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+    label: z.string().optional(),
+  }),
   z.object({ type: z.literal('ABILITY_SCORE_IMPROVEMENT'), points: z.number().int() }),
   z.object({ type: z.literal('CHOOSE_SUBCLASS'), label: z.string() }),
   z.object({ type: z.literal('UPDATE_HIT_DIE'), die: z.string() }),
