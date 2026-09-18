@@ -107,6 +107,9 @@
       "speeds": {
         "walk": 25
       },
+      "senses": {
+        "darkvision": 60
+      },
       "abilityScoreBonuses": {
         "con": 2
       },
@@ -135,6 +138,85 @@
       "languages": [
         "Common",
         "Dwarvish"
+      ],
+      "damageResistances": [
+        "poison"
+      ],
+      "levelUpEvents": [
+        {
+          "level": 1,
+          "trait": "Dwarven Combat Training",
+          "levelUpEvents": [
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "battleaxe"
+            },
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "handaxe"
+            },
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "light hammer"
+            },
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "warhammer"
+            }
+          ]
+        },
+        {
+          "level": 1,
+          "trait": "Tool Proficiency",
+          "levelUpEvents": [
+            {
+              "type": "CHOOSE_OPTION",
+              "id": "dwarf-tool-proficiency",
+              "label": "Choose your artisan's tools",
+              "options": [
+                {
+                  "id": "smiths-tools",
+                  "name": "Smith's Tools",
+                  "description": "You gain proficiency with smith's tools."
+                },
+                {
+                  "id": "brewers-supplies",
+                  "name": "Brewer's Supplies",
+                  "description": "You gain proficiency with brewer's supplies."
+                },
+                {
+                  "id": "masons-tools",
+                  "name": "Mason's Tools",
+                  "description": "You gain proficiency with mason's tools."
+                }
+              ]
+            },
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "smith's tools",
+              "whenOption": {
+                "choiceId": "dwarf-tool-proficiency",
+                "optionId": "smiths-tools"
+              }
+            },
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "brewer's supplies",
+              "whenOption": {
+                "choiceId": "dwarf-tool-proficiency",
+                "optionId": "brewers-supplies"
+              }
+            },
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "mason's tools",
+              "whenOption": {
+                "choiceId": "dwarf-tool-proficiency",
+                "optionId": "masons-tools"
+              }
+            }
+          ]
+        }
       ]
     },
     {
@@ -143,6 +225,9 @@
       "size": "medium",
       "speeds": {
         "walk": 30
+      },
+      "senses": {
+        "darkvision": 60
       },
       "abilityScoreBonuses": {
         "dex": 2
@@ -168,6 +253,18 @@
       "languages": [
         "Common",
         "Elvish"
+      ],
+      "levelUpEvents": [
+        {
+          "level": 1,
+          "trait": "Keen Senses",
+          "levelUpEvents": [
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "perception"
+            }
+          ]
+        }
       ]
     },
     {
@@ -176,6 +273,9 @@
       "size": "small",
       "speeds": {
         "walk": 25
+      },
+      "senses": {
+        "darkvision": 60
       },
       "abilityScoreBonuses": {
         "int": 2
@@ -202,6 +302,9 @@
       "speeds": {
         "walk": 30
       },
+      "senses": {
+        "darkvision": 60
+      },
       "abilityScoreBonuses": {
         "cha": 2
       },
@@ -224,6 +327,7 @@
         "Elvish",
         "1 extra language of your choice"
       ],
+      "subraceOptional": true,
       "abilityScoreChoice": {
         "from": [
           "con",
@@ -259,6 +363,9 @@
       "speeds": {
         "walk": 30
       },
+      "senses": {
+        "darkvision": 60
+      },
       "abilityScoreBonuses": {
         "str": 2,
         "con": 1
@@ -285,7 +392,19 @@
         "Common",
         "Orc"
       ],
-      "subraceOptional": true
+      "subraceOptional": true,
+      "levelUpEvents": [
+        {
+          "level": 1,
+          "trait": "Menacing",
+          "levelUpEvents": [
+            {
+              "type": "GAIN_PROFICIENCY",
+              "proficiency": "intimidation"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "halfling",
@@ -345,6 +464,9 @@
       "speeds": {
         "walk": 30
       },
+      "senses": {
+        "darkvision": 60
+      },
       "abilityScoreBonuses": {
         "int": 1,
         "cha": 2
@@ -368,6 +490,9 @@
         "Infernal"
       ],
       "subraceOptional": true,
+      "damageResistances": [
+        "fire"
+      ],
       "levelUpEvents": [
         {
           "level": 1,

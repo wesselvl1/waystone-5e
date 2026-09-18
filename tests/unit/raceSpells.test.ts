@@ -427,7 +427,7 @@ describe('a variant feature the player chooses', () => {
 describe('races that stand on their own', () => {
   it('marks the ones a subrace is optional for', () => {
     const optional = rulepack.races.filter(r => r.subraceOptional).map(r => r.id).sort()
-    expect(optional).toEqual(['dragonborn', 'half-orc', 'human', 'tiefling'])
+    expect(optional).toEqual(['dragonborn', 'half-elf', 'half-orc', 'human', 'tiefling'])
   })
 
   it('leaves the ones whose subrace the SRD requires unmarked', () => {
@@ -437,13 +437,14 @@ describe('races that stand on their own', () => {
   })
 
   /**
-   * Not optional, unlike the other four: every half-elf has an elf parent, and Half-Elf
-   * Versatility is chosen from that parentage's list — with Skill Versatility, the
-   * General option, on every one of those lists. A "None" would have meant a half-elf
-   * with no parentage at all, which is not a thing the rules describe.
+   * The SRD prints the half-elf whole, the same as a human, tiefling, half-orc or
+   * dragonborn — its subraces only exist because a sourcebook (SCAG's four half-elf
+   * descents) adds variants. Without this flag, loading such a pack would force every
+   * half-elf to pick a descent, making the plain SRD half-elf unbuildable — the same bug
+   * already fixed for the other four.
    */
-  it('requires a half-elf to name its heritage once a pack supplies them', () => {
-    expect(rulepack.races.find(r => r.id === 'half-elf')!.subraceOptional).toBeUndefined()
+  it('lets a half-elf stay plain once a pack supplies descent subraces', () => {
+    expect(rulepack.races.find(r => r.id === 'half-elf')!.subraceOptional).toBe(true)
   })
 })
 
