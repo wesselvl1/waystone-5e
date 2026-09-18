@@ -211,6 +211,7 @@ export const CharacterSchema = z.object({
   savingThrowProficiencies: z.array(z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha'])),
   skillProficiencies: SkillProficienciesSchema,
   otherProficiencies: z.array(z.string()),
+  proficiencyGroups: z.record(z.string(), z.enum(['weapons-armor', 'languages', 'tools'])).optional(),
 
   attacks: z.array(AttackEntrySchema),
   spellcastingAbility: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']).optional(),

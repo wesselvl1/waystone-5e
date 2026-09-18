@@ -258,6 +258,14 @@ export type SkillKey =
 export type ProficiencyLevel = 0 | 1 | 2    // 0 = none, 1 = proficient, 2 = expertise
 
 /**
+ * Where an entry of `otherProficiencies` is filed on the sheet.
+ *
+ * The list itself stays flat strings, because that is what the weapon and armour matchers
+ * compare against; the group is derived from the wording in `~/services/proficiencies`.
+ */
+export type ProficiencyGroup = 'weapons-armor' | 'languages' | 'tools'
+
+/**
  * A picture of the character, carried inline as a base64 data URL.
  *
  * There is no backend and no file store, so the image has to travel with the character
@@ -355,6 +363,12 @@ export interface Character {
   savingThrowProficiencies: AbilityKey[]
   skillProficiencies: Record<SkillKey, ProficiencyLevel>
   otherProficiencies: string[]          // Languages, tools, weapons, armor
+  /**
+   * The group an entry was filed under, where the derived one is wrong — keyed by
+   * `proficiencyKey(name)`. Absent means "work it out from the wording", the way a null
+   * `armorClass` means "work it out from the armour".
+   */
+  proficiencyGroups?: Record<string, ProficiencyGroup>
 
   // Attacks & spells
   attacks: AttackEntry[]

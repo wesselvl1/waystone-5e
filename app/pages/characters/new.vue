@@ -11,6 +11,7 @@ import {
 } from '~/services/abilityScoreChoice'
 import { filterBySearch } from '~/services/searchFilter'
 import { cleanEquipmentName } from '~/services/equipment'
+import { proficiencyKey } from '~/services/proficiencies'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
 import type { AbilityScoreChoice } from '~/types/rulepack'
 
@@ -180,6 +181,40 @@ function canProceed() {
   return true
 }
 
+/**
+ * Everything the sheet files under Proficiencies & Languages.
+ *
+ * The class's tools and the background's tools and languages used to be dropped on the
+ * floor — a rogue reached the sheet without thieves' tools, an acolyte without the two
+ * languages the background grants. A background counts its languages rather than naming
+ * them, so what is stored is the prompt, which the sheet prints as a dashed entry the
+ * player replaces once the table has agreed what they speak.
+ *
+ * Deduplicated by wording, since a rogue with a criminal background is granted thieves'
+ * tools twice.
+ */
+function startingProficiencies(): string[] {
+  const cls = selectedClass.value
+  const background = selectedBackground.value
+  const languageCount = background?.languages ?? 0
+  const all = [
+    ...(cls?.armorProficiencies ?? []),
+    ...(cls?.weaponProficiencies ?? []),
+    ...(cls?.toolProficiencies ?? []),
+    ...(background?.toolProficiencies ?? []),
+    ...(selectedRace.value?.languages ?? []),
+    ...(languageCount > 0
+      ? [`${languageCount} extra language${languageCount === 1 ? '' : 's'} of your choice`]
+      : []),
+  ]
+  const byKey = new Map<string, string>()
+  for (const name of all) {
+    const key = proficiencyKey(name)
+    if (key && !byKey.has(key)) byKey.set(key, name)
+  }
+  return [...byKey.values()]
+}
+
 // ── Create character ──────────────────────────────────────────────────────────
 async function createCharacter() {
   const cls = selectedClass.value
@@ -261,11 +296,7 @@ async function createCharacter() {
 
     savingThrowProficiencies: cls?.savingThrowProficiencies ?? [],
     skillProficiencies: skillProfs,
-    otherProficiencies: [
-      ...(cls?.armorProficiencies ?? []),
-      ...(cls?.weaponProficiencies ?? []),
-      ...(selectedRace.value?.languages ?? []),
-    ],
+    otherProficiencies: startingProficiencies(),
 
     spellcastingAbility: cls?.spellcastingAbility,
     classSpellcasting: {},
