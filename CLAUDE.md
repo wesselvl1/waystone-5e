@@ -173,6 +173,22 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   not a barbarian's); the calculator drops the shield and says why rather than silently
   dropping it. Nothing switched on mid-fight belongs here — Shield, Blade Song and
   barkskin last a minute, and this is the number on the sheet.
+- **A saving throw is derived the way an attack is, and what adds to it is found by
+  wording.** `app/services/savingThrows.ts` builds the roll from the ability modifier, the
+  proficiency bonus where the class grants it, whatever the character's features say, and
+  the same three named slots an attack, an armour class and an initiative roll keep apart
+  (`magic`, `feat`, `misc`, stored as `savingThrowBonuses`). The sniff reads the sentence
+  rather than a list of names: a paladin's Aura of Protection says the creature "gains a
+  bonus to the saving throw equal to your Charisma modifier (with a minimum bonus of +1)",
+  so a book this app has never read gets the same treatment. A flat "+2 bonus to
+  Constitution saving throws" is scoped to the ability it names; an unqualified one lands
+  on all six. `savingThrowAbilityBonus` overrides that one reading — `null`/absent derives
+  it, `{ ability: 'none' }` switches a misread aura off, naming an ability turns one on
+  for homebrew or for the round spent inside someone else's aura — and it *replaces* the
+  derived aura rather than stacking, since both answer the same question. There is
+  deliberately one set of slots rather than six: nearly everything that adds a number to a
+  save adds it to all of them, and a cloak of protection entered six times is six chances
+  to enter it differently.
 - **Carrying capacity is derived, and what doubles it is found by wording.**
   `app/services/equipment.ts` builds it from Strength × 15, doubled once per feature
   whose text both mentions carrying capacity and says it is doubled or counts you one size

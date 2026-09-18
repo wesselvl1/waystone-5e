@@ -209,6 +209,12 @@ export const CharacterSchema = z.object({
   conditions: z.array(z.string()),
 
   savingThrowProficiencies: z.array(z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha'])),
+  savingThrowBonuses: AttackBonusSetSchema.optional(),
+  // Null and absent both mean "read it off the features"; 'none' means "read nothing".
+  savingThrowAbilityBonus: z.object({
+    ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha', 'none']),
+    minimum: z.number().int().optional(),
+  }).nullable().optional(),
   skillProficiencies: SkillProficienciesSchema,
   otherProficiencies: z.array(z.string()),
 

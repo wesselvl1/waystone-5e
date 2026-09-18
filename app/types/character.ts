@@ -62,6 +62,32 @@ export type ArmorClassBonuses = AttackBonusSet
 export type InitiativeBonuses = AttackBonusSet
 
 /**
+ * And again on every saving throw: a cloak of protection, the Resilient feat's half, the
+ * ruling that tonight's poison is easier to shrug off. One set rather than one per
+ * ability, because almost everything that adds a number to a save adds it to all six —
+ * an item that singles one out is rare enough to belong in `misc` with a note. What the
+ * character's features already add is derived from the features themselves, the way
+ * initiative's are, and does not belong here.
+ */
+export type SavingThrowBonuses = AttackBonusSet
+
+/**
+ * An ability modifier added to every saving throw — Aura of Protection's Charisma, and
+ * the handful of things worded like it.
+ *
+ * Absent or null means derive it from the features, which is what a paladin with the
+ * feature on their sheet wants. Setting it overrides that reading: `'none'` switches a
+ * misread aura off, and naming an ability turns one on for the homebrew the sniff has
+ * never seen, or for the round spent inside someone else's aura. `minimum` is the
+ * feature's own floor ("with a minimum bonus of +1"), which bites when the ability
+ * modifier is lower than it.
+ */
+export interface SavingThrowAbilityBonus {
+  ability: AbilityKey | 'none'
+  minimum?: number
+}
+
+/**
  * A shield, held apart from the bonus slots because it is a thing carried rather than a
  * number: `equipped` lets a sword-and-board character drop it for a round without losing
  * what it was worth. `bonus` is its whole contribution — 2 for the equipment table's, 3
@@ -353,6 +379,13 @@ export interface Character {
 
   // Proficiencies
   savingThrowProficiencies: AbilityKey[]
+  /** Hand-entered additions to every save, kept apart the way an attack's are. */
+  savingThrowBonuses?: SavingThrowBonuses
+  /**
+   * The ability modifier every save gains, when the player would rather say than have it
+   * read off their features. Null or absent means derive it — see `savingThrowParts()`.
+   */
+  savingThrowAbilityBonus?: SavingThrowAbilityBonus | null
   skillProficiencies: Record<SkillKey, ProficiencyLevel>
   otherProficiencies: string[]          // Languages, tools, weapons, armor
 
