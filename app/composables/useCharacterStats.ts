@@ -1,6 +1,7 @@
 import type { Character, AbilityKey, AbilityScores, SkillKey } from '~/types/character'
 import { characterArmorClass } from '~/services/armorClass'
 import { initiativeBreakdown } from '~/services/initiative'
+import { savingThrowTotals } from '~/services/savingThrows'
 
 const SKILL_ABILITY: Record<SkillKey, AbilityKey> = {
   acrobatics: 'dex',
@@ -60,20 +61,12 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     cha: abilityMod(scores.value.cha),
   }))
 
-  const savingThrows = computed<Record<AbilityKey, number>>(() => {
-    const c = characterRef.value
-    const mods = abilityModifiers.value
-    const prof = profBonus.value
-    const proficient = new Set(c?.savingThrowProficiencies ?? [])
-    return {
-      str: mods.str + (proficient.has('str') ? prof : 0),
-      dex: mods.dex + (proficient.has('dex') ? prof : 0),
-      con: mods.con + (proficient.has('con') ? prof : 0),
-      int: mods.int + (proficient.has('int') ? prof : 0),
-      wis: mods.wis + (proficient.has('wis') ? prof : 0),
-      cha: mods.cha + (proficient.has('cha') ? prof : 0),
-    }
-  })
+  // The ability and proficiency, plus what the features say — a paladin's aura — plus the
+  // hand-entered slots. The modal shows the same sum's working, one save at a time.
+  const savingThrows = computed<Record<AbilityKey, number>>(() => savingThrowTotals(
+    characterRef.value,
+    { modifiers: abilityModifiers.value, proficiencyBonus: profBonus.value },
+  ))
 
   const skills = computed<Record<SkillKey, number>>(() => {
     const c = characterRef.value

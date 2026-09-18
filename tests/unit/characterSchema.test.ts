@@ -82,3 +82,38 @@ describe('CharacterSchema', () => {
     }
   })
 })
+
+describe('saving throw bonuses survive the import boundary', () => {
+  it('keeps the three slots and a hand-set ability bonus', () => {
+    const result = CharacterSchema.safeParse({
+      ...validCharacter,
+      savingThrowBonuses: { magic: 1, misc: -1 },
+      savingThrowAbilityBonus: { ability: 'cha', minimum: 1 },
+    })
+    expect(result.success).toBe(true)
+    expect(result.data?.savingThrowBonuses).toEqual({ magic: 1, misc: -1 })
+    expect(result.data?.savingThrowAbilityBonus).toEqual({ ability: 'cha', minimum: 1 })
+  })
+
+  it("keeps 'none', which is how a misread aura is switched off", () => {
+    const result = CharacterSchema.safeParse({
+      ...validCharacter,
+      savingThrowAbilityBonus: { ability: 'none' },
+    })
+    expect(result.data?.savingThrowAbilityBonus).toEqual({ ability: 'none' })
+  })
+
+  it('accepts a character carrying neither, which is every character so far', () => {
+    const result = CharacterSchema.safeParse(validCharacter)
+    expect(result.success).toBe(true)
+    expect(result.data?.savingThrowBonuses).toBeUndefined()
+  })
+
+  it('rejects an ability that is not one', () => {
+    const result = CharacterSchema.safeParse({
+      ...validCharacter,
+      savingThrowAbilityBonus: { ability: 'luck' },
+    })
+    expect(result.success).toBe(false)
+  })
+})
