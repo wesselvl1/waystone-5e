@@ -350,6 +350,8 @@ const SubraceSchema = z.object({
   damageResistances: z.array(z.string()).optional(),
   damageImmunities: z.array(z.string()).optional(),
   conditionImmunities: z.array(z.string()).optional(),
+  // Read after the race's own by startingProficiencies(), deduplicated the same way.
+  languages: z.array(z.string()).optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
 })
 
@@ -556,6 +558,9 @@ export const OptionalClassFeatureSchema = z.object({
   replaces: z.string().optional(),
   usesMax: z.number().int().optional(),
   recharge: z.enum(['short', 'long', 'dawn']).optional(),
+  // What taking the feature does, e.g. Primal Awareness's always-prepared spells — see
+  // the type's own comment for why this has to be resolved the same way a feat's is.
+  levelUpEvents: z.array(LevelUpEventDefSchema).optional(),
 })
 
 /**

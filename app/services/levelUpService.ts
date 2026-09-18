@@ -1331,6 +1331,124 @@ export function resolveFeatEvents(
 }
 
 /**
+ * Translate an optional class feature's `levelUpEvents` into runtime events.
+ *
+ * A Tasha's optional feature (primal-awareness's always-prepared spells, wild-companion's
+ * find familiar) is taken through OFFER_OPTIONAL_FEATURES, not levelled into, so — like a
+ * feat — it fires everything the moment it is taken, with no level of its own to resolve
+ * against. `addTo` defaults to the feature's own class and `origin` to `'class'`, since
+ * the feature only ever extends the class it is offered on rather than being a
+ * spellcasting source in its own right the way a feat is.
+ *
+ * Mirrors resolveFeatEvents's excluded set for the same reason: event types that
+ * presuppose a level actually being gained — ADD_FEATURE, spell slots, CHOOSE_SUBCLASS, a
+ * nested CHOOSE_FEAT — are ignored rather than half-applied.
+ */
+export function resolveOptionalFeatureEvents(
+  character: Character,
+  feature: OptionalClassFeature,
+  rulepack: Rulepack,
+): LevelUpEvent[] {
+  const events: LevelUpEvent[] = []
+
+  for (const eventDef of feature.levelUpEvents ?? []) {
+    switch (eventDef.type) {
+      case 'GRANT_SPELLS': {
+        const grant = grantSpellsEvent(
+          { ...eventDef, addTo: eventDef.addTo || feature.classId },
+          character,
+          rulepack,
+          { origin: 'class', label: feature.name },
+        )
+        if (grant) events.push(grant)
+        break
+      }
+      case 'CHOOSE_SPELL': {
+        const choice = chooseSpellEvent(
+          eventDef,
+          character,
+          { addTo: feature.classId, origin: 'class', label: feature.name },
+        )
+        if (choice) events.push(choice)
+        break
+      }
+      case 'CHOOSE_SPELLCASTING_ABILITY': {
+        const choice = resolveSpellcastingAbilityChoice(
+          { ...eventDef, addTo: eventDef.addTo || feature.classId, origin: eventDef.origin ?? 'class' },
+          character,
+          feature.name,
+        )
+        if (choice) events.push(choice)
+        break
+      }
+      case 'GRANT_SPELLCASTING':
+        events.push(grantSpellcastingEvent(
+          { ...eventDef, addTo: eventDef.addTo || feature.classId, origin: eventDef.origin ?? 'class' },
+          feature.name,
+        ))
+        break
+      case 'EXPAND_SPELL_LIST': {
+        const expand = expandSpellListEvent(eventDef, character, feature.name)
+        if (expand) events.push(expand)
+        break
+      }
+      case 'GAIN_PROFICIENCY': {
+        const proficiency = gainProficiencyEvent(eventDef, character)
+        if (proficiency) events.push(proficiency)
+        break
+      }
+      case 'SET_SPEED': {
+        const speed = setSpeedEvent(eventDef, character)
+        if (speed) events.push(speed)
+        break
+      }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
+        break
+      }
+      case 'CHOOSE_EXPERTISE':
+        events.push({
+          type: 'CHOOSE_EXPERTISE',
+          label: eventDef.label,
+          options: eventDef.options,
+          count: eventDef.count,
+        } satisfies ChooseExpertiseEvent)
+        break
+      case 'CHOOSE_SKILL': {
+        const skills = chooseSkillEvent(eventDef, character)
+        if (skills) events.push(skills)
+        break
+      }
+      case 'CHOOSE_OPTION': {
+        // Skip a choice already answered, so an optional feature offered again at a
+        // later level (still declared, still eligible) does not re-ask.
+        if (character.chosenOptions?.[eventDef.id] === undefined) {
+          const choice = resolveOptionChoice(eventDef, character, rulepack)
+          if (choice) events.push(choice)
+        }
+        break
+      }
+      case 'UPDATE_FEATURE_USES':
+        events.push({
+          type: 'UPDATE_FEATURE_USES',
+          featureName: eventDef.featureName,
+          usesMax: eventDef.usesMax,
+        } satisfies UpdateFeatureUsesEvent)
+        break
+      case 'ABILITY_SCORE_IMPROVEMENT':
+        events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
+        break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, feature.name))
+        break
+    }
+  }
+
+  return events
+}
+
+/**
  * Translate a GRANT_FEAT definition into the events that take the feat.
  *
  * Everything the feat does without the player is denormalized into one automatic
@@ -1570,6 +1688,11 @@ function applyGrantedFeat(character: Character, event: GrantFeatEvent): void {
  * CHOOSE_FEAT's own list does) is not silently dropped — resolveFeatEvents already
  * resolved it through resolveGrantFeat, so applying it is the same call every other
  * GRANT_FEAT goes through.
+ *
+ * RESOLVED_OPTIONAL_FEATURES uses this too, over resolveOptionalFeatureEvents's output
+ * instead of resolveFeatEvents's: the automatic event shapes it produces (GRANT_SPELLS,
+ * GAIN_PROFICIENCY, and the rest) are the same regardless of which kind of source resolved
+ * them, so applying them is not something an optional feature needs its own copy of.
  */
 function applyFeatAutomaticEvents(character: Character, events: AutomaticLevelUpEvent[]): void {
   for (const event of events) {
@@ -2170,6 +2293,18 @@ export function applyResolvedChoices(
               usesRemaining: feat.usesMax,
               recharge: feat.recharge,
             })
+            // The feature's own levelUpEvents — Primal Awareness's always-prepared
+            // spells, Wild Companion's find familiar — fire the moment it is taken, the
+            // same path RESOLVED_CHOOSE_FEAT applies a feat's through. `taken` only
+            // carries the denormalized display shape (so the sheet still renders it with
+            // the pack gone), so the full definition is looked back up by id to find them.
+            const full = rulepack.optionalFeatures.find(f => f.id === feat.id)
+            if (full) {
+              applyFeatAutomaticEvents(
+                updated,
+                getAutomaticEvents(resolveOptionalFeatureEvents(updated, full, rulepack)),
+              )
+            }
           }
         }
         break

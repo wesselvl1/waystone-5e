@@ -130,6 +130,13 @@ export interface Subrace {
   damageResistances?: string[]
   damageImmunities?: string[]
   conditionImmunities?: string[]
+  /**
+   * Languages this subrace grants on top of the race's own — a drow's Undercommon, added
+   * to the elf's Common and Elvish. `startingProficiencies()` reads these after the
+   * race's own list and deduplicates by `proficiencyKey`, the same as every other
+   * proficiency source.
+   */
+  languages?: string[]
   /** Events fired at a given total character level (high elf's cantrip). */
   levelUpEvents?: SourceLevelEvents[]
 }
@@ -702,6 +709,14 @@ export interface OptionalClassFeature {
   replaces?: string
   usesMax?: number
   recharge?: 'short' | 'long' | 'dawn'
+  /**
+   * What taking the feature actually does — Primal Awareness's always-prepared spells,
+   * Wild Companion's find familiar. Without this an optional feature is inert text: the
+   * wizard offers it and the sheet lists it, but nothing it grants ever reaches the
+   * character. Resolved by `resolveOptionalFeatureEvents`, the same way a feat's own
+   * `levelUpEvents` are, since neither has a level of its own to fire against.
+   */
+  levelUpEvents?: LevelUpEventDef[]
 }
 
 /**

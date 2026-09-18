@@ -75,6 +75,25 @@ function sortedWords(name: string): string {
   return proficiencyKey(name).split(' ').sort().join(' ')
 }
 
+/**
+ * The first occurrence of each entry's wording, in the order the sources were gathered.
+ *
+ * Character creation joins several sources onto one flat list — a class's tools, a
+ * background's, a race's languages, then a subrace's own — and more than one can name the
+ * same thing: a rogue with a criminal background is granted thieves' tools twice, a
+ * subrace's language can repeat one the race already grants. Extracted so the join is
+ * unit-testable on its own; `new.vue`'s `startingProficiencies()` is the one caller and is
+ * not, since it lives in a page component.
+ */
+export function dedupeProficiencies(names: string[]): string[] {
+  const byKey = new Map<string, string>()
+  for (const name of names) {
+    const key = proficiencyKey(name)
+    if (key && !byKey.has(key)) byKey.set(key, name)
+  }
+  return [...byKey.values()]
+}
+
 /** The names a classification can recognise, gathered from the loaded rulepacks. */
 export interface ProficiencyVocabulary {
   weapons: Set<string>

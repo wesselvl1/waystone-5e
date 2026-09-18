@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   classifyProficiency,
+  dedupeProficiencies,
   groupProficiencies,
   isProficiencyPlaceholder,
   proficiencyKey,
@@ -117,6 +118,28 @@ describe('groupProficiencies', () => {
   it('skips the empty strings a hand-edited list can carry', () => {
     const sections = groupProficiencies(['', '  '], undefined, vocab)
     expect(sections.flatMap(s => s.entries)).toEqual([])
+  })
+})
+
+describe('dedupeProficiencies', () => {
+  it('keeps the first occurrence of a wording repeated later in the list', () => {
+    // A rogue with a criminal background is granted thieves' tools twice.
+    expect(dedupeProficiencies(["thieves' tools", 'light', "Thieves' Tools"]))
+      .toEqual(["thieves' tools", 'light'])
+  })
+
+  it('keeps a race\'s language and a subrace\'s own apart', () => {
+    // A drow's Undercommon joins the elf's Common and Elvish rather than replacing them.
+    expect(dedupeProficiencies(['Common', 'Elvish', 'Undercommon']))
+      .toEqual(['Common', 'Elvish', 'Undercommon'])
+  })
+
+  it('drops a subrace language that repeats one the race already grants', () => {
+    expect(dedupeProficiencies(['Common', 'Elvish', 'Elvish'])).toEqual(['Common', 'Elvish'])
+  })
+
+  it('is empty for an empty list', () => {
+    expect(dedupeProficiencies([])).toEqual([])
   })
 })
 

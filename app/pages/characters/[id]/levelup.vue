@@ -12,6 +12,7 @@ import {
   resolveOptionReplacement,
   optionAvailable,
   resolveFeatEvents,
+  resolveOptionalFeatureEvents,
   featIncreasedAbility,
   chooseSpellEvent,
   resolveUnlockedChoices,
@@ -689,10 +690,27 @@ function initOptionalToggles(event: OfferOptionalFeaturesEvent) {
   optionalFeatureToggles.value = toggles
 }
 
+/**
+ * A taken optional feature's own choices, if it has any — mirrors queueFeatChoices. Its
+ * automatic half is applied by RESOLVED_OPTIONAL_FEATURES and so is deliberately not
+ * added to `automaticEvents`, which would apply it twice.
+ */
+function queueOptionalFeatureChoices(taken: OfferOptionalFeaturesEvent['features']) {
+  if (!character.value) return
+  const pack = mergedPack()
+  for (const feat of taken) {
+    const full = pack.optionalFeatures.find(f => f.id === feat.id)
+    if (!full?.levelUpEvents?.length) continue
+    const queued = getChoiceEvents(resolveOptionalFeatureEvents(character.value, full, pack))
+    if (queued.length > 0) choiceEvents.value = [...choiceEvents.value, ...queued]
+  }
+}
+
 function confirmOptionalFeatures() {
   const choiceEvent = currentChoice.value as OfferOptionalFeaturesEvent
   const taken = choiceEvent.features.filter(f => optionalFeatureToggles.value[f.id])
   resolvedChoices.value.push({ type: 'RESOLVED_OPTIONAL_FEATURES', taken })
+  queueOptionalFeatureChoices(taken)
   optionalFeatureToggles.value = {}
   nextChoice()
 }

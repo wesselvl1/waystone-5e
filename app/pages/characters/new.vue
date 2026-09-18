@@ -11,7 +11,7 @@ import {
 } from '~/services/abilityScoreChoice'
 import { filterBySearch } from '~/services/searchFilter'
 import { cleanEquipmentName } from '~/services/equipment'
-import { proficiencyKey } from '~/services/proficiencies'
+import { dedupeProficiencies } from '~/services/proficiencies'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
 import type { AbilityScoreChoice } from '~/types/rulepack'
 
@@ -208,16 +208,14 @@ function startingProficiencies(): string[] {
     ...(cls?.toolProficiencies ?? []),
     ...(background?.toolProficiencies ?? []),
     ...(selectedRace.value?.languages ?? []),
+    // A subrace's own languages (a drow's Undercommon) join the race's — a subrace this
+    // wizard never asks about is silently missing a language otherwise.
+    ...(selectedSubrace.value?.languages ?? []),
     ...(languageCount > 0
       ? [`${languageCount} extra language${languageCount === 1 ? '' : 's'} of your choice`]
       : []),
   ]
-  const byKey = new Map<string, string>()
-  for (const name of all) {
-    const key = proficiencyKey(name)
-    if (key && !byKey.has(key)) byKey.set(key, name)
-  }
-  return [...byKey.values()]
+  return dedupeProficiencies(all)
 }
 
 // ── Create character ──────────────────────────────────────────────────────────
