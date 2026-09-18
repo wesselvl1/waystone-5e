@@ -3,8 +3,9 @@ import type {
   Character,
   SavingThrowAbilityBonus,
   SavingThrowBonuses,
+  SavingThrowBonusesByAbility,
 } from '~/types/character'
-import { sumBonusSet } from '~/services/attacks'
+import { compactBonusSet, sumBonusSet } from '~/services/attacks'
 
 /**
  * A saving throw, derived the way initiative is.
@@ -22,9 +23,12 @@ import { sumBonusSet } from '~/services/attacks'
  * an armour class and an initiative roll already keep apart, for the cloak and the ruling
  * no rulepack models.
  *
- * There is deliberately one set of slots rather than six. Nearly everything that adds a
- * number to a save adds it to all of them, and six sets would mean entering a cloak of
- * protection six times over to get one +1.
+ * The slots come in two layers. `savingThrowBonuses` is the set that applies to every
+ * save, because nearly everything that adds a number to a save adds it to all of them and
+ * a cloak of protection entered six times over is six chances to enter it differently;
+ * `savingThrowBonusesByAbility` is the same three slots for the one save that does not
+ * share them, a periapt of health on Constitution alone. They stack rather than override,
+ * since a character wearing both has both.
  */
 
 /** Display order for the editor, mirroring an attack's and an initiative roll's slots. */
@@ -181,11 +185,17 @@ function manualAbilityPart(
   return { label: `${SAVING_THROW_ABILITY_LABELS[setting.ability]} modifier`, value }
 }
 
-/** The hand-entered slots, one per line so the modal shows where each came from. */
-function bonusParts(bonuses?: SavingThrowBonuses): SavingThrowPart[] {
+/**
+ * The hand-entered slots, one per line so the modal shows where each came from — and
+ * which layer it came from, since "Magic" twice over in one sum reads like a bug.
+ */
+function bonusParts(bonuses: SavingThrowBonuses | undefined, suffix = ''): SavingThrowPart[] {
   return SAVING_THROW_BONUS_KINDS
     .filter(kind => (bonuses?.[kind] ?? 0) !== 0)
-    .map(kind => ({ label: SAVING_THROW_BONUS_LABELS[kind].label, value: bonuses![kind]! }))
+    .map(kind => ({
+      label: `${SAVING_THROW_BONUS_LABELS[kind].label}${suffix}`,
+      value: bonuses![kind]!,
+    }))
 }
 
 /**
@@ -219,6 +229,10 @@ export function savingThrowBreakdown(
   if (manual) parts.push(manual)
 
   parts.push(...bonusParts(character.savingThrowBonuses))
+  parts.push(...bonusParts(
+    character.savingThrowBonusesByAbility?.[ability],
+    ` (${label} only)`,
+  ))
 
   return { total: parts.reduce((sum, p) => sum + p.value, 0), parts }
 }
@@ -235,7 +249,30 @@ export function savingThrowTotals(
   return out
 }
 
-/** The slots alone, for anything that wants the number without the working. */
+/** The shared slots alone, for anything that wants the number without the working. */
 export function savingThrowBonusTotal(character: Character): number {
   return sumBonusSet(character.savingThrowBonuses)
+}
+
+/** And the slots singling out one save. */
+export function savingThrowAbilityBonusTotal(
+  character: Character,
+  ability: AbilityKey,
+): number {
+  return sumBonusSet(character.savingThrowBonusesByAbility?.[ability])
+}
+
+/**
+ * Drops the abilities nobody has singled out, so a player who opens the editor for every
+ * save and types nothing does not leave six empty sets behind in the record.
+ */
+export function compactBonusesByAbility(
+  byAbility: SavingThrowBonusesByAbility | undefined,
+): SavingThrowBonusesByAbility | undefined {
+  const out: SavingThrowBonusesByAbility = {}
+  for (const [ability, bonuses] of Object.entries(byAbility ?? {}) as [AbilityKey, SavingThrowBonuses][]) {
+    const compacted = compactBonusSet(bonuses)
+    if (compacted) out[ability] = compacted
+  }
+  return Object.keys(out).length ? out : undefined
 }

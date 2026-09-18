@@ -185,10 +185,15 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   on all six. `savingThrowAbilityBonus` overrides that one reading — `null`/absent derives
   it, `{ ability: 'none' }` switches a misread aura off, naming an ability turns one on
   for homebrew or for the round spent inside someone else's aura — and it *replaces* the
-  derived aura rather than stacking, since both answer the same question. There is
-  deliberately one set of slots rather than six: nearly everything that adds a number to a
-  save adds it to all of them, and a cloak of protection entered six times is six chances
-  to enter it differently.
+  derived aura rather than stacking, since both answer the same question. The slots come
+  in two layers: `savingThrowBonuses` applies to every save, because nearly everything
+  that adds a number to a save adds it to all of them and a cloak of protection entered
+  six times is six chances to enter it differently, and `savingThrowBonusesByAbility` is
+  the same three slots for the one save that does not share them (a periapt of health on
+  Constitution). They stack rather than override; the working labels the per-ability lines
+  `Magic (Constitution only)` so two `Magic` rows do not read as a bug, and
+  `compactBonusesByAbility()` drops the abilities nobody singled out, so opening the
+  editor on all six leaves nothing behind in the record.
 - **Carrying capacity is derived, and what doubles it is found by wording.**
   `app/services/equipment.ts` builds it from Strength × 15, doubled once per feature
   whose text both mentions carrying capacity and says it is doubled or counts you one size

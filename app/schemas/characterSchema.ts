@@ -210,6 +210,15 @@ export const CharacterSchema = z.object({
 
   savingThrowProficiencies: z.array(z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha'])),
   savingThrowBonuses: AttackBonusSetSchema.optional(),
+  // Sparse: an ability nobody has singled out is absent, not an empty set.
+  savingThrowBonusesByAbility: z.object({
+    str: AttackBonusSetSchema.optional(),
+    dex: AttackBonusSetSchema.optional(),
+    con: AttackBonusSetSchema.optional(),
+    int: AttackBonusSetSchema.optional(),
+    wis: AttackBonusSetSchema.optional(),
+    cha: AttackBonusSetSchema.optional(),
+  }).optional(),
   // Null and absent both mean "read it off the features"; 'none' means "read nothing".
   savingThrowAbilityBonus: z.object({
     ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha', 'none']),

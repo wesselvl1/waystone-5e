@@ -6,17 +6,24 @@
  * say are derived and shown read-only — a paladin whose Wisdom save reads +9 off a +1
  * modifier is owed the reason — and below sit the parts the player can actually set.
  *
- * Both of those parts apply to every save rather than this one, which the labels say out
- * loud. A cloak of protection is a +1 to all six, and asking for it once per ability
- * would be six chances to enter it differently.
+ * Those parts come in two layers, which the labels say out loud rather than leaving the
+ * player to infer: the slots applying to every save, because a cloak of protection is a
+ * +1 to all six and asking for it once per ability would be six chances to enter it
+ * differently, and the slots for this save alone, because a periapt of health is not.
  */
-import type { AbilityKey, Character, SavingThrowBonuses } from '~/types/character'
+import type {
+  AbilityKey,
+  Character,
+  SavingThrowBonuses,
+  SavingThrowBonusesByAbility,
+} from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
 import { compactBonusSet, formatSigned } from '~/services/attacks'
 import {
   SAVING_THROW_ABILITY_LABELS,
   SAVING_THROW_BONUS_KINDS,
   SAVING_THROW_BONUS_LABELS,
+  compactBonusesByAbility,
   savingThrowBreakdown,
 } from '~/services/savingThrows'
 
@@ -27,7 +34,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  save: [Pick<Character, 'savingThrowBonuses' | 'savingThrowAbilityBonus'>]
+  save: [Pick<Character,
+    'savingThrowBonuses' | 'savingThrowBonusesByAbility' | 'savingThrowAbilityBonus'>]
   close: []
 }>()
 
@@ -35,6 +43,8 @@ const characterRef = computed(() => props.character)
 const stats = useCharacterStats(characterRef)
 
 const draft = ref<SavingThrowBonuses>({})
+/** The slots for the one save being edited, kept per ability so switching rows is safe. */
+const perAbilityDraft = ref<SavingThrowBonusesByAbility>({})
 /** 'derive' reads the aura off the features; anything else overrides that reading. */
 const abilityChoice = ref<AbilityKey | 'none' | 'derive'>('derive')
 const minimum = ref(0)
@@ -46,10 +56,24 @@ watch(() => props.open, (open) => {
   // Filled in rather than left sparse, so every number input has somewhere to write; the
   // zeroes are compacted away again on save.
   draft.value = { ...props.character.savingThrowBonuses }
+  perAbilityDraft.value = Object.fromEntries(
+    Object.entries(props.character.savingThrowBonusesByAbility ?? {})
+      .map(([key, bonuses]) => [key, { ...bonuses }]),
+  )
   const setting = props.character.savingThrowAbilityBonus
   abilityChoice.value = setting ? setting.ability : 'derive'
   minimum.value = setting?.minimum ?? 0
 }, { immediate: true })
+
+/**
+ * The row for the save on screen, created on demand: a number input needs an object to
+ * write into before the player has typed anything, and `compactBonusesByAbility` throws
+ * the empty ones away again on save.
+ */
+const thisSave = computed<SavingThrowBonuses>({
+  get: () => perAbilityDraft.value[props.ability] ?? {},
+  set: (value) => { perAbilityDraft.value[props.ability] = value },
+})
 
 const abilityBonusSetting = computed(() => {
   if (abilityChoice.value === 'derive') return null
@@ -67,6 +91,7 @@ const abilityBonusSetting = computed(() => {
 const preview = computed<Character>(() => ({
   ...props.character,
   savingThrowBonuses: draft.value,
+  savingThrowBonusesByAbility: perAbilityDraft.value,
   savingThrowAbilityBonus: abilityBonusSetting.value,
 }))
 
@@ -89,6 +114,7 @@ const otherSaves = computed(() => ABILITY_OPTIONS
 function save() {
   emit('save', {
     savingThrowBonuses: compactBonusSet(draft.value),
+    savingThrowBonusesByAbility: compactBonusesByAbility(perAbilityDraft.value),
     savingThrowAbilityBonus: abilityBonusSetting.value,
   })
 }
@@ -168,6 +194,32 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <p class="text-[10px] text-slate-500">
                 Only what the features below have not already counted — a feature that says
                 it adds to your saves is read off the feature itself.
+              </p>
+            </div>
+
+            <!-- And the same three, for this save alone -->
+            <div class="space-y-2">
+              <p class="section-header mb-0">
+                {{ SAVING_THROW_ABILITY_LABELS[ability] }} only
+              </p>
+              <div class="grid grid-cols-3 gap-2">
+                <div v-for="kind in SAVING_THROW_BONUS_KINDS" :key="`own-${kind}`">
+                  <label class="label" :title="SAVING_THROW_BONUS_LABELS[kind].hint">
+                    {{ SAVING_THROW_BONUS_LABELS[kind].label }}
+                  </label>
+                  <input
+                    :value="thisSave[kind]"
+                    type="number"
+                    class="input"
+                    placeholder="0"
+                    @input="thisSave = { ...thisSave, [kind]: Number(($event.target as HTMLInputElement).value) || 0 }"
+                  />
+                </div>
+              </div>
+              <p class="text-[10px] text-slate-500">
+                Something that lands on this save alone — a periapt of health, a ring
+                that turns one school aside. Added on top of the bonuses above, not
+                instead of them.
               </p>
             </div>
 
