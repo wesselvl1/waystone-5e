@@ -1,3 +1,15 @@
+<script setup lang="ts">
+import {
+  UPDATE_CONFIRM_MESSAGE,
+  UPDATE_CONFIRM_TITLE,
+  usePwaUpdate,
+} from '~/composables/usePwaUpdate'
+
+const { version, label, updateAvailable, applyUpdate } = usePwaUpdate()
+
+const confirming = ref(false)
+</script>
+
 <template>
   <div class="min-h-screen pb-8">
     <!-- Header -->
@@ -60,6 +72,27 @@
         </ul>
       </div>
 
+      <!-- Version and updates -->
+      <div class="card flex flex-col gap-3">
+        <h3 class="text-slate-200 font-semibold text-sm uppercase tracking-wider">Version</h3>
+        <div class="flex items-center gap-3">
+          <div class="flex-1 min-w-0">
+            <p class="text-white font-medium text-sm font-mono">{{ version }}</p>
+            <p class="text-xs mt-0.5" :class="updateAvailable ? 'text-primary-400' : 'text-slate-400'">{{ label }}</p>
+          </div>
+          <button
+            v-if="updateAvailable"
+            class="btn-primary text-xs px-3 py-1.5 flex-shrink-0"
+            @click="confirming = true"
+          >Update now</button>
+        </div>
+        <p class="text-slate-400 text-xs leading-relaxed">
+          Waystone keeps the version you installed until you update it here. A new release
+          never rewrites your characters or rulepacks mid-session — export first if a
+          version brings changes you would rather test before committing to.
+        </p>
+      </div>
+
       <!-- Links -->
       <div class="card flex flex-col gap-3">
         <h3 class="text-slate-200 font-semibold text-sm uppercase tracking-wider">Links</h3>
@@ -112,5 +145,15 @@
         Not affiliated with or endorsed by Wizards of the Coast.
       </p>
     </main>
+
+    <ConfirmDialog
+      :open="confirming"
+      :title="UPDATE_CONFIRM_TITLE"
+      :message="UPDATE_CONFIRM_MESSAGE"
+      confirm-label="Update and reload"
+      cancel-label="Not yet"
+      @confirm="applyUpdate"
+      @cancel="confirming = false"
+    />
   </div>
 </template>

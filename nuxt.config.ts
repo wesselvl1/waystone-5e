@@ -6,7 +6,18 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss',
     '@pinia/nuxt',
     ['@vite-pwa/nuxt', {
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate': the generated worker keeps `skipWaiting()` out, so a
+      // new deploy precaches in the background and waits to be asked. What that buys is
+      // not cosmetic — the SRD re-seed in app/plugins/srd-loader.client.ts runs at boot
+      // and drops the stored pack before rebuilding it, and character migrations run on
+      // load, so a build that takes over unasked rewrites IndexedDB unasked. See
+      // app/composables/usePwaUpdate.ts for the button that applies it.
+      registerType: 'prompt',
+      client: {
+        // Re-check hourly. This is a PWA people leave open for a whole session, so a
+        // check only at launch means an installed app can sit on a stale build for days.
+        periodicSyncForUpdates: 3600,
+      },
       manifest: {
         name: 'Waystone',
         short_name: 'Waystone',
@@ -43,6 +54,14 @@ export default defineNuxtConfig({
   ],
   nitro: {
     preset: 'static' // allows `nuxi generate` to produce static files
+  },
+  runtimeConfig: {
+    public: {
+      // Baked in at build time — `nuxi generate` has no server to read env at runtime.
+      // The deploy workflow passes the pushed v*.*.* tag, so the About page reports the
+      // exact build a device is on. Anything built outside that workflow says 'dev'.
+      appVersion: process.env.NUXT_PUBLIC_APP_VERSION || 'dev'
+    }
   },
   css: ['~/assets/css/main.css'],
   app: {

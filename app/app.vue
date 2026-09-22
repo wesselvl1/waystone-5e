@@ -2,6 +2,8 @@
   <div class="flex flex-col min-h-screen bg-surface-950">
     <NuxtRouteAnnouncer />
     <NuxtPage />
+    <!-- A waiting build announces itself here; nothing applies it but the player -->
+    <UpdateBanner />
     <!-- Bottom nav bar -->
     <nav class="fixed bottom-0 inset-x-0 z-50 flex h-16 items-center justify-around border-t border-surface-700/60 bg-surface-900/95 backdrop-blur-sm">
       <NuxtLink
