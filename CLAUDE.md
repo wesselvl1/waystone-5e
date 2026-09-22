@@ -100,6 +100,26 @@ of that mechanism.
   Export on the pack page is the only way homebrew leaves the browser, since there is no
   backend.
 
+### The service worker gates the re-seed
+
+The PWA registers with `registerType: 'prompt'`, **not** `autoUpdate`. That is a data
+decision, not a UX one: the re-seed above and `migrateCharacterShape` both run at boot, so
+a build that takes over unasked rewrites IndexedDB unasked. A new deploy precaches in the
+background and waits; `app/composables/usePwaUpdate.ts` owns the whole decision
+(`describeUpdateState` is pure and unit-tested, the rest needs Nuxt), `UpdateBanner.vue`
+offers it above the bottom nav, and the About page keeps the button after a "Later" —
+which is why the dismissal is a `ref` and never `localStorage`. Nothing else may call
+`updateServiceWorker()`.
+
+The version on the About page is `runtimeConfig.public.appVersion`, baked in at build time
+from `NUXT_PUBLIC_APP_VERSION`, which `deploy.yml` sets to the pushed tag. Outside that
+workflow it reads `dev`.
+
+One consequence worth remembering: a client running an older `autoUpdate` worker applies
+the *next* release unasked whatever this says, because that decision lives in the worker
+already installed. A release that changes stored data therefore wants a release of its own
+in front of it.
+
 ### Non-SRD books
 
 `scripts/book-manifest.mjs` is a names-only table of contents per sourcebook;

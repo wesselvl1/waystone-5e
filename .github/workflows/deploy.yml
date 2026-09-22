@@ -18,7 +18,10 @@ jobs:
           node-version: lts/*
           cache: pnpm
       - run: pnpm install
+      # The pushed tag becomes the version the About page reports back in a bug report.
       - run: pnpm generate
+        env:
+          NUXT_PUBLIC_APP_VERSION: ${{ github.ref_name }}
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

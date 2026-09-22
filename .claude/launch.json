@@ -7,6 +7,14 @@
       "runtimeArgs": ["dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "// ": "Serves a `pnpm generate` build. The dev server does not register the service worker, so this is the only way to exercise PWA update behaviour locally.",
+      "name": "waystone-generated",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "--no-clipboard", "-l", "4173", ".output/public"],
+      "port": 4173,
+      "autoPort": false
     }
   ]
 }
