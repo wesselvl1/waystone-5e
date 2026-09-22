@@ -9,6 +9,7 @@ import {
   deleteEntry,
   entryId,
   entryKindMeta,
+  entriesEqual,
   entryName,
   fieldValue,
   forkKey,
@@ -181,6 +182,58 @@ describe('validation', () => {
   it('reports unparseable JSON as an issue rather than throwing', () => {
     const result = parseEntryJson('spells', '{ nope')
     expect(result.ok).toBe(false)
+  })
+})
+
+describe('telling an edit from a no-op', () => {
+  it('sees no edit in an entry opened and saved untouched', () => {
+    // A JSON round-trip is what the editor drafts through, so it must not read as a change.
+    expect(entriesEqual('spells', spell(), JSON.parse(JSON.stringify(spell())))).toBe(true)
+  })
+
+  it('ignores key order', () => {
+    const { name, id, ...rest } = spell()
+    expect(entriesEqual('spells', spell(), { ...rest, id, name })).toBe(true)
+  })
+
+  it('ignores a difference the schema itself would erase', () => {
+    const weapon = {
+      id: 'longsword',
+      name: 'Longsword',
+      category: 'martial',
+      rangeType: 'melee',
+      damageDice: '1d8',
+      damageType: 'slashing',
+      properties: ['versatile'],
+    }
+    // The schema lowercases properties on the way in, so casing is not an edit.
+    expect(entriesEqual('weapons', weapon, { ...weapon, properties: ['Versatile'] })).toBe(true)
+    // An unknown key is stripped on the way in too, so adding one is not an edit either.
+    expect(entriesEqual('weapons', weapon, { ...weapon, notAField: true })).toBe(true)
+  })
+
+  it('sees the wording change that is the whole point', () => {
+    expect(entriesEqual('spells', spell(), spell({ description: '2d4 hit points' }))).toBe(false)
+  })
+
+  it('sees a nested trait change', () => {
+    const race = {
+      id: 'elf',
+      name: 'Elf',
+      size: 'medium',
+      speeds: { walk: 30 },
+      abilityScoreBonuses: { dex: 2 },
+      languages: ['Common'],
+      traits: [{ name: 'Darkvision', description: 'old' }],
+    }
+    const edited = setAtPath(race, ['traits', 0, 'description'], 'new')
+    expect(entriesEqual('races', race, edited)).toBe(false)
+  })
+
+  it('compares what it was given when a side will not validate', () => {
+    const broken = { ...spell(), level: 99 }
+    expect(entriesEqual('spells', broken, broken)).toBe(true)
+    expect(entriesEqual('spells', broken, spell())).toBe(false)
   })
 })
 

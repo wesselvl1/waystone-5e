@@ -16,6 +16,7 @@
 import type { EntryKind } from '~/services/homebrew'
 import {
   applyField,
+  entriesEqual,
   entryKindMeta,
   entryName,
   fieldValue,
@@ -91,6 +92,31 @@ function absorbJson(): boolean {
   return true
 }
 
+/**
+ * The draft as it currently stands, the JSON tab included.
+ *
+ * The draft proper only takes the JSON tab's text on absorb, so asking it whether
+ * anything has changed would answer for the Details tab alone. Undefined while the JSON
+ * will not parse — nothing is known about an edit that cannot be read.
+ */
+const effectiveDraft = computed<Record<string, unknown> | undefined>(() => {
+  if (tab.value !== 'json') return draft.value
+  const result = parseEntryJson(props.kind, jsonText.value)
+  return result.ok ? result.value : undefined
+})
+
+/**
+ * Nothing to save.
+ *
+ * Only while editing: a duplicate of an entry left exactly as it is, is still a new
+ * entry the reader asked for. An *edit* that changes nothing is not — saving it would
+ * copy a book's entry into the homebrew pack to say the same thing the book says.
+ */
+const unchanged = computed(() =>
+  props.mode === 'edit'
+  && effectiveDraft.value !== undefined
+  && entriesEqual(props.kind, effectiveDraft.value, props.entry))
+
 function switchTo(next: 'details' | 'json') {
   if (next === tab.value) return
   if (tab.value === 'json' && !absorbJson()) return
@@ -99,6 +125,7 @@ function switchTo(next: 'details' | 'json') {
 }
 
 function save() {
+  if (unchanged.value) return
   if (tab.value === 'json' && !absorbJson()) return
   const result = validateEntry(props.kind, draft.value)
   if (!result.ok) {
@@ -263,8 +290,10 @@ function rowsFor(text: unknown): number {
 
           <!-- Footer -->
           <div class="flex gap-2 justify-end p-4 pt-3 border-t border-surface-700/60">
-            <button class="btn-ghost" @click="emit('close')">Cancel</button>
-            <button class="btn-primary" @click="save">Save</button>
+            <button class="btn-ghost" @click="emit('close')">{{ unchanged ? 'Close' : 'Cancel' }}</button>
+            <button class="btn-primary" :disabled="unchanged" @click="save">
+              {{ unchanged ? 'No changes' : 'Save' }}
+            </button>
           </div>
         </div>
       </div>

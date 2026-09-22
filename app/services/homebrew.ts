@@ -721,6 +721,27 @@ export function validateEntry(kind: EntryKind, value: unknown): EntryValidation 
   }
 }
 
+/**
+ * Whether two entries of a kind say the same thing.
+ *
+ * Both sides are normalised through the kind's own schema before comparing, so a
+ * difference the schema itself would erase — a weapon property's casing, an absent
+ * `levelUpEvents` against an empty one, a key order — does not read as an edit. Where a
+ * side will not validate, it is compared as given: that is an entry the editor could not
+ * have produced, and claiming it matches would be a guess.
+ *
+ * This is what keeps opening a book's entry and pressing Save from copying it. A copy
+ * that says exactly what the book says is worse than none — it shadows the book without
+ * changing anything, and then reports itself stale the first time the book is corrected.
+ */
+export function entriesEqual(kind: EntryKind, a: unknown, b: unknown): boolean {
+  const normalised = (value: unknown) => {
+    const result = validateEntry(kind, value)
+    return result.ok ? result.value : value
+  }
+  return hashEntry(normalised(a)) === hashEntry(normalised(b))
+}
+
 /** Parse JSON and validate in one step, so the editor has one error channel. */
 export function parseEntryJson(kind: EntryKind, text: string): EntryValidation {
   let parsed: unknown
