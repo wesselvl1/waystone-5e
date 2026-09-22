@@ -13,19 +13,35 @@ import type { Character } from '~/types/character'
 import type { Rulepack, FeatDefinition, Background } from '~/types/rulepack'
 import { validCharacter } from '../fixtures'
 import fighter from '~/data/srd/fighter.json'
-import phbFeats from '~/data/phb/feats.json'
 
 /**
  * A dozen backgrounds and two races say "you gain the X feat" and grant nothing today —
  * GRANT_FEAT is the event that lets them. These feats stand in for the shapes the real
- * books use: a flat bonus, a real hpBonusPerLevel feat (phb.tough, unedited), and a feat
- * that asks its own question the way Magic Initiate does.
+ * books use: a flat bonus, an hpBonusPerLevel feat, and a feat that asks its own question
+ * the way Magic Initiate does.
+ *
+ * Every one of them is declared here rather than imported. Only `app/data/srd/` is
+ * committed — every other book directory is gitignored (CLAUDE.md, "Non-SRD books") — so
+ * a test that imports one cannot resolve that import in a CI clone and takes the whole
+ * suite down with it. This file used to read the real `phb.tough` for the case below.
  */
 const FLAT_BONUS_FEAT: FeatDefinition = {
   id: 'test.flat-bonus',
   name: 'Flat Bonus Feat',
   description: '',
   abilityScoreBonus: { str: 1 },
+}
+
+/**
+ * Tough's shape, field for field as `phb.tough` writes it: a flat hit-point grant per
+ * level, no ability bonus and no question of its own. It is the one feat here whose
+ * numbers the assertions depend on, so the +2 per level is the book's, not an invention.
+ */
+const TOUGH_FEAT: FeatDefinition = {
+  id: 'test.tough',
+  name: 'Tough',
+  description: 'Your hit point maximum increases by an amount equal to twice your level when you gain this feat. Whenever you gain a level thereafter, your hit point maximum increases by an additional 2 hit points.',
+  hpBonusPerLevel: 2,
 }
 
 const CLASS_OPTION = 'test.magic-initiate-option'
@@ -121,7 +137,7 @@ const TOUCHED_FEAT: FeatDefinition = {
 function pack(): Rulepack {
   const built = RulepackSchema.parse(fighter) as unknown as Rulepack
   built.feats = [
-    ...(RulepackSchema.parse(phbFeats).feats as Rulepack['feats']),
+    TOUGH_FEAT,
     FLAT_BONUS_FEAT,
     MAGIC_INITIATE,
     SCION,
@@ -206,14 +222,14 @@ describe('GRANT_FEAT — applying the flat ability bonus', () => {
   })
 })
 
-describe('GRANT_FEAT — phb.tough (real data), HP applies retroactively', () => {
+describe('GRANT_FEAT — Tough\'s shape, HP applies retroactively', () => {
   it('adds twice the character\'s total level to max HP, not just +2', () => {
-    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('phb.tough')] }
+    const packWithBg = { ...rulepack, backgrounds: [backgroundGranting('test.tough')] }
     // Already 4 levels in when the grant lands, so the retroactive math has something to prove.
     const veteran = char({ classes: [{ classId: 'fighter', level: 4 }] })
     const events = resolveLevelUpEvents(veteran, 'fighter', 1, packWithBg)
     const grant = events.find(e => e.type === 'GRANT_FEAT')
-    expect(grant).toMatchObject({ featId: 'phb.tough', hpBonusPerLevel: 2 })
+    expect(grant).toMatchObject({ featId: 'test.tough', hpBonusPerLevel: 2 })
 
     // Isolate the feat's own effect from this level's ADD_HP by applying it alone.
     const updated = applyAutomaticEvents(veteran, [grant!], 'average')
