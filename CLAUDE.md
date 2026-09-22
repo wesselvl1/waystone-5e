@@ -63,6 +63,43 @@ Because ids are the merge key, a custom pack is expected to **prefix its entry i
 
 `tests/unit/srdData.test.ts` validates every SRD JSON file against `RulepackSchema`, so schema-invalid data fails CI.
 
+### Editing content, and the homebrew pack
+
+Every rulepack entry is editable in the app, and nothing is ever written back to the pack
+it came from. A book is a document — re-imported whole, and the bundled SRD re-seeded from
+the build whenever `SRD_SEED_REVISION` moves — so an in-place edit would be lost the next
+time the app updated itself, silently. Editing an entry instead **copies it into a pack
+with id `homebrew`**, keeping the original id, and `app/services/homebrew.ts` is the whole
+of that mechanism.
+
+- **The homebrew pack shadows by id.** `inLookupOrder()` sorts it to the front, so every
+  singular getter in the rulepacks store finds it first; `claimedIds()` / `unshadowed()`
+  drop the book's version from every *list* getter and from `composedPack()`, so a
+  corrected healing word is one spell in the picker rather than two told apart by a source
+  label. Two **books** sharing an id are still two entries, as they always were — that is a
+  second take on the same content, where this is one take that has been edited.
+- **`Rulepack.forkedFrom` records what a copy was copied from**, keyed `<kind>:<id>`, with
+  an FNV-1a `hash` of the source entry as it stood at that moment. `forkStatuses()`
+  re-hashes the source and reports `changed` / `source-missing`, which is what the homebrew
+  page leads with. This matters because the rules data is still being corrected: a copy
+  taken today shadows tomorrow's fix with nothing on screen to say so. "Keep mine"
+  re-snapshots the hash; deleting the copy is the whole of the undo, since the book was
+  never touched.
+- **The editor exposes wording, not structure.** `ENTRY_KINDS` declares a short field list
+  per kind (the scalars printed beside the name), and `proseBlocks()` finds every
+  `{ name, description }` pair at any depth by *shape* — race traits, class features,
+  subclass features at 6th level, creature actions, pool options — so a book this app has
+  never read is editable without enumerating its paths. Level tables, `levelUpEvents` and
+  ability distributions are left to the JSON tab, validated by `EntrySchemas[kind]` (one
+  entry, not the whole file). A form that got those half-right would be worse than none.
+- **`optionPools` has no id**, so `poolKey()` (`group|choiceId`) stands in — the same key
+  `mergeOptionPools` already uses, so a copied pool patch shadows the one it came from
+  instead of arriving beside it. It cannot be duplicated for the same reason.
+- New entries mint `hb-<slug>` ids (`mintEntryId`), numbered only on a clash; a
+  **duplicate** blanks the id so it stands beside the original rather than replacing it.
+  Export on the pack page is the only way homebrew leaves the browser, since there is no
+  backend.
+
 ### Non-SRD books
 
 `scripts/book-manifest.mjs` is a names-only table of contents per sourcebook;
