@@ -2232,6 +2232,42 @@ export function applyAutomaticEvents(
   return updated
 }
 
+/**
+ * A newly created character's first class level: what is applied now, and what is left
+ * to ask.
+ *
+ * Creation has two endings. A level that raises a question — a cleric's cantrips, a
+ * domain — belongs to the level-up wizard, which asks it and applies the automatic half
+ * itself, so nothing is applied here and the character comes back untouched. A level
+ * that raises none is finished on the spot, and that is the path this exists for: it
+ * used to take the resolved events and push the ADD_FEATURE ones alone, so a
+ * background's granted feat, a race's skill proficiency, a granted spell, a sense and a
+ * speed were all resolved and then dropped on the floor — a whitelist of event types,
+ * the same shape of bug three other places in this pipeline have already been cured of.
+ * Everything automatic goes through the applier the wizard itself uses, so a type added
+ * later needs no second home.
+ *
+ * HP is taken at `max`, which is what the wizard forces on a character's first level.
+ * The caller therefore hands over a character with no hit points and no hit dice yet:
+ * ADD_HP and UPDATE_HIT_DIE are automatic events like any other, and computing either by
+ * hand as well would count it twice. `character.classes` carries the level being gained
+ * rather than the one before it, so a granted feat's retroactive hit points (Tough's +2
+ * per level) land on a 1st-level character.
+ */
+export function resolveFirstClassLevel(
+  character: Character,
+  classId: string,
+  rulepack: Rulepack,
+): { character: Character; choices: ChoiceLevelUpEvent[] } {
+  const events = resolveLevelUpEvents(character, classId, 1, rulepack)
+  const choices = getChoiceEvents(events)
+  if (choices.length > 0) return { character, choices }
+  return {
+    character: applyAutomaticEvents(character, getAutomaticEvents(events), 'max'),
+    choices,
+  }
+}
+
 export function applyResolvedChoices(
   character: Character,
   choices: ResolvedChoice[],
