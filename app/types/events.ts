@@ -68,6 +68,21 @@ export interface GainProficiencyEvent {
 }
 
 /**
+ * Proficiency in one saving throw. Its own event rather than a GAIN_PROFICIENCY category
+ * because it writes to `Character.savingThrowProficiencies` instead of the flat
+ * `otherProficiencies` list, and nothing reads that list for an ability name.
+ *
+ * The def's `'increased'` is already resolved to a concrete ability here, the way
+ * GRANT_SPELLS's is: the resolver has the feat's answer and the applier has no rulepack.
+ * A feat whose increase is still unanswered emits nothing, and RESOLVED_FEAT_ABILITY
+ * replays the feat's events once it is.
+ */
+export interface GainSaveProficiencyEvent {
+  type: 'GAIN_SAVE_PROFICIENCY'
+  ability: AbilityKey
+}
+
+/**
  * Records which ability a spellcasting source uses. Emitted per class on every level-up,
  * so a multiclass caster ends up with an entry each rather than sharing one ability.
  */
@@ -415,6 +430,7 @@ export type AutomaticLevelUpEvent =
   | UpdateWarlockSlotsEvent
   | AddFeatureEvent
   | GainProficiencyEvent
+  | GainSaveProficiencyEvent
   | UpdateHitDieEvent
   | UpdateFeatureUsesEvent
   | GrantSpellsEvent

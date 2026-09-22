@@ -16,6 +16,7 @@ import type {
   AddHpEvent,
   AddFeatureEvent,
   GainProficiencyEvent,
+  GainSaveProficiencyEvent,
   UpdateSpellSlotsEvent,
   UpdateWarlockSlotsEvent,
   UpdateHitDieEvent,
@@ -115,6 +116,41 @@ function applyGainProficiency(character: Character, proficiency: string): void {
   }
   if (!character.otherProficiencies.includes(proficiency)) {
     character.otherProficiencies.push(proficiency)
+  }
+}
+
+/**
+ * The saving-throw proficiency, unless an option the character has not picked guards it.
+ *
+ * Same gate as a guarded spell grant, plus the `'increased'` reading `GRANT_SPELLS`
+ * already has: Resilient's proficiency follows its own ability increase, which is not
+ * known until the player answers it. An unanswered one emits nothing rather than guessing
+ * an ability — RESOLVED_FEAT_ABILITY replays the feat's events once the answer is in.
+ */
+function gainSaveProficiencyEvent(
+  def: Extract<LevelUpEventDef, { type: 'GAIN_SAVE_PROFICIENCY' }>,
+  character: Character,
+  increasedAbility?: AbilityKey,
+): GainSaveProficiencyEvent | undefined {
+  if (def.whenOption
+    && character.chosenOptions?.[def.whenOption.choiceId] !== def.whenOption.optionId) {
+    return undefined
+  }
+  const ability = resolveAbilityRef(def.ability, increasedAbility)
+  if (!ability) return undefined
+  return { type: 'GAIN_SAVE_PROFICIENCY', ability }
+}
+
+/**
+ * Makes a character proficient in one saving throw, at every site that grants one.
+ *
+ * Never a duplicate and never a downgrade: the list is a flat set of abilities shared
+ * with the sheet's own toggle, and a class that already granted the save must not end up
+ * with two entries for it.
+ */
+function applyGainSaveProficiency(character: Character, ability: AbilityKey): void {
+  if (!character.savingThrowProficiencies.includes(ability)) {
+    character.savingThrowProficiencies.push(ability)
   }
 }
 
@@ -344,16 +380,42 @@ export function optionAvailable(
  * about it — the Knowledge Domain's Blessings of Knowledge grants two skills and then
  * doubles those same two. Never downgrades, which is the rule RESOLVED_SKILL itself
  * applies: a skill already at expertise stays there.
+ *
+ * A subclass confirmed in the same run counts too, when a `rulepack` is passed. Its
+ * automatic GAIN_PROFICIENCY events are applied by RESOLVED_SUBCLASS, which runs after
+ * the whole run of questions — so the Scout's Survivalist, which grants Nature and
+ * Survival and then doubles those same two, told every rogue not already proficient that
+ * nothing was eligible. `character.classes` must carry the level being gained, since that
+ * is the subclass level whose events are read.
  */
 export function projectSkillProficiencies(
   character: Character,
   choices: ResolvedChoice[],
+  rulepack?: Rulepack,
 ): Character['skillProficiencies'] {
   const projected = { ...character.skillProficiencies }
+  const gain = (skill: SkillKey) => {
+    if ((projected[skill] ?? 0) === 0) projected[skill] = 1
+  }
   for (const choice of choices) {
-    if (choice.type !== 'RESOLVED_SKILL') continue
-    for (const skill of choice.skills) {
-      if ((projected[skill] ?? 0) === 0) projected[skill] = 1
+    if (choice.type === 'RESOLVED_SKILL') {
+      for (const skill of choice.skills) gain(skill)
+      continue
+    }
+    if (choice.type !== 'RESOLVED_SUBCLASS' || !rulepack) continue
+    const level = character.classes.find(c => c.classId === choice.classId)?.level
+    if (level === undefined) continue
+    // Through the same resolver RESOLVED_SUBCLASS itself applies, rather than reading the
+    // level's defs by hand: a guarded grant stays guarded, and nothing here can drift
+    // from what the run will actually write.
+    const events = resolveSubclassLevelEvents(
+      character, choice.classId, choice.subclassId, level, rulepack)
+    for (const event of events) {
+      if (event.type !== 'GAIN_PROFICIENCY') continue
+      // Only the skills: `applyGainProficiency` files a weapon or a tool elsewhere, and
+      // expertise has nothing to double there.
+      const skill = matchSkillKey(event.proficiency)
+      if (skill) gain(skill)
     }
   }
   return projected
@@ -579,6 +641,98 @@ export function backfillPoolPickFeatures(character: Character, rulepack: Rulepac
 /** The id a subclass feature is filed under, wherever one is granted. */
 function subclassFeatureId(subclassId: string, featureName: string, level: number): string {
   return `${subclassId}-${featureName.toLowerCase().replaceAll(' ', '-')}-${level}`
+}
+
+/** The id a class's own feature is filed under. Shaped like a subclass's, per class. */
+function classFeatureId(classId: string, featureName: string, level: number): string {
+  return `${classId}-${featureName.toLowerCase().replace(/\s+/g, '-')}-${level}`
+}
+
+/**
+ * A name reduced to the word-shape an id is written in: `Hunter's Prey` → `hunters-prey`.
+ * Punctuation goes, because an id never carries it.
+ */
+function idWords(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/**
+ * The feature a CHOOSE_OPTION annotates, by id, or undefined when it annotates none.
+ *
+ * The link used to be `feature.id.includes(choiceId)` over the *whole character*, which
+ * is two bugs at once: `xge.cavalier-bonus-proficiency-3` contains
+ * `xge.cavalier-bonus-proficiency` and was overwritten though a book-text feature raised
+ * nothing, while `xge.storm-herald-environment` is nowhere inside
+ * `xge.path-of-the-storm-herald-storm-aura-3` and the answer landed nowhere at all.
+ *
+ * So the link is structural instead: only the features declared on the very level that
+ * declares the choice are candidates. Among those, the pack may name one outright
+ * (`feature`); otherwise it is the one the choice id is named after — `phb.totem-spirit`
+ * for "Totem Spirit" — and failing that the level's sole feature, which is what a choice
+ * declared beside exactly one feature must belong to. A level with several features and
+ * no match annotates none rather than guessing.
+ */
+function optionChoiceFeatureName(
+  def: ChooseOptionDefEvent,
+  featureNames: string[],
+): string | undefined {
+  if (def.feature) return featureNames.find(n => n === def.feature)
+  const id = idWords(def.id)
+  const named = featureNames.find((n) => {
+    const words = idWords(n)
+    return id === words || id.endsWith(`-${words}`)
+  })
+  if (named) return named
+  return featureNames.length === 1 ? featureNames[0] : undefined
+}
+
+/**
+ * Where a CHOOSE_OPTION is declared: the definition itself, and the id of the feature its
+ * answer is written onto.
+ *
+ * Classes and subclasses only. A race's or subrace's pick gets a feature of its own
+ * (`poolPickFeature` builds one grouped or not), a feat's is named on the feat's feature
+ * by `applyResolvedChoices`, and neither has a level's feature list to annotate.
+ */
+function findOptionChoiceSite(
+  rulepack: Rulepack,
+  choiceId: string,
+): { def: ChooseOptionDefEvent; featureId?: string } | undefined {
+  for (const cls of rulepack.classes) {
+    for (const level of cls.levels) {
+      for (const def of level.levelUpEvents ?? []) {
+        if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId) continue
+        const name = optionChoiceFeatureName(def, level.features)
+        return { def, featureId: name ? classFeatureId(cls.id, name, level.level) : undefined }
+      }
+    }
+    for (const sub of cls.subclasses ?? []) {
+      for (const level of sub.levels) {
+        for (const def of level.levelUpEvents ?? []) {
+          if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId) continue
+          const name = optionChoiceFeatureName(def, level.features.map(f => f.name))
+          return { def, featureId: name ? subclassFeatureId(sub.id, name, level.level) : undefined }
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+/**
+ * Writes an answered option onto the feature that asked for it — "Storm Aura (Desert)".
+ *
+ * The option's own text is appended rather than substituted. It used to replace the
+ * description outright, which traded a Cavalier's printed paragraph for the five words
+ * "Animal Handling, History, Insight, Performance, or Persuasion." — the book text is
+ * what the sheet is for, and the pick is an addition to it, not a correction of it.
+ */
+function annotateFeatureWithOption(feature: Feature, option: PoolOption): void {
+  feature.name = `${feature.name} (${option.name})`
+  if (!option.description || feature.description.includes(option.description)) return
+  feature.description = feature.description
+    ? `${feature.description}\n\n${option.name}. ${option.description}`
+    : option.description
 }
 
 /**
@@ -944,6 +1098,11 @@ export function resolveSubclassLevelEvents(
         if (proficiency) events.push(proficiency)
         break
       }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        const save = gainSaveProficiencyEvent(eventDef, character)
+        if (save) events.push(save)
+        break
+      }
       case 'CHOOSE_SKILL': {
         const skills = chooseSkillEvent(eventDef, character)
         if (skills) events.push(skills)
@@ -1079,7 +1238,7 @@ export function resolveLevelUpEvents(
     events.push({
       type: 'ADD_FEATURE',
       feature: {
-        id: `${classId}-${featureName.toLowerCase().replace(/\s+/g, '-')}-${newLevel}`,
+        id: classFeatureId(classId, featureName, newLevel),
         name: featureName,
         source: classDef.name,
         description: featDef?.description ?? '',
@@ -1135,6 +1294,11 @@ export function resolveLevelUpEvents(
       case 'GAIN_PROFICIENCY': {
         const proficiency = gainProficiencyEvent(eventDef, character)
         if (proficiency) events.push(proficiency)
+        break
+      }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        const save = gainSaveProficiencyEvent(eventDef, character)
+        if (save) events.push(save)
         break
       }
       case 'SET_SPEED': {
@@ -1301,6 +1465,11 @@ export function resolveLevelUpEvents(
             if (proficiency) events.push(proficiency)
             break
           }
+          case 'GAIN_SAVE_PROFICIENCY': {
+            const save = gainSaveProficiencyEvent(eventDef, character)
+            if (save) events.push(save)
+            break
+          }
           case 'SET_SPEED': {
             const speed = setSpeedEvent(eventDef, character)
             if (speed) events.push(speed)
@@ -1411,6 +1580,13 @@ export function resolveFeatEvents(
       case 'GAIN_PROFICIENCY': {
         const proficiency = gainProficiencyEvent(eventDef, character)
         if (proficiency) events.push(proficiency)
+        break
+      }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        // Resilient: the save follows the ability the feat's own increase went to, so
+        // this is the one resolver that has an `'increased'` answer to hand it.
+        const save = gainSaveProficiencyEvent(eventDef, character, increasedAbility)
+        if (save) events.push(save)
         break
       }
       case 'SET_SPEED': {
@@ -1528,6 +1704,11 @@ export function resolveOptionalFeatureEvents(
       case 'GAIN_PROFICIENCY': {
         const proficiency = gainProficiencyEvent(eventDef, character)
         if (proficiency) events.push(proficiency)
+        break
+      }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        const save = gainSaveProficiencyEvent(eventDef, character)
+        if (save) events.push(save)
         break
       }
       case 'SET_SPEED': {
@@ -1855,6 +2036,9 @@ function applyFeatAutomaticEvents(character: Character, events: AutomaticLevelUp
       case 'GAIN_PROFICIENCY':
         applyGainProficiency(character, event.proficiency)
         break
+      case 'GAIN_SAVE_PROFICIENCY':
+        applyGainSaveProficiency(character, event.ability)
+        break
       case 'UPDATE_FEATURE_USES': {
         const target = character.features.find(f => f.name === event.featureName)
         if (target) {
@@ -1990,6 +2174,10 @@ export function applyAutomaticEvents(
       }
       case 'GAIN_PROFICIENCY': {
         applyGainProficiency(updated, event.proficiency)
+        break
+      }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        applyGainSaveProficiency(updated, event.ability)
         break
       }
       case 'SET_SPEED': {
@@ -2269,11 +2457,19 @@ export function applyResolvedChoices(
               .flatMap(sub => sub.levels.find(l => l.level === entry.level)?.levelUpEvents ?? []),
           ]
           for (const evt of levelEvents) {
-            if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY') continue
+            if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY'
+              && evt.type !== 'GAIN_SAVE_PROFICIENCY') continue
             if (evt.whenOption?.choiceId !== choice.choiceId) continue
             if (evt.whenOption.optionId !== choice.optionId) continue
             if (evt.type === 'GAIN_PROFICIENCY') {
               applyGainProficiency(updated, evt.proficiency)
+              continue
+            }
+            // Elegant Courtier's "Intelligence or Charisma" arm. `'increased'` cannot
+            // apply here — it is a feat's own increase, and no class level has one.
+            if (evt.type === 'GAIN_SAVE_PROFICIENCY') {
+              const ability = resolveAbilityRef(evt.ability, undefined)
+              if (ability) applyGainSaveProficiency(updated, ability)
               continue
             }
             grantSpellsTo(
@@ -2297,6 +2493,7 @@ export function applyResolvedChoices(
             if (group.level > totalLevel(updated)) continue
             for (const evt of group.levelUpEvents) {
               if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY'
+                && evt.type !== 'GAIN_SAVE_PROFICIENCY'
                 && evt.type !== 'SET_SPEED' && evt.type !== 'SET_SENSE') continue
               if (evt.whenOption?.choiceId !== choice.choiceId) continue
               if (evt.whenOption.optionId !== choice.optionId) continue
@@ -2304,6 +2501,11 @@ export function applyResolvedChoices(
               // speed rather than spells, and the answer landed in this very run.
               if (evt.type === 'GAIN_PROFICIENCY') {
                 applyGainProficiency(updated, evt.proficiency)
+                continue
+              }
+              if (evt.type === 'GAIN_SAVE_PROFICIENCY') {
+                const ability = resolveAbilityRef(evt.ability, undefined)
+                if (ability) applyGainSaveProficiency(updated, ability)
                 continue
               }
               if (evt.type === 'SET_SPEED') {
@@ -2350,10 +2552,7 @@ export function applyResolvedChoices(
             // subclasses: "Scion of the Outer Planes (Good Outer Plane)".
             if (evt.type === 'CHOOSE_OPTION' && evt.id === choice.choiceId) {
               const opt = evt.options.find(o => o.id === choice.optionId)
-              if (opt) {
-                feature.name = `${feat.name} (${opt.name})`
-                if (opt.description) feature.description = opt.description
-              }
+              if (opt) annotateFeatureWithOption(feature, opt)
               continue
             }
             if (evt.type !== 'GRANT_SPELLS' || !evt.whenOption) continue
@@ -2379,29 +2578,17 @@ export function applyResolvedChoices(
           }
         }
 
-        // Find the option definition from the rulepack across all subclass level events
-        let optionName: string | undefined
-        let optionDescription: string | undefined
-        outer: for (const cls of rulepack.classes) {
-          for (const sub of cls.subclasses ?? []) {
-            for (const lvl of sub.levels) {
-              for (const evt of lvl.levelUpEvents ?? []) {
-                if (evt.type === 'CHOOSE_OPTION' && evt.id === choice.choiceId) {
-                  const opt = evt.options.find(o => o.id === choice.optionId)
-                  if (opt) { optionName = opt.name; optionDescription = opt.description; break outer }
-                }
-              }
-            }
-          }
-        }
-        if (optionName) {
-          // Update the feature whose id contains the choiceId (e.g. "totem-spirit" in the feature id)
-          const feat = updated.features.find(f =>
-            f.id !== poolFeatureId(choice.choiceId) && f.id.includes(choice.choiceId))
-          if (feat) {
-            feat.name = `${feat.name} (${optionName})`
-            feat.description = optionDescription ?? feat.description
-          }
+        // Name the pick on the feature that asked for it — a Totem Spirit, a Storm Aura's
+        // environment. A grouped pick is deliberately excluded: `poolPickFeature` above
+        // already gave it a feature of its own, and annotating as well showed a College
+        // of Swords bard its fighting style twice.
+        const site = findOptionChoiceSite(rulepack, choice.choiceId)
+        if (site && !site.def.group && site.featureId) {
+          const target = updated.features.find(f => f.id === site.featureId)
+          // Patched-in options too, for an ungrouped choice a book widened.
+          const option = site.def.options.find(o => o.id === choice.optionId)
+            ?? poolExtras(rulepack, site.def.group, site.def.id).find(o => o.id === choice.optionId)
+          if (target && option) annotateFeatureWithOption(target, option)
         }
         break
       }

@@ -158,6 +158,17 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     }).optional(),
   }),
   z.object({
+    // Proficiency in one saving throw, which lives in its own field on the character.
+    // `'increased'` names the ability the granting feat's own increase went to.
+    type: z.literal('GAIN_SAVE_PROFICIENCY'),
+    ability: SpellAbilityRefSchema,
+    // Granted only when an option was picked, e.g. Elegant Courtier's Int-or-Cha arm.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+  }),
+  z.object({
     type: z.literal('CHOOSE_SPELL'),
     addTo: z.string(),
     count: z.number().int().min(1),
@@ -290,6 +301,9 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     label: z.string(),
     options: z.array(ChooseOptionDefSchema).min(1),
     group: z.string().optional(),
+    // The feature the answer is written onto, when the level's own wording does not
+    // make it obvious. Meaningless on a grouped pick, which gets a feature of its own.
+    feature: z.string().optional(),
   }),
   z.object({
     type: z.literal('REPLACE_OPTION'),

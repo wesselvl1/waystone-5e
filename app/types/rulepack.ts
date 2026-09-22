@@ -216,6 +216,28 @@ export type LevelUpEventDef =
     whenOption?: { choiceId: string; optionId: string }
   }
   | {
+    /**
+     * A saving throw the source makes the character proficient in — the Samurai's Elegant
+     * Courtier, the Gloom Stalker's Iron Mind, Resilient.
+     *
+     * Separate from GAIN_PROFICIENCY because the two write to different fields: a save
+     * lives in `Character.savingThrowProficiencies`, keyed by ability, and a bare
+     * "wisdom" chip in `otherProficiencies` would leave the Wisdom save unchecked — the
+     * same split `applyGainProficiency` already makes for a skill.
+     *
+     * `'increased'` is read exactly as it is on a granted spell: the ability this feat's
+     * own increase went to. It is what lets Resilient say "you gain proficiency in saving
+     * throws using the chosen ability" without asking a second question.
+     */
+    type: 'GAIN_SAVE_PROFICIENCY'
+    ability: SpellAbilityRef
+    /**
+     * Granted only when a `CHOOSE_OPTION` was answered this way — Elegant Courtier's
+     * "Intelligence or Charisma". Gated like a `GRANT_SPELLS`.
+     */
+    whenOption?: { choiceId: string; optionId: string }
+  }
+  | {
       type: 'CHOOSE_SPELL'
       addTo: string
       count: number
@@ -405,6 +427,18 @@ export type LevelUpEventDef =
      * Style are each picked several times from one list, and the SRD forbids repeats.
      */
     group?: string
+    /**
+     * Name of the feature this choice belongs to, as that level prints it — "Storm Aura"
+     * for the environment a Storm Herald picks. The answer is written onto that feature
+     * so the sheet says which one was taken.
+     *
+     * Derived from the level that declares both when a pack leaves it out, which every
+     * pack does today: the feature this level names after the choice, or the level's only
+     * feature. That is a guess, so a pack whose wording does not line up says which
+     * feature it means here. Ignored on a grouped pool pick, which gets a feature of its
+     * own (`option-<choiceId>`) rather than annotating one.
+     */
+    feature?: string
   }
   | {
     /**

@@ -483,17 +483,23 @@ const pendingPicks = computed(() => {
 const projectedCharacter = computed<Character>(() => {
   const stored = toRaw(character.value!)
   const { options, spellIds } = pendingPicks.value
-  return {
+  const base: Character = {
     ...stored,
     classes: projectedClasses.value,
     chosenOptions: { ...stored.chosenOptions, ...options },
-    skillProficiencies: projectSkillProficiencies(stored, resolvedChoices.value),
     spells: [
       ...stored.spells,
       ...spellIds.map(spellId => ({
         id: spellId, spellId, name: spellId, level: 0, prepared: true,
       })),
     ],
+  }
+  // Projected off `base`, not the stored character: a subclass confirmed in this run
+  // grants its own skills automatically, and reading them needs the class level this run
+  // is gaining and the answers it has already given.
+  return {
+    ...base,
+    skillProficiencies: projectSkillProficiencies(base, resolvedChoices.value, mergedPack()),
   }
 })
 
