@@ -918,7 +918,10 @@ export function resolveSubclassLevelEvents(
         break
       }
       case 'GRANT_SPELLCASTING':
-        events.push(grantSpellcastingEvent(eventDef, classDef.name))
+        // Labelled with the subclass, not the class: an Eldritch Knight's DC belongs to
+        // the archetype rather than to "Fighter", and every other grant below already
+        // falls back to the subclass's name.
+        events.push(grantSpellcastingEvent(eventDef, subclassDef.name))
         break
       case 'EXPAND_SPELL_LIST': {
         const expand = expandSpellListEvent(eventDef, character, subclassDef.name)
@@ -1820,9 +1823,15 @@ function applyGrantedFeat(character: Character, event: GrantFeatEvent): void {
  * GRANT_FEAT goes through.
  *
  * RESOLVED_OPTIONAL_FEATURES uses this too, over resolveOptionalFeatureEvents's output
- * instead of resolveFeatEvents's: the automatic event shapes it produces (GRANT_SPELLS,
- * GAIN_PROFICIENCY, and the rest) are the same regardless of which kind of source resolved
- * them, so applying them is not something an optional feature needs its own copy of.
+ * instead of resolveFeatEvents's, and RESOLVED_SUBCLASS over resolveSubclassLevelEvents's:
+ * the automatic event shapes they produce (GRANT_SPELLS, GAIN_PROFICIENCY, and the rest)
+ * are the same regardless of which kind of source resolved them, so applying them is not
+ * something an optional feature or a subclass needs its own copy of. Each copy that did
+ * exist was a whitelist of event types that grew one incident at a time and dropped the
+ * rest in silence.
+ *
+ * What it does *not* cover is what presupposes a level actually being gained — ADD_HP,
+ * hit dice, slots, ADD_FEATURE — since none of these sources resolve those.
  */
 function applyFeatAutomaticEvents(character: Character, events: AutomaticLevelUpEvent[]): void {
   for (const event of events) {
@@ -1862,6 +1871,34 @@ function applyFeatAutomaticEvents(character: Character, events: AutomaticLevelUp
       }
       case 'GRANT_FEAT':
         applyGrantedFeat(character, event)
+        break
+      // The three a source can set outright. resolveFeatEvents has emitted SET_SPEED and
+      // SET_SENSE since Fleet of Foot and Custom Lineage were modelled, and a subclass
+      // confirmed at the level it declares SET_WILD_SHAPE_LIMITS on is a Moon druid —
+      // all three were dropped here for want of a case.
+      case 'SET_SPEED':
+        character.speeds = { ...character.speeds, [event.mode]: event.speed }
+        break
+      case 'SET_SENSE':
+        character.senses = { ...character.senses, [event.mode]: event.range }
+        break
+      case 'SET_WILD_SHAPE_LIMITS':
+        // Absolute, not a delta, exactly as applyAutomaticEvents writes it: a subclass
+        // replaces the class's limits rather than widening them by arithmetic.
+        character.wildShape = {
+          ...character.wildShape,
+          limits: {
+            maxCR: event.maxCR,
+            allowSwim: event.allowSwim,
+            allowFly: event.allowFly,
+            ...(event.types ? { types: [...event.types] } : {}),
+          },
+        }
+        break
+      case 'EXPAND_SPELL_LIST':
+        // Deliberately nothing, for the reason applyAutomaticEvents states: the rule
+        // lives on the source and is re-derived by expandedSpellIdsFor, so a snapshot
+        // written here would go stale the moment the character multiclassed.
         break
     }
   }
@@ -2157,50 +2194,32 @@ export function applyResolvedChoices(
                 })
               }
             }
-            // The subclass was unchosen when resolveLevelUpEvents ran, so its own
-            // level events were never emitted. Apply the automatic ones here.
-            for (const evt of subclassLevel?.levelUpEvents ?? []) {
-              // A guarded grant belongs to RESOLVED_OPTION, which follows this in the
-              // same run. Circle of the Land never exposed this — a druid picks the
-              // Circle at 2nd and its guarded grants start at 3rd — but Divine Soul
-              // declares both on the level the subclass itself is chosen, and replaying
-              // them here handed out every affinity's spell at once.
-              if ('whenOption' in evt && evt.whenOption
-                && updated.chosenOptions?.[evt.whenOption.choiceId] !== evt.whenOption.optionId) {
-                continue
-              }
-              if (evt.type === 'GRANT_SPELLS') {
-                // Through grantSpellsTo rather than building entries by hand: the hand
-                // -rolled version silently dropped `uses`, `cost` and the source's
-                // ability/label, which a Way of Shadow monk needs — it grants its
-                // 2-Ki spells on the very level the subclass is chosen.
-                grantSpellsTo(
-                  updated,
-                  evt.addTo,
-                  resolveGrantedSpells(evt.spellIds, rulepack),
-                  evt.alwaysPrepared ?? false,
-                  {
-                    ability: resolveAbilityRef(evt.ability, undefined),
-                    origin: evt.origin,
-                    label: evt.label ?? subclassDef.name,
-                    uses: evt.uses,
-                    cost: evt.cost,
-                    castAtLevel: evt.castAtLevel,
-                  },
-                )
-              }
-              else if (evt.type === 'GAIN_PROFICIENCY') {
-                applyGainProficiency(updated, evt.proficiency)
-              }
-              else if (evt.type === 'GRANT_SPELLCASTING') {
-                // An Eldritch Knight starts casting at the very level it is chosen, so
-                // without this the fighter would gain slots with no DC behind them.
-                registerSpellcasting(updated, evt.addTo, evt.ability, {
-                  origin: evt.origin,
-                  label: evt.label ?? subclassDef.name,
-                })
-              }
-            }
+            // The subclass was unchosen when resolveLevelUpEvents ran, so its own level
+            // events were never emitted. Resolve them through the same switch every
+            // other caller uses and apply the automatic half through the shared appliers.
+            //
+            // This was a hand-rolled replay of three event types, and the list grew one
+            // incident at a time — a Way of Shadow monk grants its 2-Ki spells on the
+            // very level the subclass is picked, an Eldritch Knight starts casting on
+            // its own, and both had to be added after the fact. Everything else was
+            // dropped in silence: a Circle of the Moon druid picks the circle at 2nd,
+            // and its SET_WILD_SHAPE_LIMITS went with it, leaving a Moon druid on the
+            // druid class's own CR 1/4.
+            //
+            // Guarded grants stay out of it, as they did before. A `whenOption` answered
+            // in this same run is not on `updated` yet — RESOLVED_OPTION follows this in
+            // the list and applies them — and each resolver skips its own, so Divine
+            // Soul does not hand out every affinity's spells at once.
+            //
+            // Only the automatic half: the wizard already raised this level's subclass
+            // choices when the subclass was picked, and their answers arrive as their
+            // own ResolvedChoices. The features above are not double-added either, since
+            // nothing here emits ADD_FEATURE.
+            applyFeatAutomaticEvents(
+              updated,
+              getAutomaticEvents(resolveSubclassLevelEvents(
+                updated, choice.classId, choice.subclassId, currentLevel, rulepack)),
+            )
           }
         }
         break
