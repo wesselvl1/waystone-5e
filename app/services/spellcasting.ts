@@ -329,22 +329,24 @@ export function spellMatchesChoice(
   // fighter whose class cap is 0.
   const cap = event.maxLevel ?? context.levelCap
   if (!event.cantrip && spell.level > cap) return false
-  // The tag filters narrow whichever list the restrictions below select, instead of being
-  // two more arms of that chain: Ritual Caster asks for a class list *and* the ritual tag,
+  // The tag filters narrow whichever list the restrictions below select, like every other
+  // restriction here: Ritual Caster asks for a class list *and* the ritual tag,
   // Spell Sniper for a cantrip *and* an attack roll.
   if (event.ritual && !spell.ritual) return false
   if (event.attackRoll && !spell.attackRoll) return false
+  // The three list restrictions narrow one another rather than the first one present
+  // deciding: an Eldritch Knight learns "abjuration or evocation spells from the wizard
+  // list", which needs `classes` and `schools` at once. Each alone reads as it always has.
+  if (event.fromList?.length && !event.fromList.includes(spell.id)) return false
   // An expansion widens which spells count as being ON a list, which is what
   // EXPAND_SPELL_LIST means — so it is folded into the class-list test rather than
   // short-circuiting ahead of every restriction. Returning true up front let a guild
   // background's spells satisfy a pick they have nothing to do with: Fey Touched asks
   // for divination or enchantment, and would have offered whatever the guild added.
-  if (event.fromList?.length) return event.fromList.includes(spell.id)
-  if (event.classes?.length) {
-    return spell.classes.some(c => event.classes!.includes(c))
-      || (context.expandedSpellIds?.has(spell.id) ?? false)
-  }
-  if (event.schools?.length) return event.schools.includes(spell.school)
+  if (event.classes?.length
+    && !spell.classes.some(c => event.classes!.includes(c))
+    && !(context.expandedSpellIds?.has(spell.id) ?? false)) return false
+  if (event.schools?.length && !event.schools.includes(spell.school)) return false
   return true
 }
 
