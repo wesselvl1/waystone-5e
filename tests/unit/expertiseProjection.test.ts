@@ -41,13 +41,54 @@ const SCOUT = {
   }],
 }
 
+/**
+ * The other shape of the same problem: a grant the *level being gained* makes on its own,
+ * with no subclass answered in this run to carry it. Mirrors scag's Purple Dragon Knight
+ * at subclass level 7, four levels after the archetype was picked — an unconditional
+ * proficiency, an arm to say which case the character is in, a grant guarded on one arm,
+ * and the expertise that doubles what was just granted.
+ */
+const ENVOY = {
+  id: 'book.envoy',
+  name: 'Envoy',
+  description: 'A diplomat of the crown.',
+  classId: 'rogue',
+  levels: [{
+    level: 7,
+    features: [{ name: 'Royal Envoy', description: 'You gain proficiency in Persuasion.' }],
+    levelUpEvents: [
+      { type: 'GAIN_PROFICIENCY' as const, proficiency: 'persuasion' },
+      {
+        type: 'CHOOSE_OPTION' as const,
+        id: 'book.envoy-royal-envoy',
+        label: 'Royal Envoy',
+        options: [
+          { id: 'persuasion', name: 'Persuasion', description: 'You were not already proficient.' },
+          { id: 'another', name: 'Another skill', description: 'You were already proficient.' },
+        ],
+      },
+      {
+        type: 'GAIN_PROFICIENCY' as const,
+        proficiency: 'insight',
+        whenOption: { choiceId: 'book.envoy-royal-envoy', optionId: 'another' },
+      },
+      {
+        type: 'CHOOSE_EXPERTISE' as const,
+        label: 'Royal Envoy',
+        options: ['persuasion' as const],
+        count: 1,
+      },
+    ],
+  }],
+}
+
 function pack(): Rulepack {
   const built = RulepackSchema.parse({
     id: 'p',
     name: 'Test',
     version: '1',
     classes: [...RulepackSchema.parse(rogueFragment).classes],
-    subclasses: [SCOUT],
+    subclasses: [SCOUT, ENVOY],
   }) as unknown as Rulepack
   // Distribute the patch entries into their classes, the way the store does at merge time
   for (const patch of built.subclasses ?? []) {
@@ -108,5 +149,56 @@ describe('the expertise projection', () => {
       rulepack,
     )
     expect(skillsEligibleForExpertise(['arcana'], projected)).toEqual(['arcana'])
+  })
+})
+
+/** The Envoy as the wizard projects them: level 7 in hand, the archetype stored since 3. */
+function envoy(chosenOptions: Record<string, string> = {}): Character {
+  return {
+    ...validCharacter,
+    classes: [{ classId: 'rogue', level: 7, subclassId: 'book.envoy' }],
+    skillProficiencies: { ...validCharacter.skillProficiencies, stealth: 1 },
+    chosenOptions,
+    features: [],
+    spells: [],
+  } as Character
+}
+
+const AT_SEVEN = { classId: 'rogue', newLevel: 7 }
+
+describe('the expertise projection, for the level being gained', () => {
+  it('offers a skill this very level grants automatically', () => {
+    const projected = projectSkillProficiencies(envoy(), [], rulepack, AT_SEVEN)
+    expect(skillsEligibleForExpertise(['persuasion'], projected)).toEqual(['persuasion'])
+  })
+
+  it('offers it whichever arm of the level\'s own choice is answered', () => {
+    // Both directions, because the arms only say which case the player is in: the
+    // unconditional grant is what the expertise doubles either way.
+    for (const optionId of ['persuasion', 'another']) {
+      const projected = projectSkillProficiencies(
+        envoy({ 'book.envoy-royal-envoy': optionId }), [], rulepack, AT_SEVEN)
+      expect(skillsEligibleForExpertise(['persuasion'], projected)).toEqual(['persuasion'])
+    }
+  })
+
+  it('withholds a guarded grant until its arm is answered', () => {
+    // The wizard projects a run's answers onto `chosenOptions` before asking anything
+    // later, so an unanswered guard is simply an absent entry.
+    const projected = projectSkillProficiencies(envoy(), [], rulepack, AT_SEVEN)
+    expect(skillsEligibleForExpertise(['insight'], projected)).toEqual([])
+  })
+
+  it('offers a guarded grant once its arm is answered', () => {
+    const projected = projectSkillProficiencies(
+      envoy({ 'book.envoy-royal-envoy': 'another' }), [], rulepack, AT_SEVEN)
+    expect(skillsEligibleForExpertise(['insight'], projected)).toEqual(['insight'])
+  })
+
+  it('leaves the level out of the projection when no level is named', () => {
+    // The parameter is optional, and every caller that does not name a level — the tests
+    // above, a sheet reading a stored character — must see exactly what it always saw.
+    const projected = projectSkillProficiencies(envoy(), [], rulepack)
+    expect(skillsEligibleForExpertise(['persuasion'], projected)).toEqual([])
   })
 })

@@ -496,10 +496,15 @@ const projectedCharacter = computed<Character>(() => {
   }
   // Projected off `base`, not the stored character: a subclass confirmed in this run
   // grants its own skills automatically, and reading them needs the class level this run
-  // is gaining and the answers it has already given.
+  // is gaining and the answers it has already given. The level being gained is named as
+  // well, so the grants it makes on its own — the Banneret's Persuasion at 7th — are
+  // eligible for the expertise asked in the same run.
   return {
     ...base,
-    skillProficiencies: projectSkillProficiencies(base, resolvedChoices.value, mergedPack()),
+    skillProficiencies: projectSkillProficiencies(base, resolvedChoices.value, mergedPack(), {
+      classId: targetClassId.value,
+      newLevel: targetLevel.value,
+    }),
   }
 })
 

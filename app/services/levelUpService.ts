@@ -387,11 +387,21 @@ export function optionAvailable(
  * Survival and then doubles those same two, told every rogue not already proficient that
  * nothing was eligible. `character.classes` must carry the level being gained, since that
  * is the subclass level whose events are read.
+ *
+ * So does the level being gained itself, when `levelUp` names it. Every automatic grant
+ * is applied only once the run is committed, and a subclass answered in this run is only
+ * one of the ways one arrives: the Banneret's Royal Envoy grants Persuasion and doubles it
+ * at subclass level 7, four levels after the archetype was chosen, so nothing above sees
+ * it. Resolved through the resolver the run itself will use rather than by reading the
+ * level's defs, so a `whenOption` arm still has to be answered before its grant counts —
+ * the caller's character carries this run's option answers, and an unanswered guard
+ * resolves to nothing at all.
  */
 export function projectSkillProficiencies(
   character: Character,
   choices: ResolvedChoice[],
   rulepack?: Rulepack,
+  levelUp?: { classId: string, newLevel: number },
 ): Character['skillProficiencies'] {
   const projected = { ...character.skillProficiencies }
   const gain = (skill: SkillKey) => {
@@ -414,6 +424,17 @@ export function projectSkillProficiencies(
       if (event.type !== 'GAIN_PROFICIENCY') continue
       // Only the skills: `applyGainProficiency` files a weapon or a tool elsewhere, and
       // expertise has nothing to double there.
+      const skill = matchSkillKey(event.proficiency)
+      if (skill) gain(skill)
+    }
+  }
+  if (rulepack && levelUp) {
+    // The whole level, not the class's own defs: a grant can sit on the class level, on
+    // the subclass level already stored, or on a race or background that fires on this
+    // total level, and the expertise that doubles it cannot tell the three apart.
+    const events = resolveLevelUpEvents(character, levelUp.classId, levelUp.newLevel, rulepack)
+    for (const event of events) {
+      if (event.type !== 'GAIN_PROFICIENCY') continue
       const skill = matchSkillKey(event.proficiency)
       if (skill) gain(skill)
     }
