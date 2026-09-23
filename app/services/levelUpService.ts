@@ -2507,15 +2507,22 @@ export function applyResolvedChoices(
         for (const cls of rulepack.classes) {
           const entry = updated.classes.find(c => c.classId === cls.id)
           if (!entry) continue
+          // Each event is carried with the name it would have been labelled under had
+          // resolveLevelUpEvents emitted it — the subclass's, falling back to the class's,
+          // since a Divine Soul's affinity spell belongs to the archetype and not to
+          // "Sorcerer".
           const levelEvents = [
-            ...(cls.levels.find(l => l.level === entry.level)?.levelUpEvents ?? []),
+            ...(cls.levels.find(l => l.level === entry.level)?.levelUpEvents ?? [])
+              .map(evt => ({ evt, label: cls.name })),
             ...(cls.subclasses ?? [])
               .filter(sub => sub.id === entry.subclassId)
-              .flatMap(sub => sub.levels.find(l => l.level === entry.level)?.levelUpEvents ?? []),
+              .flatMap(sub => (sub.levels.find(l => l.level === entry.level)?.levelUpEvents ?? [])
+                .map(evt => ({ evt, label: sub.name }))),
           ]
-          for (const evt of levelEvents) {
+          for (const { evt, label } of levelEvents) {
             if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY'
-              && evt.type !== 'GAIN_SAVE_PROFICIENCY') continue
+              && evt.type !== 'GAIN_SAVE_PROFICIENCY'
+              && evt.type !== 'SET_SPEED' && evt.type !== 'SET_SENSE') continue
             if (evt.whenOption?.choiceId !== choice.choiceId) continue
             if (evt.whenOption.optionId !== choice.optionId) continue
             if (evt.type === 'GAIN_PROFICIENCY') {
@@ -2529,12 +2536,34 @@ export function applyResolvedChoices(
               if (ability) applyGainSaveProficiency(updated, ability)
               continue
             }
-            grantSpellsTo(
-              updated,
-              evt.addTo,
-              resolveGrantedSpells(evt.spellIds, rulepack),
-              evt.alwaysPrepared ?? false,
-            )
+            // No book declares a guarded speed or sense on a class level yet. They are
+            // accepted anyway because the race branch below accepts them, and a list of
+            // event types that differs between two branches of the same case is exactly
+            // the shape that left a Moon druid on the druid's own wild-shape limits.
+            if (evt.type === 'SET_SPEED') {
+              updated.speeds = { ...updated.speeds, [evt.mode]: evt.speed }
+              continue
+            }
+            if (evt.type === 'SET_SENSE') {
+              updated.senses = { ...updated.senses, [evt.mode]: evt.range }
+              continue
+            }
+            // Through grantSpellsEvent, as the race branch below does and as every
+            // resolver does: built by hand here, the grant lost its ability, origin,
+            // label, free casts, resource cost and fixed slot level on the floor.
+            const grant = grantSpellsEvent(evt, updated, rulepack, {
+              origin: 'class',
+              label,
+            })
+            if (!grant) continue
+            grantSpellsTo(updated, grant.addTo, grant.spells, grant.alwaysPrepared, {
+              ability: grant.ability,
+              origin: grant.origin,
+              label: grant.label,
+              uses: grant.uses,
+              cost: grant.cost,
+              castAtLevel: grant.castAtLevel,
+            })
           }
         }
 
