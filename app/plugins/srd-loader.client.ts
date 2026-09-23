@@ -104,7 +104,13 @@ export default defineNuxtPlugin(async () => {
     // Drop the stored pack before re-merging. add() merges by id, so anything that ever
     // merged into srd-5.1 would otherwise survive here forever — including non-SRD dev
     // fragments from before each sourcebook declared its own pack id. The SRD ships whole
-    // in this bundle, so nothing is lost by rebuilding it from the fragments below.
+    // in this bundle, so nothing is lost by rebuilding it from the fragments below — bar
+    // a name or description the player gave it, which is carried across.
+    const labelled = existing?.labelledByPlayer
+    const playerDetails = existing && labelled && {
+      name: labelled.name ? existing.name : undefined,
+      description: labelled.description ? existing.description ?? '' : undefined,
+    }
     if (existing) await rulepackStore.remove(packId)
 
     for (const path of srdPaths) {
@@ -122,6 +128,8 @@ export default defineNuxtPlugin(async () => {
       }
       await rulepackStore.add(result.data)
     }
+
+    if (playerDetails) await rulepackStore.updatePackDetails(packId, playerDetails)
 
     localStorage.setItem(seedRevisionKey, String(SRD_SEED_REVISION))
     console.info(`[Waystone] SRD ${version} rulepack loaded.`)

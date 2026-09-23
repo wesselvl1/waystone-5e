@@ -419,6 +419,38 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     else rulepacks.value = inLookupOrder([...rulepacks.value, stored])
   }
 
+  /**
+   * Change a pack's name or description. The only fields of a book the app lets the player
+   * write to directly, because they label the pack on this browser rather than being part
+   * of the rules: a re-import merges into the stored pack and keeps them, and the SRD
+   * loader carries them across a re-seed. An empty name is ignored; an empty description
+   * clears it.
+   */
+  async function updatePackDetails(
+    id: string,
+    details: { name?: string; description?: string },
+  ): Promise<void> {
+    const pack = getById(id)
+    if (!pack) return
+    const next = plain(pack)
+    const labelled = { ...next.labelledByPlayer }
+    const name = details.name?.trim()
+    if (name && name !== pack.name) {
+      next.name = name
+      labelled.name = true
+    }
+    if (details.description !== undefined) {
+      const description = details.description.trim() || undefined
+      if (description !== pack.description) {
+        next.description = description
+        labelled.description = true
+      }
+    }
+    if (next.name === pack.name && next.description === pack.description) return
+    next.labelledByPlayer = labelled
+    await savePack(next)
+  }
+
   /** The player's own pack, created empty the first time something is written to it. */
   async function ensureHomebrewPack(): Promise<Rulepack> {
     const existing = homebrewPack()
@@ -519,6 +551,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     homebrewPack,
     ensureHomebrewPack,
     savePack,
+    updatePackDetails,
     sourceEntry,
     forkOriginFor,
     saveHomebrewEntry,

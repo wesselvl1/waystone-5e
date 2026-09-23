@@ -270,6 +270,30 @@ function descriptionOf(entry: Record<string, unknown>): string {
 }
 
 // ---------------------------------------------------------------------------
+// Name and description — the parts of a book that are the player's to change
+// ---------------------------------------------------------------------------
+
+const editingDetails = ref(false)
+const nameDraft = ref('')
+const descriptionDraft = ref('')
+
+function openDetails() {
+  if (!pack.value) return
+  nameDraft.value = pack.value.name
+  descriptionDraft.value = pack.value.description ?? ''
+  editingDetails.value = true
+}
+
+async function saveDetails() {
+  if (!nameDraft.value.trim()) return
+  editingDetails.value = false
+  await rulepackStore.updatePackDetails(packId.value, {
+    name: nameDraft.value,
+    description: descriptionDraft.value,
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Export — the only way a pack written here leaves this browser
 // ---------------------------------------------------------------------------
 
@@ -300,6 +324,11 @@ function exportPack() {
           v{{ pack.version }}<span v-if="pack.author"> · {{ pack.author }}</span>
         </p>
       </div>
+      <button v-if="pack" class="btn-ghost p-2 flex-shrink-0" aria-label="Edit name and description" title="Edit name and description" @click="openDetails">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      </button>
       <button v-if="pack" class="btn-ghost text-xs flex-shrink-0" @click="exportPack">
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -776,6 +805,31 @@ function exportPack() {
       @save="onSave"
       @close="editing = null"
     />
+
+    <Teleport to="body">
+      <div v-if="editingDetails" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="editingDetails = false">
+        <div class="w-full max-w-md card space-y-4">
+          <h2 class="font-semibold text-white">Edit pack</h2>
+          <p v-if="!isHomebrew" class="text-sm text-slate-400">
+            Nothing in the book changes, only how it is labelled; the name also shows beside its
+            entries in every picker. Re-importing the pack keeps what you write here, and removing
+            it and importing it afresh brings back the book's own.
+          </p>
+          <div>
+            <label class="label" for="pack-name">Name</label>
+            <input id="pack-name" v-model="nameDraft" type="text" class="input" @keydown.enter="saveDetails" @keydown.esc="editingDetails = false" />
+          </div>
+          <div>
+            <label class="label" for="pack-description">Description</label>
+            <textarea id="pack-description" v-model="descriptionDraft" rows="4" class="input" @keydown.esc="editingDetails = false" />
+          </div>
+          <div class="flex gap-2 justify-end">
+            <button class="btn-ghost" @click="editingDetails = false">Cancel</button>
+            <button class="btn-primary" :disabled="!nameDraft.trim()" @click="saveDetails">Save</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <ConfirmDialog
       :open="!!deletePrompt"

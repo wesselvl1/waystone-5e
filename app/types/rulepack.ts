@@ -812,6 +812,13 @@ export interface Rulepack {
    * in the app carries this; a book has nothing to have been copied from.
    */
   forkedFrom?: Record<string, ForkOrigin>
+  /**
+   * Which of the name and description the player wrote over the book's. Recorded rather
+   * than inferred by comparing against the bundled text, so the SRD loader carries a
+   * player's label across a re-seed without also freezing the bundled wording the day a
+   * build corrects it.
+   */
+  labelledByPlayer?: { name?: boolean; description?: boolean }
 }
 
 /** A subclass entry in a patch file — carries the target classId alongside the subclass definition. */
