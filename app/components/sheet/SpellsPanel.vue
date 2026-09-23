@@ -205,6 +205,11 @@ function canTogglePrepared(spell: SpellEntry): boolean {
   return spell.level > 0 && !spell.alwaysPrepared && preparesFor(spell)
 }
 
+/** Whether the spell's own definition carries the ritual tag. */
+function isRitual(spell: SpellEntry): boolean {
+  return !!rulepackStore.getSpell(spell.spellId)?.ritual
+}
+
 function togglePrepared(spellId: string) {
   const target = props.character.spells.find(s => s.id === spellId)
   if (!target || !canTogglePrepared(target)) return
@@ -552,6 +557,11 @@ const ABILITY_LABELS: Record<AbilityKey, string> = {
               @click="showDetails(spell.spellId)"
             >
               {{ spell.name }}
+              <span
+                v-if="isRitual(spell)"
+                class="text-[10px] font-medium rounded px-1 py-0.5 bg-surface-700 border border-surface-600 text-slate-400"
+                title="Ritual"
+              >R</span>
               <span v-if="spell.castAtLevel" class="text-[10px] text-slate-500">
                 (as level {{ spell.castAtLevel }})
               </span>
