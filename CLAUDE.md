@@ -53,13 +53,18 @@ Game content is data, not code. A **rulepack** (`app/types/rulepack.ts`) holds r
 
 The rulepacks store is also the lookup layer — `getClass`, `getSpell`, `getAllSpells`, `getSubclass`, `getOptionalFeaturesForClass`, `getAllCreatures`, `getCreature`, `getCreaturesMatching`, `getAllWeapons`, `getWeapon`, `getAllArmor`, `getArmor` search across *all* loaded packs, so custom packs transparently extend or override the SRD.
 
-Because ids are the merge key, a custom pack is expected to **prefix its entry ids with a source abbreviation** (`mpmm-satyr`) and reuse a bare SRD id only to override deliberately. So two books' versions of the same race are two entries, not a conflict — the `getAll*` list getters return both, each tagged with a `sourceName` (`WithSource<T>`), and every picker labels them. Don't "fix" that by de-duplicating a list by name; the source label is the disambiguator. Those getters also sort — by name, or level-then-name for spells — so merging a pack in never reshuffles a list. `composedPack()` deliberately stays on the raw arrays: `sourceName` is for display, not for the level-up pipeline.
+Because ids are the merge key, a custom pack is expected to **prefix its entry ids with a source abbreviation** (`mpmm-satyr`). Reusing another pack's id does **not** override it: the singular getters take the first pack in `inLookupOrder()`, which after the homebrew pack is IndexedDB key order on a reload but arrival order within a session, so a character storing a shared id can resolve to either pack. The only deliberate override is the homebrew pack, below. So two books' versions of the same race are two entries, not a conflict — the `getAll*` list getters return both, each tagged with a `sourceName` (`WithSource<T>`), and every picker labels them. Don't "fix" that by de-duplicating a list by name; the source label is the disambiguator. Those getters also sort — by name, or level-then-name for spells — so merging a pack in never reshuffles a list. `composedPack()` deliberately stays on the raw arrays: `sourceName` is for display, not for the level-up pipeline.
 
 ### SRD seeding
 
 `app/plugins/srd-loader.client.ts` merges the files in `app/data/srd/` on client startup. Only `SRD_FRAGMENT_ORDER` (`races`, then `subraces`) is ordered, because a patch fragment must follow the fragment defining its target; everything else is self-contained and loads alphabetically after. The loader globs the directory rather than importing each file, so adding a fragment needs no loader change. Re-seeding is gated by two things: the pack's `version` field and a `SRD_SEED_REVISION` constant tracked in `localStorage`.
 
-**When you change anything in `app/data/srd/*.json`, bump `SRD_SEED_REVISION` in the loader** — otherwise existing users keep their stale IndexedDB copy. Load order matters: a fragment that patches a class (e.g. `subclasses.json`) must come after the fragment that defines it.
+**When you change anything in `app/data/srd/*.json`, bump `SRD_SEED_REVISION` in the loader** — otherwise existing users keep their stale IndexedDB copy. Load order matters: a patch fragment (`subraces.json`) must come after the fragment that defines its target.
+
+`docs/rulepacks.md` is the pack author's guide — file format, every event type, known gaps.
+When a change adds or alters something a pack can declare (a field, an event type, a merge
+rule) or closes one of its listed gaps, update it in the same change; its examples are
+meant to validate against `RulepackSchema`.
 
 `tests/unit/srdData.test.ts` validates every SRD JSON file against `RulepackSchema`, so schema-invalid data fails CI.
 

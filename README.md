@@ -12,7 +12,7 @@ An offline-first, mobile-friendly D&D 5e character builder and digital character
   - *Items* — equipment quantities and full currency tracking (cp/sp/ep/gp/pp)
   - *Notes* — conditions, free-text notes, appearance
 - **Level Up Wizard** — contextual wizard that resolves HP gains, new spell slots, ability score improvements, feat choices, spell choices, and subclass selection at each level.
-- **Rulepacks** — pluggable JSON rule sets for races, classes, backgrounds, feats, and spells. The SRD 5.1 ruleset ships built-in; custom packs can be imported from a local file or a URL.
+- **Rulepacks** — pluggable JSON rule sets for races, classes, subclasses, backgrounds, feats, spells, weapons, armour and more. The SRD 5.1 ruleset ships built-in; custom packs can be imported from a JSON file, a zip, or a URL, and any entry can be edited in the app into your own Homebrew pack.
 - **Import / Export** — characters can be exported to JSON and re-imported on any device.
 - **Fully offline** — PWA service worker caches all assets so the app works without a network connection after the first load.
 
@@ -66,21 +66,23 @@ pnpm preview
 
 ## Rulepacks
 
-Waystone uses a rulepack system to keep game rules separate from character data. A rulepack is a JSON file that defines races, classes, backgrounds, feats, and spells.
+Waystone keeps game rules separate from character data. A rulepack is JSON that defines races, subraces, classes, subclasses, backgrounds, feats, spells, optional class features, weapons, armour and creatures. Level-up behaviour is data too: each class level, race, feat and so on declares *level-up events* (grant these spells, ask for a skill, offer a subclass) that the level-up wizard carries out.
 
-The **SRD 5.1** rulepack is bundled as a set of fragment files in `app/data/srd/` (`races.json`, `subraces.json`, `classes.json`, `subclasses.json`, `backgrounds.json`, `feats.json`, `spells.json`) which are merged and loaded automatically on startup. Additional rulepacks can be added through the **Rulepacks** page in the app — either by uploading a local `.json` file or by providing a URL.
+**To write your own pack, see [docs/rulepacks.md](docs/rulepacks.md).** It covers the file format, every content kind and event type, worked examples, how to test a pack, and what the app doesn't support yet.
 
-Rulepack files are validated with Zod against the schema in `app/schemas/rulepackSchema.ts`.
+The **SRD 5.1** rulepack is bundled as fragment files in `app/data/srd/` — one per class (`fighter.json`, `wizard.json`, …, each with its subclasses inside), plus `races.json`, `subraces.json`, `backgrounds.json`, `feats.json`, `spells.json`, `weapons.json`, `armor.json` and `beasts.json` — all sharing the pack id `srd-5.1` and merged on startup. Other packs are added on the **Rulepacks** page from a `.json` file, a `.zip` of several, or a URL. Every import is validated against the Zod schema in `app/schemas/rulepackSchema.ts`.
 
 ### Entry ids
 
-Ids are the merge key: an incoming entry whose id matches an existing one **replaces** it. The SRD uses bare ids (`satyr`, `fighter`), so a custom pack should prefix its own ids with a short source abbreviation — `mpmm-satyr`, `tce-artificer` — and reuse a bare id only when overriding the SRD deliberately (or when a patch entry's `classId` / `raceId` points at an SRD class or race on purpose).
+Ids are the merge key. Files that share a pack `id` merge into one pack, and within a pack an entry with an existing id **replaces** it whole. The SRD uses bare ids (`fighter`, `fire-bolt`), so a custom pack should prefix its own with a short source abbreviation — `mpmm-satyr`, `tce-artificer`. A top-level `subclasses` or `subraces` entry points at a class or race in any pack through its `classId` / `raceId`.
 
-Two books' takes on the same race are meant to coexist: prefixed ids keep both, and the pickers list each with the name of the pack it came from.
+Reusing another pack's id does **not** override it: two packs' entries with the same id are both listed, each labelled with its pack's name, which is how two books' takes on the same race coexist. To change an existing entry, edit it in the app. The edit is saved as a copy in the Homebrew pack, which takes precedence over the original, and the book itself is never modified.
 
 ## Project Structure
 
 ```
+docs/                 # Guides — rulepacks.md for pack authors
+scripts/              # Book scaffolding and pack-rulepacks (zip non-SRD data)
 app/
   components/sheet/   # Character sheet tab components
   composables/        # useCharacterStats — derived stat calculations
