@@ -366,7 +366,27 @@ export type LevelUpEventDef =
       origin?: SpellcastingOrigin
       label?: string
     }
-  | { type: 'CHANGE_SPELL'; addTo: string; amount: number; classes?: string[]; schools?: string[] }
+  | {
+    /**
+     * Offers to trade a spell the class knows for another — the known-spell casters'
+     * "when you gain a level in this class, you can choose one of the spells you know and
+     * replace it". Optional for the player, and only raised when there is both something to
+     * trade and something to trade it for, so it is declared on every level that allows it
+     * rather than derived.
+     *
+     * The replacement is filtered as a CHOOSE_SPELL's is, capped by the class's own level.
+     * With neither `classes` nor `schools`, it comes from the `addTo` class's own list.
+     */
+    type: 'CHANGE_SPELL'
+    addTo: string
+    /** How many spells may be traded; each is its own question. */
+    amount: number
+    classes?: string[]
+    schools?: string[]
+    /** Trade a cantrip for a cantrip instead of a levelled spell — Cantrip Versatility. */
+    cantrip?: boolean
+    label?: string
+  }
   | {
       type: 'GRANT_SPELLS'
       addTo: string

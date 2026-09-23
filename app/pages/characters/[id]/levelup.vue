@@ -10,6 +10,7 @@ import {
   resolveLevelUpEvents,
   resolveSubclassLevelEvents,
   resolveOptionReplacement,
+  resolveSpellChange,
   optionAvailable,
   resolveFeatEvents,
   resolveOptionalFeatureEvents,
@@ -35,6 +36,7 @@ import type {
   ChooseOptionEvent,
   PoolOption,
   ReplaceOptionEvent,
+  ChangeSpellEvent,
   OfferOptionalFeaturesEvent,
   ChooseSkillEvent,
   ChooseExpertiseEvent,
@@ -453,32 +455,43 @@ const projectedClassLevel = computed(() => projectedClasses.value
 const pendingPicks = computed(() => {
   const options: Record<string, string> = {}
   const spellIds: string[] = []
+  const tradedAway: Array<{ spellId: string; classId: string }> = []
   for (const choice of resolvedChoices.value) {
     if (choice.type === 'RESOLVED_OPTION' || choice.type === 'RESOLVED_OPTION_REPLACEMENT')
       options[choice.choiceId] = choice.optionId
     else if (choice.type === 'RESOLVED_CHOOSE_SPELL')
       spellIds.push(...choice.spellIds)
+    else if (choice.type === 'RESOLVED_CHANGE_SPELL') {
+      spellIds.push(choice.spellId)
+      tradedAway.push({ spellId: choice.removedSpellId, classId: choice.classId })
+    }
   }
-  return { options, spellIds }
+  return { options, spellIds, tradedAway }
 })
 
 /**
  * The character as this run will leave them, so the resolvers can answer against picks
  * that are not stored yet. Only what a prerequisite reads is projected — the run's
  * option answers, its skill picks, its spell ids and the new class level; the stub spell
- * entries carry nothing but `spellId`, which is the only field `optionAvailable` looks at.
+ * entries carry little beyond `spellId`, which is the only field `optionAvailable` looks at.
+ *
+ * A spell traded away this run is dropped, and the stubs are marked always-prepared, which
+ * is what keeps `resolveSpellChange` from offering this run's own picks back up for a
+ * second trade: what a swap gives up is a spell known before this level.
  */
 const projectedCharacter = computed<Character>(() => {
   const stored = toRaw(character.value!)
-  const { options, spellIds } = pendingPicks.value
+  const { options, spellIds, tradedAway } = pendingPicks.value
+  const kept = stored.spells.filter(s => !tradedAway.some(t =>
+    t.spellId === s.spellId && (s.classId ?? t.classId) === t.classId))
   const base: Character = {
     ...stored,
     classes: projectedClasses.value,
     chosenOptions: { ...stored.chosenOptions, ...options },
     spells: [
-      ...stored.spells,
+      ...kept,
       ...spellIds.map(spellId => ({
-        id: spellId, spellId, name: spellId, level: 0, prepared: true,
+        id: spellId, spellId, name: spellId, level: 0, prepared: true, alwaysPrepared: true,
       })),
     ],
   }
@@ -639,6 +652,66 @@ function replacementSummary(choice: Extract<ResolvedChoice, { type: 'RESOLVED_OP
   return `Replaced ${from} with ${to}`
 }
 
+// ── Trade a known spell (CHANGE_SPELL) ────────────────────────────────────────
+const changeFromSpellId = ref('')
+const changeToSpellId = ref('')
+const spellChangeSearch = ref('')
+
+/**
+ * The trade as it stands after this run's own picks, for the same reason
+ * `replacementOptions` is re-resolved: a spell learnt or traded moments ago is not
+ * stored yet, and a second trade has to be answered against the first.
+ */
+const spellChangeOffer = computed(() => {
+  const choiceEvent = currentChoice.value as ChangeSpellEvent | null
+  if (!choiceEvent || choiceEvent.type !== 'CHANGE_SPELL' || !character.value) return undefined
+  const projected = projectedCharacter.value
+  return resolveSpellChange(
+    {
+      type: 'CHANGE_SPELL',
+      addTo: choiceEvent.addTo,
+      amount: 1,
+      classes: choiceEvent.classes,
+      schools: choiceEvent.schools,
+      cantrip: choiceEvent.cantrip,
+      label: choiceEvent.label,
+    },
+    projected,
+    mergedPack(),
+    projected.classes.find(c => c.classId === choiceEvent.addTo)?.level ?? projectedClassLevel.value,
+  )
+})
+
+/** The replacements, as the store lists them — sorted, labelled with their pack. */
+const spellChangeReplacements = computed(() => {
+  const ids = new Set(spellChangeOffer.value?.options ?? [])
+  return rulepackStore.getAllSpells().filter(s => ids.has(s.id))
+})
+
+const filteredSpellChangeReplacements = computed(() =>
+  filterBySearch(spellChangeReplacements.value, spellChangeSearch.value,
+    s => [s.name, s.school, s.sourceName, s.level === 0 ? 'cantrip' : `level ${s.level}`]))
+
+function confirmSpellChange() {
+  const choiceEvent = currentChoice.value as ChangeSpellEvent
+  if (!changeFromSpellId.value || !changeToSpellId.value) return
+  resolvedChoices.value.push({
+    type: 'RESOLVED_CHANGE_SPELL',
+    classId: choiceEvent.addTo,
+    removedSpellId: changeFromSpellId.value,
+    spellId: changeToSpellId.value,
+  })
+  changeFromSpellId.value = ''
+  changeToSpellId.value = ''
+  nextChoice()
+}
+
+/** Reads a spell trade back on the summary, since it takes something off the sheet. */
+function spellChangeSummary(choice: Extract<ResolvedChoice, { type: 'RESOLVED_CHANGE_SPELL' }>): string {
+  const name = (id: string) => rulepackStore.getSpell(id)?.name ?? id
+  return `Replaced ${name(choice.removedSpellId)} with ${name(choice.spellId)}`
+}
+
 /**
  * The run's second stage. A guarded grant can be replayed once its option is answered,
  * but a guarded *question* has to be asked — and by the time the option is answered the
@@ -727,6 +800,10 @@ watch(currentChoice, (choice) => {
   if (choice?.type === 'REPLACE_OPTION') {
     replaceFromChoiceId.value = ''
     replaceToOptionId.value = ''
+  }
+  if (choice?.type === 'CHANGE_SPELL') {
+    changeFromSpellId.value = ''
+    changeToSpellId.value = ''
   }
   if (choice?.type === 'CHOOSE_FEAT_ABILITY') {
     grantedFeatAbilityPicks.value = {}
@@ -832,6 +909,7 @@ watch(currentChoiceIdx, () => {
   subclassSearch.value = ''
   optionSearch.value = ''
   replacementSearch.value = ''
+  spellChangeSearch.value = ''
   optionalFeatureSearch.value = ''
   spellLevelOverrides.value = new Map()
   cancelSpellHold()
@@ -1366,6 +1444,81 @@ watch(isFirstCharacterLevel, (val) => {
           </div>
         </template>
 
+        <!-- Trade a known spell for another (a sorcerer, bard, warlock or ranger levelling) -->
+        <template v-else-if="currentChoice.type === 'CHANGE_SPELL'">
+          <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ChangeSpellEvent).label }}</h2>
+          <p class="text-xs text-slate-400 mt-1">Optional — skip to keep the spells you know.</p>
+
+          <p v-if="!spellChangeOffer" class="text-slate-500 text-sm text-center py-4">
+            Nothing left to trade this level.
+          </p>
+
+          <template v-else>
+            <p class="section-header mt-4">Give up</p>
+            <div class="space-y-2">
+              <button
+                v-for="held in spellChangeOffer.current"
+                :key="held.spellId"
+                class="card w-full text-left hover:border-danger-500/50 transition-colors"
+                :class="changeFromSpellId === held.spellId ? 'border-danger-500 bg-danger-900/20' : ''"
+                @click="changeFromSpellId = held.spellId"
+              >
+                <span class="font-semibold text-white">{{ held.name }}</span>
+                <span class="text-slate-500 ml-2 text-xs">{{ held.level === 0 ? 'Cantrip' : `Level ${held.level}` }}</span>
+              </button>
+            </div>
+
+            <template v-if="changeFromSpellId">
+              <p class="section-header mt-4">Learn instead</p>
+              <SearchBox
+                v-if="spellChangeReplacements.length > 6"
+                v-model="spellChangeSearch"
+                class="mb-2"
+                placeholder="Search by name, school or level…"
+                :matches="filteredSpellChangeReplacements.length"
+                :total="spellChangeReplacements.length"
+              />
+              <div class="space-y-1.5 max-h-80 overflow-y-auto">
+                <div
+                  v-for="spell in filteredSpellChangeReplacements"
+                  :key="spell.id"
+                  class="card flex items-center gap-1 p-0 transition-colors hover:border-primary-500/50"
+                  :class="changeToSpellId === spell.id ? 'border-primary-500 bg-primary-900/20' : ''"
+                >
+                  <button class="flex-1 min-w-0 text-left text-sm py-2 pl-3" @click="changeToSpellId = spell.id">
+                    <span class="font-medium text-white">{{ spell.name }}</span>
+                    <span class="text-slate-500 ml-2 text-xs">{{ spell.level === 0 ? 'Cantrip' : `Level ${spell.level}` }} · {{ spell.school }} · {{ spell.sourceName }}</span>
+                  </button>
+                  <button
+                    class="px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors"
+                    :title="`Read ${spell.name}`"
+                    :aria-label="`Read ${spell.name}`"
+                    @click.stop="previewSpellId = spell.id"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="9" />
+                      <path stroke-linecap="round" d="M12 11v5" />
+                      <path stroke-linecap="round" d="M12 8h.01" />
+                    </svg>
+                  </button>
+                </div>
+                <p v-if="spellChangeReplacements.length && filteredSpellChangeReplacements.length === 0" class="text-slate-500 text-sm text-center py-4">
+                  Nothing matches “{{ spellChangeSearch }}”.
+                </p>
+              </div>
+            </template>
+          </template>
+
+          <div class="flex gap-2 mt-2">
+            <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
+            <button
+              class="btn-primary flex-1 text-sm"
+              :disabled="!changeFromSpellId || !changeToSpellId"
+              @click="confirmSpellChange"
+            >Confirm</button>
+          </div>
+        </template>
+
         <!-- Expertise -->
         <!-- Spellcasting ability, for a source that leaves it to the player -->
         <template v-else-if="currentChoice.type === 'CHOOSE_SPELLCASTING_ABILITY'">
@@ -1645,6 +1798,9 @@ watch(isFirstCharacterLevel, (val) => {
               </span>
               <span v-else-if="choice.type === 'RESOLVED_OPTION_REPLACEMENT'">
                 {{ replacementSummary(choice) }}
+              </span>
+              <span v-else-if="choice.type === 'RESOLVED_CHANGE_SPELL'">
+                {{ spellChangeSummary(choice) }}
               </span>
               <span v-else-if="choice.type === 'RESOLVED_SKILL'">
                 Skills: {{ choice.skills.map(s => SKILL_LABELS[s] ?? s).join(', ') }}
