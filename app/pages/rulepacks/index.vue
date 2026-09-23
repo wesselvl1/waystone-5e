@@ -12,7 +12,8 @@ const router = useRouter()
  * Open the pack the in-app editor writes to, creating it empty if this is the first time.
  *
  * It is made here rather than seeded at startup so a player who never writes anything
- * never sees an empty pack in this list.
+ * never sees an empty pack in this list. Once it exists its own card is the way in, so
+ * the button that makes it goes away.
  */
 async function openHomebrew() {
   await rulepackStore.ensureHomebrewPack()
@@ -145,15 +146,9 @@ async function confirmRemoval() {
 
 <template>
   <div class="min-h-screen pb-4">
-    <header class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-surface-900/95 backdrop-blur border-b border-surface-700/60">
-      <h1 class="font-display text-lg font-semibold text-primary-400 tracking-wide">Rulepacks</h1>
-      <div class="flex gap-2">
-        <button class="btn-ghost text-xs" @click="openHomebrew">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          Homebrew
-        </button>
+    <header class="sticky top-0 z-40 flex items-center justify-between gap-3 px-4 py-3 bg-surface-900/95 backdrop-blur border-b border-surface-700/60">
+      <h1 class="font-display text-lg font-semibold text-primary-400 tracking-wide truncate min-w-0">Rulepacks</h1>
+      <div class="flex gap-2 flex-shrink-0">
         <button class="btn-ghost text-xs" @click="fileInput?.click()">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -183,7 +178,7 @@ async function confirmRemoval() {
         </div>
         <div>
           <p class="text-slate-300 font-medium">No rulepacks loaded</p>
-          <p class="text-slate-500 text-sm mt-1">Import a rulepack — a JSON file, a zip of several — or paste a URL. Homebrew starts one of your own.</p>
+          <p class="text-slate-500 text-sm mt-1">Import a rulepack — a JSON file, a zip of several — or paste a URL — or start a homebrew pack of your own.</p>
         </div>
       </div>
 
@@ -212,8 +207,14 @@ async function confirmRemoval() {
         </div>
       </div>
 
-      <div v-if="rulepackStore.rulepacks.length > 0" class="pt-2 flex justify-center">
-        <button class="btn-danger text-xs" @click="pendingRemoval = { kind: 'all', count: rulepackStore.rulepacks.length }">
+      <div class="pt-2 flex flex-wrap justify-center gap-2">
+        <button v-if="!rulepackStore.homebrewPack()" class="btn-ghost text-xs" @click="openHomebrew">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Start a homebrew pack
+        </button>
+        <button v-if="rulepackStore.rulepacks.length > 0" class="btn-danger text-xs" @click="pendingRemoval = { kind: 'all', count: rulepackStore.rulepacks.length }">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>

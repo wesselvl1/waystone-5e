@@ -99,6 +99,12 @@ of that mechanism.
   **duplicate** blanks the id so it stands beside the original rather than replacing it.
   Export on the pack page is the only way homebrew leaves the browser, since there is no
   backend.
+- **A pack's name and description are the exception**: they label the pack rather than
+  being rules, so `updatePackDetails` writes them onto the book itself and sets
+  `labelledByPlayer`. A re-import keeps them (`applyFragment` spreads the stored pack), and
+  the SRD loader re-applies only the flagged fields after a re-seed — a flag rather than a
+  diff against the bundled text, which would freeze the old wording the day a build
+  corrects it.
 
 ### The service worker gates the re-seed
 
