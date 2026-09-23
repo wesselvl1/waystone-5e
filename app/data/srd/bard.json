@@ -146,6 +146,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -199,6 +208,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -233,6 +251,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -258,6 +285,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -283,6 +319,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -306,6 +351,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -333,6 +387,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -359,6 +422,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -418,6 +490,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -443,6 +524,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -463,6 +553,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -491,6 +590,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -521,6 +629,15 @@
               "addTo": "bard",
               "count": 2,
               "cantrip": false
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -550,6 +667,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -572,6 +698,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -602,6 +737,15 @@
               "classes": [
                 "bard"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -629,6 +773,15 @@
               "addTo": "bard",
               "count": 2,
               "cantrip": false
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -652,6 +805,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -673,7 +835,17 @@
           "features": [
             "Superior Inspiration"
           ],
-          "levelUpEvents": []
+          "levelUpEvents": [
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "bard",
+              "amount": 1,
+              "classes": [
+                "bard"
+              ],
+              "label": "Replace a spell you know"
+            }
+          ]
         }
       ],
       "featureDefinitions": [

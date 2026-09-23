@@ -214,12 +214,23 @@ export interface ChooseSpellEvent {
   label?: string
 }
 
+/**
+ * Offers to trade one spell a class knows for another. One event is one trade: a
+ * definition allowing two raises two, so the second is answered against the first.
+ *
+ * `current` is what may be given up and `options` the spell ids that may replace it,
+ * both worked out by `resolveSpellChange`; the filters are carried so the wizard can
+ * re-resolve against the character as this run leaves them.
+ */
 export interface ChangeSpellEvent {
   type: 'CHANGE_SPELL'
   addTo: string         // classId of the class spell list to swap spells in
-  amount: number        // Number of spells the player may swap out
+  label: string
+  cantrip: boolean
   classes?: string[]    // Restrict replacements to spells from these class lists
   schools?: string[]    // Restrict replacements to spells from these schools of magic
+  current: Array<{ spellId: string; name: string; level: number }>
+  options: string[]
 }
 
 /**
@@ -396,6 +407,17 @@ export interface ResolvedOptionReplacement {
   optionId: string
 }
 
+/**
+ * A known spell traded for another. Scoped by `classId`, so the same spell known from a
+ * second source — a bard's *sleep* beside a sorcerer's — is not taken with it.
+ */
+export interface ResolvedChangeSpell {
+  type: 'RESOLVED_CHANGE_SPELL'
+  classId: string
+  removedSpellId: string
+  spellId: string
+}
+
 /** Carries the player's selections from an OFFER_OPTIONAL_FEATURES choice. */
 export interface ResolvedOptionalFeatures {
   type: 'RESOLVED_OPTIONAL_FEATURES'
@@ -483,6 +505,7 @@ export type ResolvedChoice =  | ResolvedChoiceSpell
   | ResolvedSubclass
   | ResolvedOption
   | ResolvedOptionReplacement
+  | ResolvedChangeSpell
   | ResolvedOptionalFeatures
   | ResolvedSkill
   | ResolvedExpertise

@@ -102,6 +102,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -226,6 +235,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -265,6 +283,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -292,6 +319,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -321,6 +357,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -349,6 +394,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -381,6 +435,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -410,6 +473,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -498,6 +570,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -528,6 +609,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -553,6 +643,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -584,6 +683,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -608,6 +716,15 @@
               "type": "UPDATE_FEATURE_USES",
               "featureName": "Font of Magic",
               "usesMax": 14
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -640,6 +757,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -667,6 +793,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -750,6 +885,15 @@
               "classes": [
                 "sorcerer"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -776,6 +920,15 @@
               "type": "UPDATE_FEATURE_USES",
               "featureName": "Font of Magic",
               "usesMax": 18
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -804,6 +957,15 @@
             {
               "type": "ABILITY_SCORE_IMPROVEMENT",
               "points": 2
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -830,6 +992,15 @@
               "type": "UPDATE_FEATURE_USES",
               "featureName": "Font of Magic",
               "usesMax": 20
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "sorcerer",
+              "amount": 1,
+              "classes": [
+                "sorcerer"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         }

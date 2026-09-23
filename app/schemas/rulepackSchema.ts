@@ -239,6 +239,9 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     amount: z.number().int().min(1),
     classes: z.array(z.string()).optional(),
     schools: z.array(z.string()).optional(),
+    // A cantrip traded for a cantrip, rather than a levelled spell for a levelled one.
+    cantrip: z.boolean().optional(),
+    label: z.string().optional(),
   }),
   z.object({
     type: z.literal('CHOOSE_EXPERTISE'),

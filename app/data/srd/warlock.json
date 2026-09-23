@@ -521,6 +521,15 @@
               "classes": [
                 "warlock"
               ]
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -570,6 +579,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -608,6 +626,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -840,6 +867,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -867,6 +903,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1099,6 +1144,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1128,6 +1182,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1360,6 +1423,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1387,6 +1459,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1414,6 +1495,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1641,6 +1731,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1668,6 +1767,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1686,6 +1794,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1920,6 +2037,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1940,6 +2066,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -1967,6 +2102,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -2190,6 +2334,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -2219,6 +2372,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         },
@@ -2237,6 +2399,15 @@
               "type": "REPLACE_OPTION",
               "group": "eldritch-invocation",
               "label": "Replace an Eldritch Invocation"
+            },
+            {
+              "type": "CHANGE_SPELL",
+              "addTo": "warlock",
+              "amount": 1,
+              "classes": [
+                "warlock"
+              ],
+              "label": "Replace a spell you know"
             }
           ]
         }

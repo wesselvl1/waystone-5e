@@ -7,7 +7,8 @@ import type {
   LevelUpEventDef,
   SpellAbilityRef,
 } from '~/types/rulepack'
-import { addHitDieForClass, multiclassProficiencies } from '~/services/multiclass'
+import { addHitDieForClass, multiclassProficiencies, projectClassLevel } from '~/services/multiclass'
+import { expandedSpellIdsFor, maxSpellLevelForClass, spellMatchesChoice } from '~/services/spellcasting'
 import { matchSkillKey } from '~/services/proficiencies'
 import type {
   LevelUpEvent,
@@ -26,6 +27,7 @@ import type {
   ChooseOptionEvent,
   PoolOption,
   ReplaceOptionEvent,
+  ChangeSpellEvent,
   ChooseSpellEvent,
   ChooseSpellcastingAbilityEvent,
   GrantSpellcastingEvent,
@@ -840,6 +842,91 @@ export function resolveOptionReplacement(
 }
 
 /**
+ * Whether a stored spell is one the class chose to know, and so may trade.
+ *
+ * A spell granted outright — always prepared, or cast free or for a resource — is a
+ * trait's, not a pick. An entry with no `classId` predates the field; it is the class's
+ * only when the character has no other class it could belong to.
+ */
+function isTradeableSpell(
+  spell: Character['spells'][number],
+  classId: string,
+  character: Character,
+): boolean {
+  if (spell.alwaysPrepared || spell.uses || spell.cost) return false
+  if (spell.classId) return spell.classId === classId
+  return character.classes.length === 1 && character.classes[0]!.classId === classId
+}
+
+/**
+ * Translates a CHANGE_SPELL definition into the offer to trade one known spell.
+ *
+ * Returns undefined unless the trade is possible: nothing known from the class yet (a
+ * ranger's first spells arrive at 2nd, so there is nothing to swap on that level), or
+ * nothing left to take. The replacement is filtered by `spellMatchesChoice`, as a
+ * CHOOSE_SPELL's is, and capped by the class's own level once `newLevel` is gained.
+ */
+export function resolveSpellChange(
+  eventDef: Extract<LevelUpEventDef, { type: 'CHANGE_SPELL' }>,
+  character: Character,
+  rulepack: Rulepack,
+  newLevel: number,
+): ChangeSpellEvent | undefined {
+  const cantrip = eventDef.cantrip ?? false
+  const current = character.spells
+    .filter(s => (s.level === 0) === cantrip && isTradeableSpell(s, eventDef.addTo, character))
+    .map(s => ({ spellId: s.spellId, name: s.name, level: s.level }))
+  if (current.length === 0) return undefined
+
+  // With no restriction at all, "another spell from the sorcerer spell list" is meant.
+  const classes = eventDef.classes ?? (eventDef.schools ? undefined : [eventDef.addTo])
+  const filter: ChooseSpellEvent = {
+    type: 'CHOOSE_SPELL',
+    addTo: eventDef.addTo,
+    count: 1,
+    cantrip,
+    classes,
+    schools: eventDef.schools,
+  }
+  const projected = { ...character, classes: projectClassLevel(character.classes, eventDef.addTo, newLevel) }
+  const context = {
+    levelCap: maxSpellLevelForClass(eventDef.addTo, projected.classes, rulepack),
+    expandedSpellIds: expandedSpellIdsFor(eventDef.addTo, projected, rulepack),
+  }
+  const knownIds = new Set(character.spells.map(s => s.spellId))
+  const options = rulepack.spells
+    .filter(s => !knownIds.has(s.id) && spellMatchesChoice(s, filter, context))
+    .map(s => s.id)
+  if (options.length === 0) return undefined
+
+  return {
+    type: 'CHANGE_SPELL',
+    addTo: eventDef.addTo,
+    label: eventDef.label ?? 'Replace a spell',
+    cantrip,
+    classes: eventDef.classes,
+    schools: eventDef.schools,
+    current,
+    options,
+  }
+}
+
+/**
+ * One CHANGE_SPELL offer per trade the definition allows. Each is its own question so the
+ * second is answered against the first: they are identical here, and the wizard
+ * re-resolves each against the run before asking it.
+ */
+function spellChangeEvents(
+  eventDef: Extract<LevelUpEventDef, { type: 'CHANGE_SPELL' }>,
+  character: Character,
+  rulepack: Rulepack,
+  newLevel: number,
+): ChangeSpellEvent[] {
+  const offer = resolveSpellChange(eventDef, character, rulepack, newLevel)
+  return offer ? Array.from({ length: eventDef.amount }, () => ({ ...offer })) : []
+}
+
+/**
  * Translate a CHOOSE_SPELLCASTING_ABILITY definition, skipping it once the player has
  * answered for that source.
  *
@@ -1078,6 +1165,10 @@ export function resolveSubclassLevelEvents(
         if (choice) events.push(choice)
         break
       }
+      case 'CHANGE_SPELL':
+        // `addTo` is the parent class, as a subclass's CHOOSE_SPELL files its picks under it
+        events.push(...spellChangeEvents(eventDef, character, rulepack, newLevel))
+        break
       case 'CHOOSE_SPELL': {
         // The class the pick is filed under and the subclass that asked for it: a spell
         // learnt from an archetype still belongs to its class's list, and the answer
@@ -1413,6 +1504,9 @@ export function resolveLevelUpEvents(
         if (choice) events.push(choice)
         break
       }
+      case 'CHANGE_SPELL':
+        events.push(...spellChangeEvents(eventDef, character, rulepack, newLevel))
+        break
       case 'UPDATE_FEATURE_USES':
         events.push({
           type: 'UPDATE_FEATURE_USES',
@@ -2705,6 +2799,25 @@ export function applyResolvedChoices(
           if (at >= 0) updated.features[at] = { ...updated.features[at]!, ...swapped }
           else updated.features.push(swapped)
         }
+        break
+      }
+      case 'RESOLVED_CHANGE_SPELL': {
+        // One entry out, one in, so the count known cannot drift. The old entry is found
+        // the way the offer found it, so a granted copy of the same spell stays; and it
+        // stays put too when the new spell is missing, rather than leaving a gap.
+        const spellDef = rulepack.spells.find(s => s.id === choice.spellId)
+        const at = updated.spells.findIndex(s =>
+          s.spellId === choice.removedSpellId && isTradeableSpell(s, choice.classId, updated))
+        if (!spellDef || at < 0 || updated.spells.some(s => s.spellId === choice.spellId)) break
+        updated.spells.splice(at, 1)
+        updated.spells.push({
+          id: crypto.randomUUID(),
+          spellId: spellDef.id,
+          name: spellDef.name,
+          level: spellDef.level,
+          prepared: spellDef.level === 0,
+          classId: choice.classId,
+        })
         break
       }
       case 'RESOLVED_OPTIONAL_FEATURES': {
