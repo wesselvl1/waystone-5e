@@ -53,6 +53,8 @@ const EI = 'eldritch-invocation'
 /** Shared pools the SRD declares on other classes, widened here by Tasha's own options. */
 const FIGHTING_STYLE = 'fighting-style'
 const METAMAGIC = 'metamagic'
+/** The Battle Master's maneuver pool, which the PHB declares and so owns the id of. */
+const MANEUVER = 'phb.maneuver'
 const PACT_BLADE = { choiceId: 'pact-boon', optionId: 'pact-of-the-blade' }
 const PACT_CHAIN = { choiceId: 'pact-boon', optionId: 'pact-of-the-chain' }
 const PACT_TOME = { choiceId: 'pact-boon', optionId: 'pact-of-the-tome' }
@@ -533,6 +535,15 @@ export const BOOKS = [
       ['Unarmed Fighting', { group: FIGHTING_STYLE }],
       ['Seeking Spell', { group: METAMAGIC }],
       ['Transmuted Spell', { group: METAMAGIC }],
+      // Tasha's maneuvers, widening the PHB Battle Master's pool by group name rather
+      // than redeclaring the subclass, so the book stays separately removable.
+      ['Ambush', { group: MANEUVER }],
+      ['Bait and Switch', { group: MANEUVER }],
+      ['Brace', { group: MANEUVER }],
+      ['Commanding Presence', { group: MANEUVER }],
+      ['Grappling Strike', { group: MANEUVER }],
+      ['Quick Toss', { group: MANEUVER }],
+      ['Tactical Assessment', { group: MANEUVER }],
     ],
     feats: [
       'Artificer Initiate', 'Chef', 'Crusher', 'Eldritch Adept', 'Fey Touched',
