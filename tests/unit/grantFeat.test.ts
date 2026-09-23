@@ -10,7 +10,7 @@ import {
   isChoiceEvent,
 } from '~/services/levelUpService'
 import type { Character } from '~/types/character'
-import type { Rulepack, FeatDefinition, Background } from '~/types/rulepack'
+import type { Rulepack, FeatDefinition, Background, Race } from '~/types/rulepack'
 import { validCharacter } from '../fixtures'
 import fighter from '~/data/srd/fighter.json'
 
@@ -359,5 +359,52 @@ describe('GRANT_FEAT — a nested grant survives the CHOOSE_FEAT path too', () =
     const nested = result.features.find(f => f.id === 'test.flat-bonus')
     expect(nested).toMatchObject({ name: 'Flat Bonus Feat', source: 'Feat' })
     expect(result.abilityScores.str).toBe(char().abilityScores.str + 1)
+  })
+})
+
+/**
+ * A race asking for a feat rather than naming one. The variant human's Feat trait and
+ * Custom Lineage both write it as a bare `CHOOSE_FEAT` in a level-1 group, and the
+ * race/subrace/background switch in resolveLevelUpEvents had no case for it — so the
+ * trait showed on the sheet and the player was never asked. Declared here rather than
+ * imported from `app/data/phb/`: only `app/data/srd/` is committed.
+ */
+function raceChoosingFeat(): Race {
+  return {
+    id: 'test-race',
+    name: 'Test Race',
+    size: 'medium',
+    speeds: { walk: 30 },
+    abilityScoreBonuses: {},
+    traits: [{ name: 'Feat', description: 'You gain one feat of your choice.' }],
+    languages: ['Common'],
+    levelUpEvents: [{ level: 1, trait: 'Feat', levelUpEvents: [{ type: 'CHOOSE_FEAT' }] }],
+  }
+}
+
+describe('CHOOSE_FEAT declared by a race', () => {
+  const packWithRace = { ...rulepack, races: [raceChoosingFeat()] }
+  const human = () => char({ race: 'test-race' })
+
+  it('raises the choice at the total level the group names', () => {
+    const events = resolveLevelUpEvents(human(), 'fighter', 1, packWithRace)
+    expect(getChoiceEvents(events)).toContainEqual({ type: 'CHOOSE_FEAT' })
+  })
+
+  it('applies the picked feat\'s own ability increase and granted spell', () => {
+    const choice = getChoiceEvents(resolveLevelUpEvents(human(), 'fighter', 1, packWithRace))
+      .find(e => e.type === 'CHOOSE_FEAT')
+    expect(choice).toBeDefined()
+
+    const result = applyResolvedChoices(
+      human(),
+      [{ type: 'RESOLVED_CHOOSE_FEAT', featId: 'test.touched', abilityBonus: { wis: 1 } }],
+      packWithRace,
+    )
+    expect(result.features.some(f => f.id === 'test.touched')).toBe(true)
+    expect(result.abilityScores.wis).toBe(human().abilityScores.wis + 1)
+    // The feat's own levelUpEvents, keyed to the ability it just increased.
+    expect(result.spells.map(s => s.spellId)).toContain('sacred-flame')
+    expect(result.classSpellcasting?.['test.touched']).toMatchObject({ ability: 'wis', origin: 'feat' })
   })
 })

@@ -1506,6 +1506,18 @@ export function resolveLevelUpEvents(
             if (skills) events.push(skills)
             break
           }
+          case 'CHOOSE_FEAT':
+            // The variant human's Feat trait and Custom Lineage's both declare a bare
+            // CHOOSE_FEAT on the race side; without a case here the trait was printed on
+            // the sheet and the question was never asked. Nothing about it is
+            // class-specific — RESOLVED_CHOOSE_FEAT reads the feat out of the rulepack and
+            // the wizard's picker lists every loaded feat — so it is the class switch's
+            // push verbatim. It needs no "already answered" guard of its own the way
+            // CHOOSE_OPTION does: a bare CHOOSE_FEAT carries no id to record an answer
+            // against, and the group only fires on the one total level it names, which a
+            // character passes exactly once.
+            events.push({ type: 'CHOOSE_FEAT' })
+            break
           case 'GRANT_FEAT': {
             // resolveGrantFeat already skips a feat the character carries, which is what
             // keeps a background from re-granting it on every later level.
