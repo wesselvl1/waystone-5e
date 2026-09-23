@@ -246,6 +246,19 @@ export type LevelUpEventDef =
       classes?: string[]
       schools?: string[]
       /**
+       * Only spells carrying the ritual tag. Ritual Caster's two 1st-level spells are
+       * "from that class's spell list" *and* ritual, so this narrows whichever list the
+       * restrictions above select rather than replacing it — without it the feat offers
+       * magic missile.
+       */
+      ritual?: boolean
+      /**
+       * Only spells that require an attack roll, i.e. that set `SpellDefinition.attackRoll`
+       * either way. Spell Sniper's cantrip is the case; a boolean, not a `'melee' | 'ranged'`,
+       * because no feat this app has read asks for one reach and not the other.
+       */
+      attackRoll?: boolean
+      /**
        * Highest spell level that may be picked. Only needed when the source is not a
        * class: a class's own cap comes from its level (`maxSpellLevelForClass`), but a
        * feat grants a fixed level regardless — Magic Initiate gives a non-caster fighter

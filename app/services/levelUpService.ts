@@ -994,6 +994,8 @@ export function chooseSpellEvent(
     fromList: eventDef.fromList,
     classes: eventDef.classes,
     schools: eventDef.schools,
+    ritual: eventDef.ritual,
+    attackRoll: eventDef.attackRoll,
     maxLevel: eventDef.maxLevel,
     ability: resolveAbilityRef(eventDef.ability, defaults.increasedAbility),
     origin: eventDef.origin ?? defaults.origin,

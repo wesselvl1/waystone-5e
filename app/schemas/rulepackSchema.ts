@@ -176,6 +176,10 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     cantrip: z.boolean().optional(),
     classes: z.array(z.string()).optional(),
     schools: z.array(z.string()).optional(),
+    // Tag filters. Absent means unfiltered; set, they narrow whichever list the
+    // restrictions above select — Ritual Caster wants a class list *and* the ritual tag.
+    ritual: z.boolean().optional(),
+    attackRoll: z.boolean().optional(),
     // Caps spell level for a source that has no class level of its own to cap by.
     maxLevel: z.number().int().min(0).max(9).optional(),
     // Asked only once this option is picked; queued by the wizard's second stage.

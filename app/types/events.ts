@@ -190,6 +190,13 @@ export interface ChooseSpellEvent {
   classes?: string[]    // Restrict to spells from these class lists
   schools?: string[]    // Restrict to spells from these schools of magic
   /**
+   * Tag filters, which narrow whatever the restrictions above select rather than standing
+   * in for them: Ritual Caster asks for a class list *and* the ritual tag, Spell Sniper
+   * for a cantrip *and* an attack roll. Absent means unfiltered.
+   */
+  ritual?: boolean
+  attackRoll?: boolean
+  /**
    * Hard cap on spell level, overriding the target class's own cap. Set by sources that
    * grant a spell level outright — a feat gives a non-caster a 1st-level spell, where
    * the class cap would be 0.

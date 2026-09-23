@@ -2,7 +2,7 @@
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { multiclassOptions, describeMulticlassPrerequisites, effectiveScores, projectClassLevel } from '~/services/multiclass'
-import { maxSpellLevelForClass, clampSpellSlots, spellSaveDCFor, spellAttackBonusFor, expandedSpellIdsFor } from '~/services/spellcasting'
+import { maxSpellLevelForClass, clampSpellSlots, spellSaveDCFor, spellAttackBonusFor, expandedSpellIdsFor, spellMatchesChoice } from '~/services/spellcasting'
 import { abilityMod, proficiencyBonus } from '~/composables/useCharacterStats'
 import { isChoiceSatisfied, type AbilityPicks } from '~/services/abilityScoreChoice'
 import { filterBySearch } from '~/services/searchFilter'
@@ -291,24 +291,12 @@ const availableSpells = computed(() => {
   const expanded = expandedForChoice.value
   return allSpells.filter(s => {
     if (existing.has(s.id)) return false
-    if (choiceEvent.cantrip !== (s.level === 0)) return false
-    // Cap by the *class's* own level, not the character's slots: a cleric 1 / wizard 1
-    // has a 2nd-level slot but may only take 1st-level spells from either list. A source
-    // with no class level to cap by states its own maxLevel — a feat grants a 1st-level
-    // spell to a fighter whose class cap is 0.
-    const cap = choiceEvent.maxLevel ?? maxLearnableSpellLevel.value
-    if (!choiceEvent.cantrip && s.level > cap) return false
-    // An expansion widens which spells count as being ON a list, which is what
-    // EXPAND_SPELL_LIST means — so it is folded into the class-list test rather than
-    // short-circuiting ahead of every restriction. Returning true up front let a guild
-    // background's spells satisfy a pick they have nothing to do with: Fey Touched asks
-    // for divination or enchantment, and would have offered whatever the guild added.
-    if (choiceEvent.fromList?.length) return choiceEvent.fromList.includes(s.id)
-    if (choiceEvent.classes?.length) {
-      return s.classes.some(c => choiceEvent.classes!.includes(c)) || expanded.has(s.id)
-    }
-    if (choiceEvent.schools?.length) return choiceEvent.schools.includes(s.school)
-    return true
+    // Every restriction the event carries is applied by spellMatchesChoice, so the picker
+    // cannot silently fall behind a filter the rulepack types have gained.
+    return spellMatchesChoice(s, choiceEvent, {
+      levelCap: maxLearnableSpellLevel.value,
+      expandedSpellIds: expanded,
+    })
   })
 })
 
