@@ -519,10 +519,12 @@ export const BOOKS = [
       ['Rebuke of the Talisman', { group: EI, requiresOption: PACT_TALISMAN }],
       ['Undying Servitude', { group: EI, minLevel: 5 }],
       // Tasha's fighting styles and metamagic, widening the SRD's own pools by group name
-      // rather than redeclaring fighter/paladin/ranger or sorcerer. Superior Technique is
-      // fighter-only and Druidic Warrior ranger-only; per the manifest's header comment,
-      // that restriction is not a field here — every class drawing from `fighting-style`
-      // is offered both, and the option's own description text says who it is for.
+      // rather than redeclaring fighter/paladin/ranger or sorcerer. Blessed Warrior is
+      // paladin-only, Druidic Warrior ranger-only and Superior Technique fighter-only;
+      // per the manifest's header comment, that restriction is not a field here — every
+      // class drawing from `fighting-style` is offered all three, and the option's own
+      // description text says who it is for.
+      ['Blessed Warrior', { group: FIGHTING_STYLE }],
       ['Blind Fighting', { group: FIGHTING_STYLE }],
       ['Druidic Warrior', { group: FIGHTING_STYLE }],
       ['Interception', { group: FIGHTING_STYLE }],
