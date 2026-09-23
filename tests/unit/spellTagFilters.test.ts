@@ -96,6 +96,53 @@ describe('absent means unfiltered', () => {
   })
 })
 
+describe('the list restrictions combine', () => {
+  const ids = (event: ChooseSpellEvent) => offered(event).map(s => s.id)
+
+  it('a class list and schools together offer only that list’s spells of those schools', () => {
+    // The Eldritch Knight's shape: "abjuration or evocation spells from the wizard list"
+    const list = offered(choice({ classes: ['wizard'], schools: ['abjuration', 'evocation'] }))
+
+    expect(list.length).toBeGreaterThan(0)
+    expect(list.every(s => s.classes.includes('wizard'))).toBe(true)
+    expect(list.every(s => ['abjuration', 'evocation'].includes(s.school))).toBe(true)
+    expect(list.map(s => s.id)).toContain('shield')
+    expect(list.map(s => s.id)).toContain('magic-missile')
+    // On the wizard list, wrong school
+    expect(list.map(s => s.id)).not.toContain('sleep')
+    // Right school, not on the wizard list
+    expect(list.map(s => s.id)).not.toContain('cure-wounds')
+  })
+
+  it('an expanded spell still has to be of the named school', () => {
+    const event = choice({ classes: ['wizard'], schools: ['evocation'] })
+    const expandedSpellIds = new Set(['guiding-bolt', 'sleep'])
+    const list = allSpells.filter(s => spellMatchesChoice(s, event, { levelCap: 9, expandedSpellIds }))
+      .map(s => s.id)
+
+    // A cleric evocation added to the list counts; an enchantment added to it does not
+    expect(list).toContain('guiding-bolt')
+    expect(list).not.toContain('sleep')
+  })
+
+  it('a named list is narrowed by a class list', () => {
+    // Cure wounds is named, but is not a wizard spell
+    expect(ids(choice({ fromList: ['shield', 'cure-wounds', 'sleep'], classes: ['wizard'] })).sort())
+      .toEqual(['shield', 'sleep'])
+  })
+
+  it('a named list is narrowed by schools', () => {
+    expect(ids(choice({ fromList: ['shield', 'magic-missile', 'sleep'], schools: ['abjuration'] })))
+      .toEqual(['shield'])
+  })
+
+  it('schools alone still draw from every class’s list', () => {
+    const list = ids(choice({ schools: ['evocation'] }))
+    expect(list).toContain('cure-wounds')
+    expect(list).toContain('magic-missile')
+  })
+})
+
 describe('the filters survive the trip from rulepack JSON to runtime event', () => {
   it('chooseSpellEvent carries ritual and attackRoll through', () => {
     const ritual = chooseSpellEvent(
