@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
-import type { LevelUpEventDef, Race, Subrace, SubclassDefinition } from '~/types/rulepack'
+import type { LevelUpEventDef, Race, Subrace, SubclassDefinition, SpellDefinition } from '~/types/rulepack'
 
 /**
  * Glob-driven so a new fragment file is schema-validated without touching this test.
@@ -217,5 +217,28 @@ describe('SRD race proficiencies, senses and resistances', () => {
 
   it('grants the rock gnome Tinker tool proficiency', () => {
     expect(grantedProficiencies(findSubrace('rock-gnome'))).toContain('tinker\'s tools')
+  })
+})
+
+function allSpells(): SpellDefinition[] {
+  const out: SpellDefinition[] = []
+  for (const { data } of entries) {
+    const pack = RulepackSchema.parse(data)
+    for (const spell of pack.spells) out.push(spell)
+  }
+  return out
+}
+
+function findSpell(id: string): SpellDefinition {
+  const spell = allSpells().find(s => s.id === id)
+  if (!spell) throw new Error(`spell not found: ${id}`)
+  return spell
+}
+
+describe('SRD spell ritual flags', () => {
+  it('flags Detect Magic, Detect Poison and Disease, Floating Disk and Unseen Servant as rituals', () => {
+    for (const id of ['detect-magic', 'detect-poison-and-disease', 'floating-disk', 'unseen-servant']) {
+      expect(findSpell(id).ritual, `${id} ritual`).toBe(true)
+    }
   })
 })
