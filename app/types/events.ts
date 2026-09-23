@@ -1,4 +1,5 @@
 import type { AbilityKey, SkillKey, SpellcastingOrigin, SpellSlotLevel } from './character'
+import type { AbilityScoreChoice } from './rulepack'
 
 // ─── Automatic events (applied without player input) ──────────────────────────
 
@@ -35,12 +36,50 @@ export interface AddFeatureEvent {
   }
 }
 
+/**
+ * A specific feat handed out by a source, rather than picked from CHOOSE_FEAT's list.
+ * Denormalized like GRANT_SPELLS: everything is resolved against the rulepack up front
+ * (resolveLevelUpEvents / resolveFeatEvents run with a rulepack, applyAutomaticEvents does
+ * not), so applying this needs no lookup and cannot forget a field the two would drift on.
+ *
+ * `withOption`, when set, is the feat's own CHOOSE_OPTION already answered by the source —
+ * `optionName` is carried along so applying this can rename the feature the same way
+ * answering the question by hand would (see the RESOLVED_OPTION handling in
+ * applyResolvedChoices, which this mirrors for the pre-answered case).
+ */
+export interface GrantFeatEvent {
+  type: 'GRANT_FEAT'
+  featId: string
+  name: string
+  description: string
+  abilityScoreBonus?: Partial<Record<AbilityKey, number>>
+  grantedSpells?: Array<{ spellId: string; name: string; level: number }>
+  hpBonusPerLevel?: number
+  withOption?: { choiceId: string; optionId: string; optionName: string }
+  label?: string
+}
+
 export interface GainProficiencyEvent {
   type: 'GAIN_PROFICIENCY'
   proficiency: string
   category: 'armor' | 'weapon' | 'tool' | 'language' | 'skill' | 'save'
   skill?: SkillKey
   save?: AbilityKey
+}
+
+/**
+ * Proficiency in one saving throw. Its own event rather than a GAIN_PROFICIENCY category
+ * because it writes to `Character.savingThrowProficiencies` instead of the flat
+ * `otherProficiencies` list, and nothing reads that list for an ability name.
+ *
+ * The def's `'increased'` is already resolved to a concrete ability here, the way
+ * GRANT_SPELLS's is: the resolver has the feat's answer and the applier has no rulepack.
+ * A feat whose increase is still unanswered emits nothing, and RESOLVED_FEAT_ABILITY
+ * replays the feat's events once it is.
+ */
+export interface GainSaveProficiencyEvent {
+  type: 'GAIN_SAVE_PROFICIENCY'
+  ability: AbilityKey
 }
 
 /**
@@ -151,6 +190,13 @@ export interface ChooseSpellEvent {
   classes?: string[]    // Restrict to spells from these class lists
   schools?: string[]    // Restrict to spells from these schools of magic
   /**
+   * Tag filters, which narrow whatever the restrictions above select rather than standing
+   * in for them: Ritual Caster asks for a class list *and* the ritual tag, Spell Sniper
+   * for a cantrip *and* an attack roll. Absent means unfiltered.
+   */
+  ritual?: boolean
+  attackRoll?: boolean
+  /**
    * Hard cap on spell level, overriding the target class's own cap. Set by sources that
    * grant a spell level outright — a feat gives a non-caster a 1st-level spell, where
    * the class cap would be 0.
@@ -198,6 +244,18 @@ export interface ChooseExpertiseEvent {
 
 export interface ChooseFeatEvent {
   type: 'CHOOSE_FEAT'
+}
+
+/**
+ * The ability increase left over by a feat GRANT_FEAT handed out — Resilient's "one
+ * ability score of your choice" — when the feat came from a source rather than from
+ * CHOOSE_FEAT's own picker, which asks the same question inline instead.
+ */
+export interface ChooseFeatAbilityEvent {
+  type: 'CHOOSE_FEAT_ABILITY'
+  featId: string
+  label: string
+  choice: AbilityScoreChoice
 }
 
 export interface AbilityScoreImprovementEvent {
@@ -294,6 +352,13 @@ export interface ResolvedChoiceFeat {
   abilityBonus?: Partial<Record<AbilityKey, number>>
 }
 
+/** Answers a CHOOSE_FEAT_ABILITY: the feat itself was already applied by GRANT_FEAT. */
+export interface ResolvedFeatAbility {
+  type: 'RESOLVED_FEAT_ABILITY'
+  featId: string
+  bonuses: Partial<Record<AbilityKey, number>>
+}
+
 /** The ability the player picked to cast a source's spells with. */
 export interface ResolvedSpellcastingAbility {
   type: 'RESOLVED_SPELLCASTING_ABILITY'
@@ -357,6 +422,13 @@ export interface SetSpeedEvent {
   speed: number
 }
 
+/** A sense set to a fixed range — the darkvision arm of Tasha's Custom Lineage. */
+export interface SetSenseEvent {
+  type: 'SET_SENSE'
+  mode: 'darkvision' | 'blindsight' | 'tremorsense' | 'truesight'
+  range: number
+}
+
 export type AutomaticLevelUpEvent =
   | AddHpEvent
   | GrantSpellcastingEvent
@@ -365,12 +437,15 @@ export type AutomaticLevelUpEvent =
   | UpdateWarlockSlotsEvent
   | AddFeatureEvent
   | GainProficiencyEvent
+  | GainSaveProficiencyEvent
   | UpdateHitDieEvent
   | UpdateFeatureUsesEvent
   | GrantSpellsEvent
   | SetWildShapeLimitsEvent
   | SetSpellcastingAbilityEvent
   | SetSpeedEvent
+  | SetSenseEvent
+  | GrantFeatEvent
 
 export type ChoiceLevelUpEvent =
   | ChooseSpellEvent
@@ -378,6 +453,7 @@ export type ChoiceLevelUpEvent =
   | ChangeSpellEvent
   | ChooseExpertiseEvent
   | ChooseFeatEvent
+  | ChooseFeatAbilityEvent
   | AbilityScoreImprovementEvent
   | ChooseSubclassEvent
   | ChooseSkillEvent
@@ -402,6 +478,7 @@ export interface ResolvedSkill {
 export type ResolvedChoice =  | ResolvedChoiceSpell
   | ResolvedSpellcastingAbility
   | ResolvedChoiceFeat
+  | ResolvedFeatAbility
   | ResolvedASI
   | ResolvedSubclass
   | ResolvedOption

@@ -349,6 +349,19 @@ export interface DeathSaves {
   failures: number    // 0-3
 }
 
+/**
+ * Special senses in feet — a dwarf's 60ft darkvision, a bat-like blindsight. Absent
+ * means the character sees only as anyone does; the sheet shows nothing rather than a
+ * zero. Merged from a race and its subrace by `raceSenses()`, which takes the larger
+ * range per mode rather than letting one silently override the other.
+ */
+export interface CharacterSenses {
+  darkvision?: number
+  blindsight?: number
+  tremorsense?: number
+  truesight?: number
+}
+
 export interface Character {
   id: string                            // UUID
   name: string
@@ -384,6 +397,8 @@ export interface Character {
    */
   armorClassConfig?: ArmorClassConfig
   speeds: { walk: number; climb?: number; swim?: number; fly?: number }
+  /** Darkvision and the like, merged from the character's race and subrace. */
+  senses?: CharacterSenses
   initiative: number | null             // null = derive from Dex, features and the slots below
   /** Hand-entered additions to the derived roll, kept apart the way an attack's are. */
   initiativeBonuses?: InitiativeBonuses
@@ -394,6 +409,15 @@ export interface Character {
   hitDice: HitDicePool[]
   deathSaves: DeathSaves
   conditions: string[]
+  /**
+   * Damage types the character takes half damage from, taken no damage from, and
+   * conditions it cannot be affected by — Hellish Resistance, Dwarven Resilience.
+   * Merged from race and subrace by `raceResistances()`, which unions rather than
+   * overrides, since either can grant its own on top of the other's.
+   */
+  damageResistances?: string[]
+  damageImmunities?: string[]
+  conditionImmunities?: string[]
 
   // Proficiencies
   savingThrowProficiencies: AbilityKey[]

@@ -1,4 +1,4 @@
-import type { AbilityKey, AbilityScores, SkillKey, SpellcastingOrigin, SpellSlotLevel } from './character'
+import type { AbilityKey, AbilityScores, CharacterSenses, SkillKey, SpellcastingOrigin, SpellSlotLevel } from './character'
 
 /**
  * Which ability a granted or chosen spell casts with.
@@ -63,9 +63,18 @@ export interface Race {
   name: string
   size: 'tiny' | 'small' | 'medium' | 'large'
   speeds: RaceSpeeds
+  /** Darkvision and the like, before a subrace's own are merged in — see `raceSenses()`. */
+  senses?: CharacterSenses
   abilityScoreBonuses: Partial<Record<AbilityKey, number>>
   traits: RaceTrait[]
   languages: string[]
+  /**
+   * Hellish Resistance, Dwarven Resilience — before a subrace's own are unioned in, see
+   * `raceResistances()`.
+   */
+  damageResistances?: string[]
+  damageImmunities?: string[]
+  conditionImmunities?: string[]
   /** Bonuses the player distributes, e.g. half-elf's +1 to two abilities of choice. */
   abilityScoreChoice?: AbilityScoreChoice
   /** Events fired at a given total character level (tiefling spells, dragonborn ancestry). */
@@ -111,6 +120,23 @@ export interface Subrace {
   replacesRaceTraits?: string[]
   /** Speed values this subrace grants or overrides (e.g. fly: 30 for Winged Tiefling). */
   speedOverrides?: Partial<RaceSpeeds>
+  /**
+   * Senses this subrace grants on top of the race's own — `raceSenses()` takes the
+   * larger range per mode, since a subrace's darkvision should not blind out a race
+   * that already sees further.
+   */
+  senses?: CharacterSenses
+  /** Unioned with the race's own by `raceResistances()`, not replaced. */
+  damageResistances?: string[]
+  damageImmunities?: string[]
+  conditionImmunities?: string[]
+  /**
+   * Languages this subrace grants on top of the race's own — a drow's Undercommon, added
+   * to the elf's Common and Elvish. `startingProficiencies()` reads these after the
+   * race's own list and deduplicates by `proficiencyKey`, the same as every other
+   * proficiency source.
+   */
+  languages?: string[]
   /** Events fired at a given total character level (high elf's cantrip). */
   levelUpEvents?: SourceLevelEvents[]
 }
@@ -168,11 +194,46 @@ export type LevelUpEventDef =
     whenOption?: { choiceId: string; optionId: string }
   }
   | {
+    /**
+     * Sets one sense outright, for a sense hanging off a choice rather than one the race
+     * simply has. Tasha's Custom Lineage offers 60ft darkvision *or* a skill — an "or"
+     * a static `Race.senses` field cannot express — so the darkvision arm is this
+     * instead. A race or subrace that just has the sense declares it on its own
+     * `senses` field, the way `Race.speeds` and `Subrace.speedOverrides` do for a speed.
+     */
+    type: 'SET_SENSE'
+    mode: 'darkvision' | 'blindsight' | 'tremorsense' | 'truesight'
+    range: number
+    whenOption?: { choiceId: string; optionId: string }
+  }
+  | {
     type: 'GAIN_PROFICIENCY'
     proficiency: string
     /**
      * Granted only when a `CHOOSE_OPTION` was answered this way — the Elf Weapon
      * Training arm of a half-elf descent's variant feature. Gated like a `GRANT_SPELLS`.
+     */
+    whenOption?: { choiceId: string; optionId: string }
+  }
+  | {
+    /**
+     * A saving throw the source makes the character proficient in — the Samurai's Elegant
+     * Courtier, the Gloom Stalker's Iron Mind, Resilient.
+     *
+     * Separate from GAIN_PROFICIENCY because the two write to different fields: a save
+     * lives in `Character.savingThrowProficiencies`, keyed by ability, and a bare
+     * "wisdom" chip in `otherProficiencies` would leave the Wisdom save unchecked — the
+     * same split `applyGainProficiency` already makes for a skill.
+     *
+     * `'increased'` is read exactly as it is on a granted spell: the ability this feat's
+     * own increase went to. It is what lets Resilient say "you gain proficiency in saving
+     * throws using the chosen ability" without asking a second question.
+     */
+    type: 'GAIN_SAVE_PROFICIENCY'
+    ability: SpellAbilityRef
+    /**
+     * Granted only when a `CHOOSE_OPTION` was answered this way — Elegant Courtier's
+     * "Intelligence or Charisma". Gated like a `GRANT_SPELLS`.
      */
     whenOption?: { choiceId: string; optionId: string }
   }
@@ -184,6 +245,19 @@ export type LevelUpEventDef =
       cantrip?: boolean
       classes?: string[]
       schools?: string[]
+      /**
+       * Only spells carrying the ritual tag. Ritual Caster's two 1st-level spells are
+       * "from that class's spell list" *and* ritual, so this narrows whichever list the
+       * restrictions above select rather than replacing it — without it the feat offers
+       * magic missile.
+       */
+      ritual?: boolean
+      /**
+       * Only spells that require an attack roll, i.e. that set `SpellDefinition.attackRoll`
+       * either way. Spell Sniper's cantrip is the case; a boolean, not a `'melee' | 'ranged'`,
+       * because no feat this app has read asks for one reach and not the other.
+       */
+      attackRoll?: boolean
       /**
        * Highest spell level that may be picked. Only needed when the source is not a
        * class: a class's own cap comes from its level (`maxSpellLevelForClass`), but a
@@ -339,6 +413,19 @@ export type LevelUpEventDef =
     whenOption?: { choiceId: string; optionId: string }
   }
   | { type: 'CHOOSE_FEAT' }
+  | {
+    /**
+     * A source hands the character a specific feat — "You gain the Tough feat", as a
+     * dozen backgrounds and two races are written. Distinct from CHOOSE_FEAT, which
+     * asks the player; this one names it.
+     */
+    type: 'GRANT_FEAT'
+    featId: string
+    /** Pre-answered arm of a feat that asks a question, e.g. Magic Initiate's class. */
+    withOption?: { choiceId: string; optionId: string }
+    /** Display label for the granting source, e.g. "Wildspace Adaptation". */
+    label?: string
+  }
   | { type: 'ABILITY_SCORE_IMPROVEMENT'; points: number }
   | { type: 'CHOOSE_SUBCLASS'; label: string }
   | { type: 'UPDATE_HIT_DIE'; die: string }
@@ -353,6 +440,18 @@ export type LevelUpEventDef =
      * Style are each picked several times from one list, and the SRD forbids repeats.
      */
     group?: string
+    /**
+     * Name of the feature this choice belongs to, as that level prints it — "Storm Aura"
+     * for the environment a Storm Herald picks. The answer is written onto that feature
+     * so the sheet says which one was taken.
+     *
+     * Derived from the level that declares both when a pack leaves it out, which every
+     * pack does today: the feature this level names after the choice, or the level's only
+     * feature. That is a guess, so a pack whose wording does not line up says which
+     * feature it means here. Ignored on a grouped pool pick, which gets a feature of its
+     * own (`option-<choiceId>`) rather than annotating one.
+     */
+    feature?: string
   }
   | {
     /**
@@ -657,6 +756,14 @@ export interface OptionalClassFeature {
   replaces?: string
   usesMax?: number
   recharge?: 'short' | 'long' | 'dawn'
+  /**
+   * What taking the feature actually does — Primal Awareness's always-prepared spells,
+   * Wild Companion's find familiar. Without this an optional feature is inert text: the
+   * wizard offers it and the sheet lists it, but nothing it grants ever reaches the
+   * character. Resolved by `resolveOptionalFeatureEvents`, the same way a feat's own
+   * `levelUpEvents` are, since neither has a level of its own to fire against.
+   */
+  levelUpEvents?: LevelUpEventDef[]
 }
 
 /**

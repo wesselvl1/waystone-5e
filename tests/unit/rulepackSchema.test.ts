@@ -93,4 +93,33 @@ describe('RulepackSchema', () => {
       expect('extraField' in result.data).toBe(false)
     }
   })
+
+  it('accepts a subrace carrying its own languages', () => {
+    const result = RulepackSchema.safeParse({
+      ...minimalRulepack,
+      races: [{
+        id: 'elf', name: 'Elf', size: 'medium', speeds: { walk: 30 },
+        abilityScoreBonuses: {}, traits: [], languages: ['Common', 'Elvish'],
+        subraces: [{
+          id: 'drow', name: 'Drow', abilityScoreBonuses: {}, traits: [],
+          languages: ['Undercommon'],
+        }],
+      }],
+    })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.races[0]!.subraces?.[0]!.languages).toEqual(['Undercommon'])
+  })
+
+  it('leaves a subrace with no languages of its own undefined, not defaulted', () => {
+    const result = RulepackSchema.safeParse({
+      ...minimalRulepack,
+      races: [{
+        id: 'dwarf', name: 'Dwarf', size: 'medium', speeds: { walk: 25 },
+        abilityScoreBonuses: {}, traits: [], languages: ['Common', 'Dwarvish'],
+        subraces: [{ id: 'hill', name: 'Hill Dwarf', abilityScoreBonuses: {}, traits: [] }],
+      }],
+    })
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.races[0]!.subraces?.[0]!.languages).toBeUndefined()
+  })
 })

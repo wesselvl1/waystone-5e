@@ -2,24 +2,26 @@
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { multiclassOptions, describeMulticlassPrerequisites, effectiveScores, projectClassLevel } from '~/services/multiclass'
-import { maxSpellLevelForClass, clampSpellSlots, spellSaveDCFor, spellAttackBonusFor, expandedSpellIdsFor } from '~/services/spellcasting'
+import { maxSpellLevelForClass, clampSpellSlots, spellSaveDCFor, spellAttackBonusFor, expandedSpellIdsFor, spellMatchesChoice } from '~/services/spellcasting'
 import { abilityMod, proficiencyBonus } from '~/composables/useCharacterStats'
 import { isChoiceSatisfied, type AbilityPicks } from '~/services/abilityScoreChoice'
 import { filterBySearch } from '~/services/searchFilter'
 import {
   resolveLevelUpEvents,
-  resolveOptionChoice,
+  resolveSubclassLevelEvents,
   resolveOptionReplacement,
   optionAvailable,
   resolveFeatEvents,
+  resolveOptionalFeatureEvents,
   featIncreasedAbility,
-  chooseSpellEvent,
   resolveUnlockedChoices,
   applyAutomaticEvents,
   applyResolvedChoices,
   getChoiceEvents,
   getAutomaticEvents,
   checkFeatPrerequisite,
+  projectSkillProficiencies,
+  skillsEligibleForExpertise,
 } from '~/services/levelUpService'
 import type { Character, AbilityKey, SkillKey } from '~/types/character'
 import type { FeatDefinition, LevelUpEventDef } from '~/types/rulepack'
@@ -37,6 +39,8 @@ import type {
   ChooseSkillEvent,
   ChooseExpertiseEvent,
   ChooseSpellcastingAbilityEvent,
+  ChooseFeatAbilityEvent,
+  GrantFeatEvent,
 } from '~/types/events'
 
 const route = useRoute()
@@ -287,24 +291,12 @@ const availableSpells = computed(() => {
   const expanded = expandedForChoice.value
   return allSpells.filter(s => {
     if (existing.has(s.id)) return false
-    if (choiceEvent.cantrip !== (s.level === 0)) return false
-    // Cap by the *class's* own level, not the character's slots: a cleric 1 / wizard 1
-    // has a 2nd-level slot but may only take 1st-level spells from either list. A source
-    // with no class level to cap by states its own maxLevel — a feat grants a 1st-level
-    // spell to a fighter whose class cap is 0.
-    const cap = choiceEvent.maxLevel ?? maxLearnableSpellLevel.value
-    if (!choiceEvent.cantrip && s.level > cap) return false
-    // An expansion widens which spells count as being ON a list, which is what
-    // EXPAND_SPELL_LIST means — so it is folded into the class-list test rather than
-    // short-circuiting ahead of every restriction. Returning true up front let a guild
-    // background's spells satisfy a pick they have nothing to do with: Fey Touched asks
-    // for divination or enchantment, and would have offered whatever the guild added.
-    if (choiceEvent.fromList?.length) return choiceEvent.fromList.includes(s.id)
-    if (choiceEvent.classes?.length) {
-      return s.classes.some(c => choiceEvent.classes!.includes(c)) || expanded.has(s.id)
-    }
-    if (choiceEvent.schools?.length) return choiceEvent.schools.includes(s.school)
-    return true
+    // Every restriction the event carries is applied by spellMatchesChoice, so the picker
+    // cannot silently fall behind a filter the rulepack types have gained.
+    return spellMatchesChoice(s, choiceEvent, {
+      levelCap: maxLearnableSpellLevel.value,
+      expandedSpellIds: expanded,
+    })
   })
 })
 
@@ -370,6 +362,22 @@ function confirmFeat() {
   nextChoice()
 }
 
+// The ability increase left over by a feat a source granted outright (GRANT_FEAT) rather
+// than one the player picked from CHOOSE_FEAT's list — the feat itself is already applied,
+// this is only the one question it still asks.
+const grantedFeatAbilityPicks = ref<AbilityPicks>({})
+
+function confirmGrantedFeatAbility() {
+  const choiceEvent = currentChoice.value as ChooseFeatAbilityEvent
+  resolvedChoices.value.push({
+    type: 'RESOLVED_FEAT_ABILITY',
+    featId: choiceEvent.featId,
+    bonuses: { ...grantedFeatAbilityPicks.value },
+  })
+  grantedFeatAbilityPicks.value = {}
+  nextChoice()
+}
+
 // Choose option (e.g. totem spirit)
 const selectedOptionId = ref('')
 
@@ -402,11 +410,15 @@ const selectedExpertise = ref<SkillKey[]>([])
 /**
  * Expertise doubles an existing proficiency, so only skills the character is already
  * proficient in are eligible, and ones already at expertise are excluded.
+ *
+ * "Already" counts a CHOOSE_SKILL answered moments ago in this run: Blessings of Knowledge
+ * grants two skills and then doubles those same two, and nothing is stored until the run
+ * is applied, so reading the stored character told a Knowledge cleric there was nothing
+ * eligible. The projection is the same one the option gates re-answer against.
  */
 function expertiseCandidates(options: SkillKey[]): SkillKey[] {
-  const profs = character.value?.skillProficiencies
-  if (!profs) return []
-  return options.filter(s => (profs[s] ?? 0) === 1)
+  if (!character.value) return []
+  return skillsEligibleForExpertise(options, projectedCharacter.value.skillProficiencies)
 }
 
 function toggleExpertise(skill: SkillKey, count: number) {
@@ -453,13 +465,13 @@ const pendingPicks = computed(() => {
 /**
  * The character as this run will leave them, so the resolvers can answer against picks
  * that are not stored yet. Only what a prerequisite reads is projected — the run's
- * option answers, its spell ids and the new class level; the stub spell entries carry
- * nothing but `spellId`, which is the only field `optionAvailable` looks at.
+ * option answers, its skill picks, its spell ids and the new class level; the stub spell
+ * entries carry nothing but `spellId`, which is the only field `optionAvailable` looks at.
  */
 const projectedCharacter = computed<Character>(() => {
   const stored = toRaw(character.value!)
   const { options, spellIds } = pendingPicks.value
-  return {
+  const base: Character = {
     ...stored,
     classes: projectedClasses.value,
     chosenOptions: { ...stored.chosenOptions, ...options },
@@ -469,6 +481,18 @@ const projectedCharacter = computed<Character>(() => {
         id: spellId, spellId, name: spellId, level: 0, prepared: true,
       })),
     ],
+  }
+  // Projected off `base`, not the stored character: a subclass confirmed in this run
+  // grants its own skills automatically, and reading them needs the class level this run
+  // is gaining and the answers it has already given. The level being gained is named as
+  // well, so the grants it makes on its own — the Banneret's Persuasion at 7th — are
+  // eligible for the expertise asked in the same run.
+  return {
+    ...base,
+    skillProficiencies: projectSkillProficiencies(base, resolvedChoices.value, mergedPack(), {
+      classId: targetClassId.value,
+      newLevel: targetLevel.value,
+    }),
   }
 })
 
@@ -631,10 +655,19 @@ function queueUnlockedChoices(choiceId: string, optionId: string) {
     .find((c): c is Extract<ResolvedChoice, { type: 'RESOLVED_SUBCLASS' }> =>
       c.type === 'RESOLVED_SUBCLASS' && c.classId === targetClassId.value)
     ?.subclassId
-  const feats = resolvedChoices.value
-    .filter((c): c is Extract<ResolvedChoice, { type: 'RESOLVED_CHOOSE_FEAT' }> =>
-      c.type === 'RESOLVED_CHOOSE_FEAT')
-    .map(c => rulepackStore.getFeat(c.featId) as FeatDefinition | undefined)
+  // A feat picked via CHOOSE_FEAT lives in resolvedChoices; one a source granted outright
+  // (GRANT_FEAT) is an automatic event instead — its own CHOOSE_OPTION, left unanswered
+  // (no withOption), can still be sitting among this run's choiceEvents right now.
+  const feats = [
+    ...resolvedChoices.value
+      .filter((c): c is Extract<ResolvedChoice, { type: 'RESOLVED_CHOOSE_FEAT' }> =>
+        c.type === 'RESOLVED_CHOOSE_FEAT')
+      .map(c => c.featId),
+    ...automaticEvents.value
+      .filter((e): e is GrantFeatEvent => e.type === 'GRANT_FEAT')
+      .map(e => e.featId),
+  ]
+    .map(featId => rulepackStore.getFeat(featId) as FeatDefinition | undefined)
     .filter((f): f is FeatDefinition => !!f)
 
   const unlocked = resolveUnlockedChoices(
@@ -662,10 +695,27 @@ function initOptionalToggles(event: OfferOptionalFeaturesEvent) {
   optionalFeatureToggles.value = toggles
 }
 
+/**
+ * A taken optional feature's own choices, if it has any — mirrors queueFeatChoices. Its
+ * automatic half is applied by RESOLVED_OPTIONAL_FEATURES and so is deliberately not
+ * added to `automaticEvents`, which would apply it twice.
+ */
+function queueOptionalFeatureChoices(taken: OfferOptionalFeaturesEvent['features']) {
+  if (!character.value) return
+  const pack = mergedPack()
+  for (const feat of taken) {
+    const full = pack.optionalFeatures.find(f => f.id === feat.id)
+    if (!full?.levelUpEvents?.length) continue
+    const queued = getChoiceEvents(resolveOptionalFeatureEvents(character.value, full, pack))
+    if (queued.length > 0) choiceEvents.value = [...choiceEvents.value, ...queued]
+  }
+}
+
 function confirmOptionalFeatures() {
   const choiceEvent = currentChoice.value as OfferOptionalFeaturesEvent
   const taken = choiceEvent.features.filter(f => optionalFeatureToggles.value[f.id])
   resolvedChoices.value.push({ type: 'RESOLVED_OPTIONAL_FEATURES', taken })
+  queueOptionalFeatureChoices(taken)
   optionalFeatureToggles.value = {}
   nextChoice()
 }
@@ -677,6 +727,9 @@ watch(currentChoice, (choice) => {
   if (choice?.type === 'REPLACE_OPTION') {
     replaceFromChoiceId.value = ''
     replaceToOptionId.value = ''
+  }
+  if (choice?.type === 'CHOOSE_FEAT_ABILITY') {
+    grantedFeatAbilityPicks.value = {}
   }
 })
 
@@ -790,36 +843,16 @@ function confirmSubclass() {
   resolvedChoices.value.push({ type: 'RESOLVED_SUBCLASS', subclassId, classId: targetClassId.value })
   selectedSubclassId.value = ''
 
-  // Inject subclass-level choice events for this level now that we know the subclass
-  const pack = mergedPack()
-  const subclassDef = pack.classes.flatMap(c => c.subclasses ?? []).find(s => s.id === subclassId)
-  const subclassLevelDef = subclassDef?.levels.find(l => l.level === targetLevel.value)
-  const injected: ChoiceLevelUpEvent[] = []
-  for (const eventDef of subclassLevelDef?.levelUpEvents ?? []) {
-    if (eventDef.type === 'CHOOSE_OPTION') {
-      // Through the service, so an option already taken from the same pool is dropped here
-      // too rather than only on the paths that go via resolveLevelUpEvents.
-      const choice = character.value
-        ? resolveOptionChoice(eventDef, toRaw(character.value), pack, targetLevel.value)
-        : undefined
-      if (choice) injected.push(choice)
-    }
-    else if (eventDef.type === 'CHOOSE_SPELL') {
-      // Through the service, like the CHOOSE_OPTION above. Hand-building it here
-      // dropped the whenOption guard — so a subclass shaped like Divine Soul asked
-      // every one of its guarded spell questions at once — along with the free-cast
-      // terms and the source metadata a pick has to carry to the answer.
-      const choice = character.value
-        ? chooseSpellEvent(eventDef, toRaw(character.value), {
-            addTo: eventDef.addTo || targetClassId.value,
-            label: subclassDef?.name,
-          })
-        : undefined
-      if (choice) injected.push(choice)
-    }
-    else if (eventDef.type === 'ABILITY_SCORE_IMPROVEMENT')
-      injected.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
-  }
+  // Ask the subclass's own questions for this level, now that we know which subclass it
+  // is. Through the service's resolution rather than a list of event types kept here: the
+  // list only knew three, so the Knowledge Domain's skill and expertise questions — and
+  // anything a later book declares — were never asked at all. The subclass is not on the
+  // character until the run is applied, which is why this cannot go through
+  // resolveLevelUpEvents; the events still arrive in the order the book prints them.
+  const injected: ChoiceLevelUpEvent[] = character.value
+    ? getChoiceEvents(resolveSubclassLevelEvents(
+        toRaw(character.value), targetClassId.value, subclassId, targetLevel.value, mergedPack()))
+    : []
   if (injected.length > 0)
     choiceEvents.value.splice(currentChoiceIdx.value + 1, 0, ...injected)
 
@@ -868,6 +901,8 @@ async function applyLevelUp() {
 
 const addHpEvent = computed(() => automaticEvents.value.find(e => e.type === 'ADD_HP') as { type: 'ADD_HP'; roll: number; average: number; max: number; conBonus: number; hpFlatBonus: number } | undefined)
 const newFeatures = computed(() => automaticEvents.value.filter(e => e.type === 'ADD_FEATURE'))
+const grantedFeats = computed(() =>
+  automaticEvents.value.filter((e): e is GrantFeatEvent => e.type === 'GRANT_FEAT'))
 const newSpellSlots = computed(() => automaticEvents.value.find(e => e.type === 'UPDATE_SPELL_SLOTS') as { type: 'UPDATE_SPELL_SLOTS'; slots: Record<number, number> } | undefined)
 
 const targetLevel = computed(() => {
@@ -1178,6 +1213,25 @@ watch(isFirstCharacterLevel, (val) => {
               class="btn-primary flex-1 text-sm"
               :disabled="!selectedFeatId || !isChoiceSatisfied(selectedFeatChoice, featAsiChoice)"
               @click="confirmFeat"
+            >Confirm</button>
+          </div>
+        </template>
+
+        <!-- A granted feat's own ability choice (Resilient's "one ability of your choice") -->
+        <template v-else-if="currentChoice.type === 'CHOOSE_FEAT_ABILITY'">
+          <h2 class="font-semibold text-white text-lg">{{ (currentChoice as ChooseFeatAbilityEvent).label }}</h2>
+          <AbilityScoreChoicePicker
+            v-model="grantedFeatAbilityPicks"
+            class="mt-2"
+            :choice="(currentChoice as ChooseFeatAbilityEvent).choice"
+            :base-scores="character!.abilityScores"
+          />
+          <div class="flex gap-2 mt-2">
+            <button class="btn-ghost flex-1 text-sm" @click="skipChoice">Skip</button>
+            <button
+              class="btn-primary flex-1 text-sm"
+              :disabled="!isChoiceSatisfied((currentChoice as ChooseFeatAbilityEvent).choice, grantedFeatAbilityPicks)"
+              @click="confirmGrantedFeatAbility"
             >Confirm</button>
           </div>
         </template>
@@ -1535,6 +1589,19 @@ watch(isFirstCharacterLevel, (val) => {
           </div>
         </div>
 
+        <!-- Feats granted outright (GRANT_FEAT), as opposed to one picked at ASI -->
+        <div v-if="grantedFeats.length" class="card">
+          <p class="section-header">Feat Gained</p>
+          <div class="space-y-1">
+            <div v-for="f in grantedFeats" :key="f.featId" class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-success-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span class="text-sm text-white">{{ f.withOption ? `${f.name} (${f.withOption.optionName})` : f.name }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Spell slots -->
         <div v-if="newSpellSlots" class="card">
           <p class="section-header">Spell Slots Updated</p>
@@ -1559,6 +1626,10 @@ watch(isFirstCharacterLevel, (val) => {
               </span>
               <span v-else-if="choice.type === 'RESOLVED_CHOOSE_FEAT'">
                 Feat: {{ rulepackStore.getFeat(choice.featId)?.name ?? choice.featId }}
+              </span>
+              <span v-else-if="choice.type === 'RESOLVED_FEAT_ABILITY'">
+                {{ rulepackStore.getFeat(choice.featId)?.name ?? choice.featId }} ability:
+                {{ Object.entries(choice.bonuses).map(([k, v]) => `+${v} ${k.toUpperCase()}`).join(', ') }}
               </span>
               <span v-else-if="choice.type === 'RESOLVED_CHOOSE_SPELL'">
                 Spells: {{ choice.spellIds.map(id => rulepackStore.getSpell(id)?.name ?? id).join(', ') }}

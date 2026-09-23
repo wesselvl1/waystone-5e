@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
-import { resolveLevelUpEvents, getChoiceEvents } from '~/services/levelUpService'
-import { raceAbilityBonuses, raceSpeeds } from '~/services/multiclass'
+import { resolveFirstClassLevel } from '~/services/levelUpService'
+import { raceAbilityBonuses, raceResistances, raceSenses, raceSpeeds } from '~/services/multiclass'
 import {
   choiceSummary,
   isChoiceSatisfied,
@@ -11,7 +11,7 @@ import {
 } from '~/services/abilityScoreChoice'
 import { filterBySearch } from '~/services/searchFilter'
 import { cleanEquipmentName } from '~/services/equipment'
-import { proficiencyKey } from '~/services/proficiencies'
+import { dedupeProficiencies } from '~/services/proficiencies'
 import type { Character, AbilityScores, SkillKey } from '~/types/character'
 import type { AbilityScoreChoice } from '~/types/rulepack'
 
@@ -90,6 +90,11 @@ const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id ==
  * every one of those characters was stored walking and nothing else.
  */
 const speeds = computed(() => raceSpeeds(selectedRace.value, selectedSubrace.value))
+
+/** Darkvision and the like, race and subrace merged the same way speeds are. */
+const senses = computed(() => raceSenses(selectedRace.value, selectedSubrace.value))
+/** Damage resistance, damage immunity and condition immunity, race and subrace unioned. */
+const resistances = computed(() => raceResistances(selectedRace.value, selectedSubrace.value))
 
 /** Whether step 1 may not continue until a subrace is picked. */
 const subraceRequired = computed(() =>
@@ -203,16 +208,14 @@ function startingProficiencies(): string[] {
     ...(cls?.toolProficiencies ?? []),
     ...(background?.toolProficiencies ?? []),
     ...(selectedRace.value?.languages ?? []),
+    // A subrace's own languages (a drow's Undercommon) join the race's — a subrace this
+    // wizard never asks about is silently missing a language otherwise.
+    ...(selectedSubrace.value?.languages ?? []),
     ...(languageCount > 0
       ? [`${languageCount} extra language${languageCount === 1 ? '' : 's'} of your choice`]
       : []),
   ]
-  const byKey = new Map<string, string>()
-  for (const name of all) {
-    const key = proficiencyKey(name)
-    if (key && !byKey.has(key)) byKey.set(key, name)
-  }
-  return [...byKey.values()]
+  return dedupeProficiencies(all)
 }
 
 // ── Create character ──────────────────────────────────────────────────────────
@@ -227,34 +230,6 @@ async function createCharacter() {
     }
   }
 
-  // Check if level 1 has choice events (e.g. spell selection). If so, create the character at
-  // level 0 so the level-up wizard handles level 1 — including HP roll and spell choices.
-  //
-  // The probe carries the chosen race, subrace and background: their level-up events fire
-  // on TOTAL character level, so a race that asks something at 1st level (which ability
-  // casts its spells, say) is only visible here if those ids are set. Without them a
-  // Fairy fighter would be created at level 1 and never asked.
-  const pack = rulepackStore.rulepacks.find(r => r.classes.some(c => c.id === draft.classId))
-  const hasLevel1Choices = pack
-    ? getChoiceEvents(resolveLevelUpEvents(
-        {
-          abilityScores: effectiveAbilities.value,
-          hitDice: [],
-          classes: [{ classId: draft.classId, level: 0 }],
-          spells: [],
-          race: draft.raceId,
-          subrace: draft.subraceId || undefined,
-          background: draft.backgroundId,
-          classSpellcasting: {},
-        } as any,
-        // Composed rather than the class's own pack: the race may come from a different
-        // one, and its events are invisible in a pack that does not contain it.
-        draft.classId, 1, rulepackStore.composedPack(),
-      )).length > 0
-    : false
-
-  const startingLevel = hasLevel1Choices ? 0 : 1
-
   const character: Character = {
     id: crypto.randomUUID(),
     name: draft.name || 'Unnamed Adventurer',
@@ -262,7 +237,10 @@ async function createCharacter() {
     subrace: draft.subraceId || undefined,
     background: draft.backgroundId,
     alignment: draft.alignment,
-    classes: [{ classId: draft.classId, level: startingLevel }],
+    // The level being gained, not the one before it: the whole of level 1 is resolved
+    // below, and a granted feat's retroactive hit points count the levels the character
+    // has. The wizard path stores it back at 0, since the level is the wizard's to apply.
+    classes: [{ classId: draft.classId, level: 1 }],
     experiencePoints: 0,
     inspiration: false,
 
@@ -278,21 +256,20 @@ async function createCharacter() {
     appliedRacialBonuses: sumBonuses([racialBonuses.value, distributedBonuses.value]),
     abilityScoreOverrides: {},
 
-    hp: hasLevel1Choices
-      ? { max: 0, current: 0, temp: 0 }
-      : {
-          max: Math.max(1, Number.parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
-          current: Math.max(1, Number.parseInt((cls?.hitDie ?? 'd8').replace('d', '')) + Math.floor((effectiveAbilities.value.con - 10) / 2)),
-          temp: 0,
-        },
+    // Empty on purpose, both of them. Hit points and the hit die are what level 1's own
+    // ADD_HP and UPDATE_HIT_DIE events supply, whichever ending creation takes, and a
+    // figure worked out here as well would be counted twice.
+    hp: { max: 0, current: 0, temp: 0 },
     armorClass: null,
     speeds: speeds.value,
+    senses: senses.value,
     initiative: null,
-    hitDice: startingLevel > 0
-      ? [{ classId: draft.classId, die: cls?.hitDie ?? 'd8', total: startingLevel, remaining: startingLevel }]
-      : [],
+    hitDice: [],
     deathSaves: { successes: 0, failures: 0 },
     conditions: [],
+    damageResistances: resistances.value.damageResistances,
+    damageImmunities: resistances.value.damageImmunities,
+    conditionImmunities: resistances.value.conditionImmunities,
 
     savingThrowProficiencies: cls?.savingThrowProficiencies ?? [],
     skillProficiencies: skillProfs,
@@ -343,28 +320,31 @@ async function createCharacter() {
     rulepackIds: rulepackStore.rulepacks.map(r => r.id),
   }
 
-  if (hasLevel1Choices) {
-    // The level-up wizard handles HP, features, and spell choices for level 1
-    await characterStore.save(character)
-    router.push(`/characters/${character.id}/levelup`)
+  // Level 1 goes through the level-up pipeline, resolved once so the decision and the
+  // application can never read the level differently.
+  //
+  // Deep-copied first: several fields above come straight off the reactive rulepack
+  // store, and every applier begins with a structuredClone, which cannot clone a Vue
+  // proxy. It is the copy the stores make on the way into IndexedDB, taken a step early.
+  //
+  // Composed rather than the class's own pack: the race, the subrace and the background
+  // are each free to come from another book, and their events — which fire on TOTAL
+  // character level — are invisible in a pack that does not contain them.
+  const created: Character = JSON.parse(JSON.stringify(character))
+  const levelOne = resolveFirstClassLevel(created, draft.classId, rulepackStore.composedPack())
+
+  if (levelOne.choices.length > 0) {
+    // A question has to be asked, not applied, so the whole level belongs to the level-up
+    // wizard — HP roll, spells, subclass and every automatic event beside them. Nothing is
+    // applied here, or the wizard would apply it a second time; the character is stored a
+    // level short until it runs.
+    await characterStore.save({ ...created, classes: [{ classId: draft.classId, level: 0 }] })
+    router.push(`/characters/${created.id}/levelup`)
     return
   }
 
-  // Apply level 1 class features for classes without level-1 choices
-  if (pack) {
-    const levelOneEvents = resolveLevelUpEvents(character, draft.classId, 1, pack)
-    for (const event of levelOneEvents) {
-      if (event.type === 'ADD_FEATURE') {
-        character.features.push({
-          ...event.feature,
-          usesRemaining: event.feature.usesMax,
-        })
-      }
-    }
-  }
-
-  await characterStore.save(character)
-  router.push(`/characters/${character.id}`)
+  await characterStore.save(levelOne.character)
+  router.push(`/characters/${created.id}`)
 }
 
 function abilityMod(score: number) {

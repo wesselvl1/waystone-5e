@@ -11,6 +11,7 @@ import type { Character } from '~/types/character'
 import type { Rulepack } from '~/types/rulepack'
 import { validCharacter } from '../fixtures'
 import druidFragment from '~/data/srd/druid.json'
+import sorcererFragment from '~/data/srd/sorcerer.json'
 import spellFragment from '~/data/srd/spells.json'
 
 function pack(): Rulepack {
@@ -210,5 +211,151 @@ describe('chosenOptions on the schema', () => {
   it('is optional, so characters predating it still validate', () => {
     const parsed = CharacterSchema.parse(JSON.parse(JSON.stringify(validCharacter)))
     expect(parsed.chosenOptions).toBeUndefined()
+  })
+})
+
+/**
+ * Stands in for xge.divine-soul, which is gitignored book data: five guarded grants on the
+ * very level the affinity is picked, each naming its own label. The arms below carry the
+ * rest of what a grant can say — the ability that casts it, a free cast, a fixed slot
+ * level — because the class branch of RESOLVED_OPTION built the grant by hand and passed
+ * no source object at all, so every one of those fields was dropped on the floor while
+ * the race branch three lines below kept them.
+ */
+const DIVINE_SOUL = {
+  id: 'book.divine-soul',
+  name: 'Divine Soul',
+  description: 'Your magic comes from a divine source.',
+  classId: 'sorcerer',
+  levels: [{
+    level: 1,
+    features: [{ name: 'Divine Magic', description: 'Your link to the divine lets you learn spells from the cleric list.' }],
+    levelUpEvents: [
+      {
+        type: 'CHOOSE_OPTION' as const,
+        id: 'book.divine-soul-affinity',
+        label: 'Choose your divine affinity',
+        feature: 'Divine Magic',
+        options: [
+          { id: 'good', name: 'Good', description: 'You learn cure wounds.' },
+          { id: 'evil', name: 'Evil', description: 'You learn inflict wounds.' },
+          { id: 'law', name: 'Law', description: 'You learn bless.' },
+        ],
+      },
+      {
+        type: 'GRANT_SPELLS' as const,
+        addTo: 'sorcerer',
+        spellIds: ['cure-wounds'],
+        alwaysPrepared: true,
+        ability: 'cha' as const,
+        origin: 'class' as const,
+        label: 'Divine Soul: Good',
+        whenOption: { choiceId: 'book.divine-soul-affinity', optionId: 'good' },
+      },
+      {
+        // The same arm written as a free cast, which a book prints often enough that the
+        // three fields carrying it have to survive the replay too.
+        type: 'GRANT_SPELLS' as const,
+        addTo: 'sorcerer',
+        spellIds: ['inflict-wounds'],
+        ability: 'cha' as const,
+        origin: 'class' as const,
+        label: 'Divine Soul: Evil',
+        uses: { max: 1, recharge: 'long' as const },
+        cost: { resource: 'Sorcery Points', amount: 2 },
+        castAtLevel: 2,
+        whenOption: { choiceId: 'book.divine-soul-affinity', optionId: 'evil' },
+      },
+      {
+        // Names no label of its own, so the subclass's name has to stand in — the same
+        // fallback resolveLevelUpEvents applies when it emits a grant unguarded.
+        type: 'GRANT_SPELLS' as const,
+        addTo: 'sorcerer',
+        spellIds: ['bless'],
+        ability: 'cha' as const,
+        whenOption: { choiceId: 'book.divine-soul-affinity', optionId: 'law' },
+      },
+    ],
+  }],
+}
+
+function soulPack(): Rulepack {
+  const built = RulepackSchema.parse({
+    id: 'p',
+    name: 'Test',
+    version: '1',
+    classes: RulepackSchema.parse(sorcererFragment).classes,
+    spells: RulepackSchema.parse(spellFragment).spells,
+    subclasses: [DIVINE_SOUL],
+  }) as unknown as Rulepack
+  // Distribute the patch entry into its class, the way the store does at merge time.
+  for (const patch of built.subclasses ?? []) {
+    const { classId, ...rest } = patch as never as { classId: string }
+    const cls = built.classes.find(c => c.id === classId)
+    if (cls) cls.subclasses = [...(cls.subclasses ?? []), rest as never]
+  }
+  return built
+}
+
+describe('a guarded grant on a subclass level keeps what it was declared with', () => {
+  const soulRulepack = soulPack()
+
+  function soul(): Character {
+    return {
+      ...validCharacter,
+      classes: [{ classId: 'sorcerer', level: 1, subclassId: 'book.divine-soul' }],
+      spells: [],
+      spellSlots: {},
+      features: [],
+      classSpellcasting: {},
+    } as Character
+  }
+
+  it('records the ability, origin and label behind the spell', () => {
+    const applied = applyResolvedChoices(
+      soul(),
+      [{ type: 'RESOLVED_OPTION', choiceId: 'book.divine-soul-affinity', optionId: 'good' }],
+      soulRulepack,
+    )
+    expect(applied.spells.map(s => s.spellId)).toEqual(['cure-wounds'])
+    expect(applied.spells[0]!.alwaysPrepared).toBe(true)
+    expect(applied.classSpellcasting?.sorcerer).toMatchObject({
+      ability: 'cha',
+      origin: 'class',
+      label: 'Divine Soul: Good',
+    })
+  })
+
+  it('carries the free cast, the resource cost and the fixed slot level', () => {
+    const applied = applyResolvedChoices(
+      soul(),
+      [{ type: 'RESOLVED_OPTION', choiceId: 'book.divine-soul-affinity', optionId: 'evil' }],
+      soulRulepack,
+    )
+    const spell = applied.spells.find(s => s.spellId === 'inflict-wounds')!
+    expect(spell.uses).toEqual({ max: 1, recharge: 'long', remaining: 1 })
+    expect(spell.cost).toEqual({ resource: 'Sorcery Points', amount: 2 })
+    expect(spell.castAtLevel).toBe(2)
+    expect(applied.classSpellcasting?.sorcerer?.label).toBe('Divine Soul: Evil')
+  })
+
+  it('falls back to the subclass name when the grant names no label', () => {
+    const applied = applyResolvedChoices(
+      soul(),
+      [{ type: 'RESOLVED_OPTION', choiceId: 'book.divine-soul-affinity', optionId: 'law' }],
+      soulRulepack,
+    )
+    expect(applied.spells.map(s => s.spellId)).toEqual(['bless'])
+    expect(applied.classSpellcasting?.sorcerer?.label).toBe('Divine Soul')
+  })
+
+  it('still grants only the arm that was chosen', () => {
+    const applied = applyResolvedChoices(
+      soul(),
+      [{ type: 'RESOLVED_OPTION', choiceId: 'book.divine-soul-affinity', optionId: 'good' }],
+      soulRulepack,
+    )
+    expect(applied.spells.map(s => s.spellId)).not.toContain('inflict-wounds')
+    expect(applied.spells.map(s => s.spellId)).not.toContain('bless')
   })
 })

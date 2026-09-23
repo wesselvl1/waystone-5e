@@ -45,6 +45,14 @@ const RaceSpeedsSchema = z.object({
   fly: z.number().int().min(0).optional(),
 })
 
+// Mirrors CharacterSenses: every mode optional, absent means "sees as anyone does".
+const CharacterSensesSchema = z.object({
+  darkvision: z.number().int().min(0).optional(),
+  blindsight: z.number().int().min(0).optional(),
+  tremorsense: z.number().int().min(0).optional(),
+  truesight: z.number().int().min(0).optional(),
+})
+
 const SpellSlotLevelSchema = z.union([
   z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5),
   z.literal(6), z.literal(7), z.literal(8), z.literal(9),
@@ -131,9 +139,30 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     }).optional(),
   }),
   z.object({
+    type: z.literal('SET_SENSE'),
+    mode: z.enum(['darkvision', 'blindsight', 'tremorsense', 'truesight']),
+    range: z.number().int().min(0),
+    // Set only when an option was picked, e.g. Custom Lineage's darkvision arm.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+  }),
+  z.object({
     type: z.literal('GAIN_PROFICIENCY'),
     proficiency: z.string(),
     // Granted only when an option was picked, e.g. the Elf Weapon Training arm.
+    whenOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+  }),
+  z.object({
+    // Proficiency in one saving throw, which lives in its own field on the character.
+    // `'increased'` names the ability the granting feat's own increase went to.
+    type: z.literal('GAIN_SAVE_PROFICIENCY'),
+    ability: SpellAbilityRefSchema,
+    // Granted only when an option was picked, e.g. Elegant Courtier's Int-or-Cha arm.
     whenOption: z.object({
       choiceId: z.string(),
       optionId: z.string(),
@@ -147,6 +176,10 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     cantrip: z.boolean().optional(),
     classes: z.array(z.string()).optional(),
     schools: z.array(z.string()).optional(),
+    // Tag filters. Absent means unfiltered; set, they narrow whichever list the
+    // restrictions above select — Ritual Caster wants a class list *and* the ritual tag.
+    ritual: z.boolean().optional(),
+    attackRoll: z.boolean().optional(),
     // Caps spell level for a source that has no class level of its own to cap by.
     maxLevel: z.number().int().min(0).max(9).optional(),
     // Asked only once this option is picked; queued by the wizard's second stage.
@@ -251,6 +284,18 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     types: z.array(CreatureTypeSchema).optional(),
   }),
   z.object({ type: z.literal('CHOOSE_FEAT') }),
+  z.object({
+    // Names a specific feat rather than asking the player, e.g. a background's "You gain
+    // the Tough feat".
+    type: z.literal('GRANT_FEAT'),
+    featId: z.string(),
+    // Pre-answers one arm of the feat's own CHOOSE_OPTION, e.g. Magic Initiate's class.
+    withOption: z.object({
+      choiceId: z.string(),
+      optionId: z.string(),
+    }).optional(),
+    label: z.string().optional(),
+  }),
   z.object({ type: z.literal('ABILITY_SCORE_IMPROVEMENT'), points: z.number().int() }),
   z.object({ type: z.literal('CHOOSE_SUBCLASS'), label: z.string() }),
   z.object({ type: z.literal('UPDATE_HIT_DIE'), die: z.string() }),
@@ -260,6 +305,9 @@ const LevelUpEventDefSchema = z.discriminatedUnion('type', [
     label: z.string(),
     options: z.array(ChooseOptionDefSchema).min(1),
     group: z.string().optional(),
+    // The feature the answer is written onto, when the level's own wording does not
+    // make it obvious. Meaningless on a grouped pick, which gets a feature of its own.
+    feature: z.string().optional(),
   }),
   z.object({
     type: z.literal('REPLACE_OPTION'),
@@ -314,6 +362,14 @@ const SubraceSchema = z.object({
   replacesRaceTraits: z.array(z.string()).optional(),
   traits: z.array(RaceTraitSchema),
   speedOverrides: RaceSpeedsSchema.partial().optional(),
+  // Merged over the race's own by raceSenses()/raceResistances() — senses take the
+  // larger range per mode, the resistance lists union.
+  senses: CharacterSensesSchema.optional(),
+  damageResistances: z.array(z.string()).optional(),
+  damageImmunities: z.array(z.string()).optional(),
+  conditionImmunities: z.array(z.string()).optional(),
+  // Read after the race's own by startingProficiencies(), deduplicated the same way.
+  languages: z.array(z.string()).optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
 })
 
@@ -322,9 +378,13 @@ const RaceSchema = z.object({
   name: z.string(),
   size: z.enum(['tiny', 'small', 'medium', 'large']),
   speeds: RaceSpeedsSchema,
+  senses: CharacterSensesSchema.optional(),
   abilityScoreBonuses: z.partialRecord(AbilityKeySchema, z.number()),
   traits: z.array(RaceTraitSchema),
   languages: z.array(z.string()),
+  damageResistances: z.array(z.string()).optional(),
+  damageImmunities: z.array(z.string()).optional(),
+  conditionImmunities: z.array(z.string()).optional(),
   abilityScoreChoice: AbilityScoreChoiceSchema.optional(),
   levelUpEvents: z.array(SourceLevelEventsSchema).optional(),
   // The race stands on its own; any subraces are sourcebook variants, so "None" is offered.
@@ -516,6 +576,9 @@ export const OptionalClassFeatureSchema = z.object({
   replaces: z.string().optional(),
   usesMax: z.number().int().optional(),
   recharge: z.enum(['short', 'long', 'dawn']).optional(),
+  // What taking the feature does, e.g. Primal Awareness's always-prepared spells — see
+  // the type's own comment for why this has to be resolved the same way a feat's is.
+  levelUpEvents: z.array(LevelUpEventDefSchema).optional(),
 })
 
 /**

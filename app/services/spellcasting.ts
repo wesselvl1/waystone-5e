@@ -1,5 +1,6 @@
 import type { AbilityKey, Character, ClassEntry, SpellSlotLevel, SpellSlots } from '~/types/character'
-import type { CasterProgression, ClassDefinition, LevelUpEventDef, Rulepack, SubclassDefinition } from '~/types/rulepack'
+import type { CasterProgression, ClassDefinition, LevelUpEventDef, Rulepack, SpellDefinition, SubclassDefinition } from '~/types/rulepack'
+import type { ChooseSpellEvent } from '~/types/events'
 import {
   spellLimitBonusTotal, preparedSpellCount, knownSpellCount,
 } from '~/utils/spellLimits'
@@ -305,6 +306,46 @@ export function maxSpellLevelForClass(
     .map(Number)
     .filter(n => (own[n as SpellSlotLevel] ?? 0) > 0)
   return levels.length > 0 ? Math.max(...levels) : 0
+}
+
+/**
+ * Whether one spell satisfies a CHOOSE_SPELL's restrictions — the level-up wizard's picker
+ * asks this of every spell it lists.
+ *
+ * It lives here rather than inline in the page because the picker is the *only* thing
+ * enforcing these restrictions: a filter with nowhere to test it is a filter that quietly
+ * stops filtering. `levelCap` is the target class's own cap, already resolved by the
+ * caller, and `expandedSpellIds` are the spells a standing rule adds to that list.
+ */
+export function spellMatchesChoice(
+  spell: SpellDefinition,
+  event: ChooseSpellEvent,
+  context: { levelCap: number; expandedSpellIds?: ReadonlySet<string> },
+): boolean {
+  if (event.cantrip !== (spell.level === 0)) return false
+  // Cap by the *class's* own level, not the character's slots: a cleric 1 / wizard 1 has a
+  // 2nd-level slot but may only take 1st-level spells from either list. A source with no
+  // class level to cap by states its own maxLevel — a feat grants a 1st-level spell to a
+  // fighter whose class cap is 0.
+  const cap = event.maxLevel ?? context.levelCap
+  if (!event.cantrip && spell.level > cap) return false
+  // The tag filters narrow whichever list the restrictions below select, instead of being
+  // two more arms of that chain: Ritual Caster asks for a class list *and* the ritual tag,
+  // Spell Sniper for a cantrip *and* an attack roll.
+  if (event.ritual && !spell.ritual) return false
+  if (event.attackRoll && !spell.attackRoll) return false
+  // An expansion widens which spells count as being ON a list, which is what
+  // EXPAND_SPELL_LIST means — so it is folded into the class-list test rather than
+  // short-circuiting ahead of every restriction. Returning true up front let a guild
+  // background's spells satisfy a pick they have nothing to do with: Fey Touched asks
+  // for divination or enchantment, and would have offered whatever the guild added.
+  if (event.fromList?.length) return event.fromList.includes(spell.id)
+  if (event.classes?.length) {
+    return spell.classes.some(c => event.classes!.includes(c))
+      || (context.expandedSpellIds?.has(spell.id) ?? false)
+  }
+  if (event.schools?.length) return event.schools.includes(spell.school)
+  return true
 }
 
 /** Spell save DC for one spellcasting source. */

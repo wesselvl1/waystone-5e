@@ -8,6 +8,7 @@ import type {
   SpellAbilityRef,
 } from '~/types/rulepack'
 import { addHitDieForClass, multiclassProficiencies } from '~/services/multiclass'
+import { matchSkillKey } from '~/services/proficiencies'
 import type {
   LevelUpEvent,
   AutomaticLevelUpEvent,
@@ -15,6 +16,7 @@ import type {
   AddHpEvent,
   AddFeatureEvent,
   GainProficiencyEvent,
+  GainSaveProficiencyEvent,
   UpdateSpellSlotsEvent,
   UpdateWarlockSlotsEvent,
   UpdateHitDieEvent,
@@ -32,6 +34,9 @@ import type {
   GrantSpellsEvent,
   SetWildShapeLimitsEvent,
   SetSpeedEvent,
+  SetSenseEvent,
+  GrantFeatEvent,
+  ChooseFeatAbilityEvent,
   ResolvedChoice,
 } from '~/types/events'
 
@@ -85,6 +90,70 @@ function gainProficiencyEvent(
   return { type: 'GAIN_PROFICIENCY', proficiency: def.proficiency, category: 'skill' }
 }
 
+/**
+ * Applies a GAIN_PROFICIENCY grant to the character, at every site that resolves one —
+ * a race, a feat, a class or a guarded `whenOption` arm all go through this so they
+ * behave the same.
+ *
+ * Skills are the one category with their own backing field: `isProficientWithWeapon` /
+ * `isProficientWithArmor` read `otherProficiencies` directly, so a weapon, a tool or an
+ * armour category belongs there, but the Skills panel and `useCharacterStats` read only
+ * `Character.skillProficiencies` and never scan `otherProficiencies` for a skill name —
+ * a "perception" chip in the Proficiencies tab would leave Perception itself unchecked.
+ * `matchSkillKey` tells the two apart by wording, the same way `classifyProficiency`
+ * works out a group, so the entry lands in exactly one of the two lists rather than both
+ * (which would render it twice).
+ */
+function applyGainProficiency(character: Character, proficiency: string): void {
+  const skill = matchSkillKey(proficiency)
+  if (skill) {
+    // Never downgrade: a skill already at expertise (2) stays there, mirroring
+    // RESOLVED_SKILL's own rule for a player-chosen grant.
+    if ((character.skillProficiencies[skill] ?? 0) === 0) {
+      character.skillProficiencies[skill] = 1
+    }
+    return
+  }
+  if (!character.otherProficiencies.includes(proficiency)) {
+    character.otherProficiencies.push(proficiency)
+  }
+}
+
+/**
+ * The saving-throw proficiency, unless an option the character has not picked guards it.
+ *
+ * Same gate as a guarded spell grant, plus the `'increased'` reading `GRANT_SPELLS`
+ * already has: Resilient's proficiency follows its own ability increase, which is not
+ * known until the player answers it. An unanswered one emits nothing rather than guessing
+ * an ability — RESOLVED_FEAT_ABILITY replays the feat's events once the answer is in.
+ */
+function gainSaveProficiencyEvent(
+  def: Extract<LevelUpEventDef, { type: 'GAIN_SAVE_PROFICIENCY' }>,
+  character: Character,
+  increasedAbility?: AbilityKey,
+): GainSaveProficiencyEvent | undefined {
+  if (def.whenOption
+    && character.chosenOptions?.[def.whenOption.choiceId] !== def.whenOption.optionId) {
+    return undefined
+  }
+  const ability = resolveAbilityRef(def.ability, increasedAbility)
+  if (!ability) return undefined
+  return { type: 'GAIN_SAVE_PROFICIENCY', ability }
+}
+
+/**
+ * Makes a character proficient in one saving throw, at every site that grants one.
+ *
+ * Never a duplicate and never a downgrade: the list is a flat set of abilities shared
+ * with the sheet's own toggle, and a class that already granted the save must not end up
+ * with two entries for it.
+ */
+function applyGainSaveProficiency(character: Character, ability: AbilityKey): void {
+  if (!character.savingThrowProficiencies.includes(ability)) {
+    character.savingThrowProficiencies.push(ability)
+  }
+}
+
 /** The speed, unless an option the character has not picked guards it. */
 function setSpeedEvent(
   def: Extract<LevelUpEventDef, { type: 'SET_SPEED' }>,
@@ -95,6 +164,18 @@ function setSpeedEvent(
     return undefined
   }
   return { type: 'SET_SPEED', mode: def.mode, speed: def.speed }
+}
+
+/** The sense, unless an option the character has not picked guards it. Mirrors setSpeedEvent. */
+function setSenseEvent(
+  def: Extract<LevelUpEventDef, { type: 'SET_SENSE' }>,
+  character: Character,
+): SetSenseEvent | undefined {
+  if (def.whenOption
+    && character.chosenOptions?.[def.whenOption.choiceId] !== def.whenOption.optionId) {
+    return undefined
+  }
+  return { type: 'SET_SENSE', mode: def.mode, range: def.range }
 }
 
 function rollDie(sides: number): number {
@@ -291,6 +372,91 @@ export function optionAvailable(
   return true
 }
 
+/**
+ * Skill proficiencies as this run's answers will leave them.
+ *
+ * A CHOOSE_SKILL answered moments ago is not written to the character until the run is
+ * applied, so anything later in the same run that reads the character has to be told
+ * about it — the Knowledge Domain's Blessings of Knowledge grants two skills and then
+ * doubles those same two. Never downgrades, which is the rule RESOLVED_SKILL itself
+ * applies: a skill already at expertise stays there.
+ *
+ * A subclass confirmed in the same run counts too, when a `rulepack` is passed. Its
+ * automatic GAIN_PROFICIENCY events are applied by RESOLVED_SUBCLASS, which runs after
+ * the whole run of questions — so the Scout's Survivalist, which grants Nature and
+ * Survival and then doubles those same two, told every rogue not already proficient that
+ * nothing was eligible. `character.classes` must carry the level being gained, since that
+ * is the subclass level whose events are read.
+ *
+ * So does the level being gained itself, when `levelUp` names it. Every automatic grant
+ * is applied only once the run is committed, and a subclass answered in this run is only
+ * one of the ways one arrives: the Banneret's Royal Envoy grants Persuasion and doubles it
+ * at subclass level 7, four levels after the archetype was chosen, so nothing above sees
+ * it. Resolved through the resolver the run itself will use rather than by reading the
+ * level's defs, so a `whenOption` arm still has to be answered before its grant counts —
+ * the caller's character carries this run's option answers, and an unanswered guard
+ * resolves to nothing at all.
+ */
+export function projectSkillProficiencies(
+  character: Character,
+  choices: ResolvedChoice[],
+  rulepack?: Rulepack,
+  levelUp?: { classId: string, newLevel: number },
+): Character['skillProficiencies'] {
+  const projected = { ...character.skillProficiencies }
+  const gain = (skill: SkillKey) => {
+    if ((projected[skill] ?? 0) === 0) projected[skill] = 1
+  }
+  for (const choice of choices) {
+    if (choice.type === 'RESOLVED_SKILL') {
+      for (const skill of choice.skills) gain(skill)
+      continue
+    }
+    if (choice.type !== 'RESOLVED_SUBCLASS' || !rulepack) continue
+    const level = character.classes.find(c => c.classId === choice.classId)?.level
+    if (level === undefined) continue
+    // Through the same resolver RESOLVED_SUBCLASS itself applies, rather than reading the
+    // level's defs by hand: a guarded grant stays guarded, and nothing here can drift
+    // from what the run will actually write.
+    const events = resolveSubclassLevelEvents(
+      character, choice.classId, choice.subclassId, level, rulepack)
+    for (const event of events) {
+      if (event.type !== 'GAIN_PROFICIENCY') continue
+      // Only the skills: `applyGainProficiency` files a weapon or a tool elsewhere, and
+      // expertise has nothing to double there.
+      const skill = matchSkillKey(event.proficiency)
+      if (skill) gain(skill)
+    }
+  }
+  if (rulepack && levelUp) {
+    // The whole level, not the class's own defs: a grant can sit on the class level, on
+    // the subclass level already stored, or on a race or background that fires on this
+    // total level, and the expertise that doubles it cannot tell the three apart.
+    const events = resolveLevelUpEvents(character, levelUp.classId, levelUp.newLevel, rulepack)
+    for (const event of events) {
+      if (event.type !== 'GAIN_PROFICIENCY') continue
+      const skill = matchSkillKey(event.proficiency)
+      if (skill) gain(skill)
+    }
+  }
+  return projected
+}
+
+/**
+ * The skills a CHOOSE_EXPERTISE may be answered with.
+ *
+ * Expertise doubles an existing proficiency, so a skill the character is not proficient
+ * in is not eligible, and one already doubled is not offered a second time. The caller
+ * passes the proficiencies *including* this run's own picks, since the wizard asks the
+ * question before any of them is stored.
+ */
+export function skillsEligibleForExpertise(
+  options: SkillKey[],
+  skillProficiencies: Character['skillProficiencies'],
+): SkillKey[] {
+  return options.filter(s => (skillProficiencies[s] ?? 0) === 1)
+}
+
 /** Total level across every class, the yardstick for a race's or feat's own pools. */
 function totalLevel(character: Character): number {
   return character.classes.reduce((sum, c) => sum + c.level, 0)
@@ -412,7 +578,7 @@ function poolFeatureId(choiceId: string): string {
 
 /**
  * The feature a pool pick is worth on its own, or undefined when the choice is not a
- * class-level pool pick.
+ * grouped pool pick.
  *
  * A pick from a shared pool was recorded in `chosenOptions` and nowhere else, so the sheet
  * — which renders `features` — showed a warlock "Eldritch Invocations" without ever saying
@@ -426,19 +592,26 @@ function poolPickFeature(
   optionId: string,
 ): Feature | undefined {
   for (const cls of rulepack.classes) {
-    for (const level of cls.levels) {
-      for (const def of level.levelUpEvents ?? []) {
-        if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId || !def.group) continue
-        // Patched-in options too, or a sourcebook invocation would be picked and then
-        // named nothing on the sheet.
-        const option = def.options.find(o => o.id === optionId)
-          ?? poolExtras(rulepack, def.group, def.id).find(o => o.id === optionId)
-        if (!option) return undefined
-        return {
-          id: poolFeatureId(choiceId),
-          name: option.name,
-          source: cls.name,
-          description: option.description,
+    // Subclass levels declare pools of their own — a Battle Master's manoeuvres, a Four
+    // Elements monk's disciplines — and looking only at the class's own levels left those
+    // picks with no feature at all, the very thing this function exists to prevent.
+    // `allOptionChoices` already walks both; the source names whichever owns the pool,
+    // since a sheet reader looking for Trip Attack is looking under Battle Master.
+    for (const owner of [cls, ...(cls.subclasses ?? [])]) {
+      for (const level of owner.levels) {
+        for (const def of level.levelUpEvents ?? []) {
+          if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId || !def.group) continue
+          // Patched-in options too, or a sourcebook invocation would be picked and then
+          // named nothing on the sheet.
+          const option = def.options.find(o => o.id === optionId)
+            ?? poolExtras(rulepack, def.group, def.id).find(o => o.id === optionId)
+          if (!option) return undefined
+          return {
+            id: poolFeatureId(choiceId),
+            name: option.name,
+            source: owner.name,
+            description: option.description,
+          }
         }
       }
     }
@@ -489,6 +662,98 @@ export function backfillPoolPickFeatures(character: Character, rulepack: Rulepac
 /** The id a subclass feature is filed under, wherever one is granted. */
 function subclassFeatureId(subclassId: string, featureName: string, level: number): string {
   return `${subclassId}-${featureName.toLowerCase().replaceAll(' ', '-')}-${level}`
+}
+
+/** The id a class's own feature is filed under. Shaped like a subclass's, per class. */
+function classFeatureId(classId: string, featureName: string, level: number): string {
+  return `${classId}-${featureName.toLowerCase().replace(/\s+/g, '-')}-${level}`
+}
+
+/**
+ * A name reduced to the word-shape an id is written in: `Hunter's Prey` → `hunters-prey`.
+ * Punctuation goes, because an id never carries it.
+ */
+function idWords(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/**
+ * The feature a CHOOSE_OPTION annotates, by id, or undefined when it annotates none.
+ *
+ * The link used to be `feature.id.includes(choiceId)` over the *whole character*, which
+ * is two bugs at once: `xge.cavalier-bonus-proficiency-3` contains
+ * `xge.cavalier-bonus-proficiency` and was overwritten though a book-text feature raised
+ * nothing, while `xge.storm-herald-environment` is nowhere inside
+ * `xge.path-of-the-storm-herald-storm-aura-3` and the answer landed nowhere at all.
+ *
+ * So the link is structural instead: only the features declared on the very level that
+ * declares the choice are candidates. Among those, the pack may name one outright
+ * (`feature`); otherwise it is the one the choice id is named after — `phb.totem-spirit`
+ * for "Totem Spirit" — and failing that the level's sole feature, which is what a choice
+ * declared beside exactly one feature must belong to. A level with several features and
+ * no match annotates none rather than guessing.
+ */
+function optionChoiceFeatureName(
+  def: ChooseOptionDefEvent,
+  featureNames: string[],
+): string | undefined {
+  if (def.feature) return featureNames.find(n => n === def.feature)
+  const id = idWords(def.id)
+  const named = featureNames.find((n) => {
+    const words = idWords(n)
+    return id === words || id.endsWith(`-${words}`)
+  })
+  if (named) return named
+  return featureNames.length === 1 ? featureNames[0] : undefined
+}
+
+/**
+ * Where a CHOOSE_OPTION is declared: the definition itself, and the id of the feature its
+ * answer is written onto.
+ *
+ * Classes and subclasses only. A race's or subrace's pick gets a feature of its own
+ * (`poolPickFeature` builds one grouped or not), a feat's is named on the feat's feature
+ * by `applyResolvedChoices`, and neither has a level's feature list to annotate.
+ */
+function findOptionChoiceSite(
+  rulepack: Rulepack,
+  choiceId: string,
+): { def: ChooseOptionDefEvent; featureId?: string } | undefined {
+  for (const cls of rulepack.classes) {
+    for (const level of cls.levels) {
+      for (const def of level.levelUpEvents ?? []) {
+        if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId) continue
+        const name = optionChoiceFeatureName(def, level.features)
+        return { def, featureId: name ? classFeatureId(cls.id, name, level.level) : undefined }
+      }
+    }
+    for (const sub of cls.subclasses ?? []) {
+      for (const level of sub.levels) {
+        for (const def of level.levelUpEvents ?? []) {
+          if (def.type !== 'CHOOSE_OPTION' || def.id !== choiceId) continue
+          const name = optionChoiceFeatureName(def, level.features.map(f => f.name))
+          return { def, featureId: name ? subclassFeatureId(sub.id, name, level.level) : undefined }
+        }
+      }
+    }
+  }
+  return undefined
+}
+
+/**
+ * Writes an answered option onto the feature that asked for it — "Storm Aura (Desert)".
+ *
+ * The option's own text is appended rather than substituted. It used to replace the
+ * description outright, which traded a Cavalier's printed paragraph for the five words
+ * "Animal Handling, History, Insight, Performance, or Persuasion." — the book text is
+ * what the sheet is for, and the pick is an addition to it, not a correction of it.
+ */
+function annotateFeatureWithOption(feature: Feature, option: PoolOption): void {
+  feature.name = `${feature.name} (${option.name})`
+  if (!option.description || feature.description.includes(option.description)) return
+  feature.description = feature.description
+    ? `${feature.description}\n\n${option.name}. ${option.description}`
+    : option.description
 }
 
 /**
@@ -729,6 +994,8 @@ export function chooseSpellEvent(
     fromList: eventDef.fromList,
     classes: eventDef.classes,
     schools: eventDef.schools,
+    ritual: eventDef.ritual,
+    attackRoll: eventDef.attackRoll,
     maxLevel: eventDef.maxLevel,
     ability: resolveAbilityRef(eventDef.ability, defaults.increasedAbility),
     origin: eventDef.origin ?? defaults.origin,
@@ -774,6 +1041,143 @@ function expandSpellListEvent(
     ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
     ...(label ? { label } : {}),
   }
+}
+
+/**
+ * The events a subclass's own level declares — a totem choice, an archetype's spells,
+ * the Knowledge Domain's skills and the expertise that doubles them.
+ *
+ * Split out of `resolveLevelUpEvents` because the wizard needs it on its own: a subclass
+ * picked moments ago is not on the character yet, so nothing that reads the character can
+ * find it, and the page was listing by hand the event types it knew how to raise. A
+ * hand-kept list is a list that goes stale — the page's had three entries where the data
+ * already used six — so both callers read this one switch instead, and a subclass level's
+ * events are raised in the order the book prints them either way.
+ */
+export function resolveSubclassLevelEvents(
+  character: Character,
+  classId: string,
+  subclassId: string,
+  newLevel: number,
+  rulepack: Rulepack,
+): LevelUpEvent[] {
+  const classDef = rulepack.classes.find(c => c.id === classId)
+  const subclassDef = rulepack.classes.flatMap(c => c.subclasses ?? []).find(s => s.id === subclassId)
+  if (!classDef || !subclassDef) return []
+
+  const events: LevelUpEvent[] = []
+  for (const eventDef of subclassDef.levels.find(l => l.level === newLevel)?.levelUpEvents ?? []) {
+    switch (eventDef.type) {
+      case 'CHOOSE_OPTION': {
+        const choice = resolveOptionChoice(eventDef, character, rulepack, newLevel)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'REPLACE_OPTION': {
+        const choice = resolveOptionReplacement(eventDef, character, rulepack, newLevel)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'CHOOSE_SPELL': {
+        // The class the pick is filed under and the subclass that asked for it: a spell
+        // learnt from an archetype still belongs to its class's list, and the answer
+        // carries the label the sheet files it under.
+        const choice = chooseSpellEvent(eventDef, character, {
+          addTo: classId,
+          label: subclassDef.name,
+        })
+        if (choice) events.push(choice)
+        break
+      }
+      case 'CHOOSE_SPELLCASTING_ABILITY': {
+        const choice = resolveSpellcastingAbilityChoice(eventDef, character, classDef.name)
+        if (choice) events.push(choice)
+        break
+      }
+      case 'GRANT_SPELLCASTING':
+        // Labelled with the subclass, not the class: an Eldritch Knight's DC belongs to
+        // the archetype rather than to "Fighter", and every other grant below already
+        // falls back to the subclass's name.
+        events.push(grantSpellcastingEvent(eventDef, subclassDef.name))
+        break
+      case 'EXPAND_SPELL_LIST': {
+        const expand = expandSpellListEvent(eventDef, character, subclassDef.name)
+        if (expand) events.push(expand)
+        break
+      }
+      case 'GRANT_SPELLS': {
+        // A guarded grant only fires once the option it depends on has been picked. At
+        // the level the option is chosen the answer is not known yet, so the grant is
+        // skipped and applied by RESOLVED_OPTION or RESOLVED_SUBCLASS instead.
+        const grant = grantSpellsEvent(eventDef, character, rulepack, {
+          origin: 'class',
+          label: subclassDef.name,
+        })
+        if (grant) events.push(grant)
+        break
+      }
+      case 'GAIN_PROFICIENCY': {
+        const proficiency = gainProficiencyEvent(eventDef, character)
+        if (proficiency) events.push(proficiency)
+        break
+      }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        const save = gainSaveProficiencyEvent(eventDef, character)
+        if (save) events.push(save)
+        break
+      }
+      case 'CHOOSE_SKILL': {
+        const skills = chooseSkillEvent(eventDef, character)
+        if (skills) events.push(skills)
+        break
+      }
+      case 'CHOOSE_EXPERTISE':
+        events.push({
+          type: 'CHOOSE_EXPERTISE',
+          label: eventDef.label,
+          options: eventDef.options,
+          count: eventDef.count,
+        } satisfies ChooseExpertiseEvent)
+        break
+      case 'SET_SPEED': {
+        const speed = setSpeedEvent(eventDef, character)
+        if (speed) events.push(speed)
+        break
+      }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
+        break
+      }
+      case 'SET_WILD_SHAPE_LIMITS':
+        events.push({
+          type: 'SET_WILD_SHAPE_LIMITS',
+          maxCR: eventDef.maxCR,
+          // Unset means unrestricted, so a subclass that widens the limits can simply
+          // omit the gates rather than having to re-state them as true.
+          allowSwim: eventDef.allowSwim ?? true,
+          allowFly: eventDef.allowFly ?? true,
+          // Copy: eventDef belongs to the reactive rulepack store, and a Vue proxy
+          // stored on the character makes the next structuredClone throw.
+          types: eventDef.types ? [...eventDef.types] : undefined,
+        } satisfies SetWildShapeLimitsEvent)
+        break
+      case 'UPDATE_FEATURE_USES':
+        events.push({
+          type: 'UPDATE_FEATURE_USES',
+          featureName: eventDef.featureName,
+          usesMax: eventDef.usesMax,
+        } satisfies UpdateFeatureUsesEvent)
+        break
+      case 'ABILITY_SCORE_IMPROVEMENT':
+        events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
+        break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, subclassDef.name))
+        break
+    }
+  }
+  return events
 }
 
 export function resolveLevelUpEvents(
@@ -846,7 +1250,6 @@ export function resolveLevelUpEvents(
     : undefined
   const subclassLevelData = subclassDef?.levels.find(l => l.level === newLevel)
   const subclassLevelFeatures = subclassLevelData?.features ?? []
-  const subclassLevelEvents = subclassLevelData?.levelUpEvents ?? []
   // Track which level-data feature names are placeholders replaced by subclass features
   const hasSubclassFeatures = subclassLevelFeatures.length > 0
 
@@ -858,7 +1261,7 @@ export function resolveLevelUpEvents(
     events.push({
       type: 'ADD_FEATURE',
       feature: {
-        id: `${classId}-${featureName.toLowerCase().replace(/\s+/g, '-')}-${newLevel}`,
+        id: classFeatureId(classId, featureName, newLevel),
         name: featureName,
         source: classDef.name,
         description: featDef?.description ?? '',
@@ -916,9 +1319,19 @@ export function resolveLevelUpEvents(
         if (proficiency) events.push(proficiency)
         break
       }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        const save = gainSaveProficiencyEvent(eventDef, character)
+        if (save) events.push(save)
+        break
+      }
       case 'SET_SPEED': {
         const speed = setSpeedEvent(eventDef, character)
         if (speed) events.push(speed)
+        break
+      }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
         break
       }
       case 'CHOOSE_SPELL': {
@@ -979,6 +1392,9 @@ export function resolveLevelUpEvents(
       case 'CHOOSE_FEAT':
         events.push({ type: 'CHOOSE_FEAT' })
         break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, classDef.name))
+        break
       case 'ABILITY_SCORE_IMPROVEMENT':
         events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
         break
@@ -1007,75 +1423,10 @@ export function resolveLevelUpEvents(
     }
   }
 
-  // Process levelUpEvents defined on the subclass level (e.g. totem/archetype choices)
-  for (const eventDef of subclassLevelEvents) {
-    switch (eventDef.type) {
-      case 'CHOOSE_OPTION': {
-        const choice = resolveOptionChoice(eventDef, character, rulepack, newLevel)
-        if (choice) events.push(choice)
-        break
-      }
-      case 'REPLACE_OPTION': {
-        const choice = resolveOptionReplacement(eventDef, character, rulepack, newLevel)
-        if (choice) events.push(choice)
-        break
-      }
-      case 'CHOOSE_SPELL': {
-        const choice = chooseSpellEvent(eventDef, character)
-        if (choice) events.push(choice)
-        break
-      }
-      case 'CHOOSE_SPELLCASTING_ABILITY': {
-        const choice = resolveSpellcastingAbilityChoice(eventDef, character, classDef.name)
-        if (choice) events.push(choice)
-        break
-      }
-      case 'GRANT_SPELLCASTING':
-        events.push(grantSpellcastingEvent(eventDef, classDef.name))
-        break
-      case 'EXPAND_SPELL_LIST': {
-        const expand = expandSpellListEvent(eventDef, character, subclassDef?.name ?? classDef.name)
-        if (expand) events.push(expand)
-        break
-      }
-      case 'GRANT_SPELLS': {
-        // A guarded grant only fires once the option it depends on has been picked. At
-        // the level the option is chosen the answer is not known yet, so the grant is
-        // skipped and applied by RESOLVED_OPTION or RESOLVED_SUBCLASS instead.
-        const grant = grantSpellsEvent(eventDef, character, rulepack, {
-          origin: 'class',
-          label: subclassDef?.name ?? classDef.name,
-        })
-        if (grant) events.push(grant)
-        break
-      }
-      case 'GAIN_PROFICIENCY': {
-        const proficiency = gainProficiencyEvent(eventDef, character)
-        if (proficiency) events.push(proficiency)
-        break
-      }
-      case 'SET_SPEED': {
-        const speed = setSpeedEvent(eventDef, character)
-        if (speed) events.push(speed)
-        break
-      }
-      case 'SET_WILD_SHAPE_LIMITS':
-        events.push({
-          type: 'SET_WILD_SHAPE_LIMITS',
-          maxCR: eventDef.maxCR,
-          // Unset means unrestricted, so a subclass that widens the limits can simply
-          // omit the gates rather than having to re-state them as true.
-          allowSwim: eventDef.allowSwim ?? true,
-          allowFly: eventDef.allowFly ?? true,
-          // Copy: eventDef belongs to the reactive rulepack store, and a Vue proxy
-          // stored on the character makes the next structuredClone throw.
-          types: eventDef.types ? [...eventDef.types] : undefined,
-        } satisfies SetWildShapeLimitsEvent)
-        break
-      case 'ABILITY_SCORE_IMPROVEMENT':
-        events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
-        break
-    }
+  // Events defined on the subclass level (e.g. totem/archetype choices). Shared with the
+  // wizard, which has to ask them the moment a subclass is picked, before it is stored.
+  if (subclassId) {
+    events.push(...resolveSubclassLevelEvents(character, classId, subclassId, newLevel, rulepack))
   }
 
   // Race, subrace and background events fire on TOTAL character level, not class level:
@@ -1137,14 +1488,42 @@ export function resolveLevelUpEvents(
             if (proficiency) events.push(proficiency)
             break
           }
+          case 'GAIN_SAVE_PROFICIENCY': {
+            const save = gainSaveProficiencyEvent(eventDef, character)
+            if (save) events.push(save)
+            break
+          }
           case 'SET_SPEED': {
             const speed = setSpeedEvent(eventDef, character)
             if (speed) events.push(speed)
             break
           }
+          case 'SET_SENSE': {
+            const sense = setSenseEvent(eventDef, character)
+            if (sense) events.push(sense)
+            break
+          }
           case 'CHOOSE_SKILL': {
             const skills = chooseSkillEvent(eventDef, character)
             if (skills) events.push(skills)
+            break
+          }
+          case 'CHOOSE_FEAT':
+            // The variant human's Feat trait and Custom Lineage's both declare a bare
+            // CHOOSE_FEAT on the race side; without a case here the trait was printed on
+            // the sheet and the question was never asked. Nothing about it is
+            // class-specific — RESOLVED_CHOOSE_FEAT reads the feat out of the rulepack and
+            // the wizard's picker lists every loaded feat — so it is the class switch's
+            // push verbatim. It needs no "already answered" guard of its own the way
+            // CHOOSE_OPTION does: a bare CHOOSE_FEAT carries no id to record an answer
+            // against, and the group only fires on the one total level it names, which a
+            // character passes exactly once.
+            events.push({ type: 'CHOOSE_FEAT' })
+            break
+          case 'GRANT_FEAT': {
+            // resolveGrantFeat already skips a feat the character carries, which is what
+            // keeps a background from re-granting it on every later level.
+            events.push(...resolveGrantFeat(eventDef, character, rulepack, source?.name))
             break
           }
         }
@@ -1169,7 +1548,9 @@ export function resolveLevelUpEvents(
  * letting it borrow whichever class happened to come first.
  *
  * Event types that presuppose a class — CHOOSE_SUBCLASS, UPDATE_HIT_DIE, spell slots,
- * a nested CHOOSE_FEAT — are ignored rather than half-applied.
+ * a nested CHOOSE_FEAT — are ignored rather than half-applied. A nested GRANT_FEAT is not
+ * one of those: a feat naming another outright (rather than asking) needs no class to
+ * resolve against, so it recurses through resolveGrantFeat like any other source does.
  */
 export function resolveFeatEvents(
   character: Character,
@@ -1236,9 +1617,21 @@ export function resolveFeatEvents(
         if (proficiency) events.push(proficiency)
         break
       }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        // Resilient: the save follows the ability the feat's own increase went to, so
+        // this is the one resolver that has an `'increased'` answer to hand it.
+        const save = gainSaveProficiencyEvent(eventDef, character, increasedAbility)
+        if (save) events.push(save)
+        break
+      }
       case 'SET_SPEED': {
         const speed = setSpeedEvent(eventDef, character)
         if (speed) events.push(speed)
+        break
+      }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
         break
       }
       case 'CHOOSE_EXPERTISE':
@@ -1272,7 +1665,198 @@ export function resolveFeatEvents(
       case 'ABILITY_SCORE_IMPROVEMENT':
         events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
         break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, feat.name))
+        break
     }
+  }
+
+  return events
+}
+
+/**
+ * Translate an optional class feature's `levelUpEvents` into runtime events.
+ *
+ * A Tasha's optional feature (primal-awareness's always-prepared spells, wild-companion's
+ * find familiar) is taken through OFFER_OPTIONAL_FEATURES, not levelled into, so — like a
+ * feat — it fires everything the moment it is taken, with no level of its own to resolve
+ * against. `addTo` defaults to the feature's own class and `origin` to `'class'`, since
+ * the feature only ever extends the class it is offered on rather than being a
+ * spellcasting source in its own right the way a feat is.
+ *
+ * Mirrors resolveFeatEvents's excluded set for the same reason: event types that
+ * presuppose a level actually being gained — ADD_FEATURE, spell slots, CHOOSE_SUBCLASS, a
+ * nested CHOOSE_FEAT — are ignored rather than half-applied.
+ */
+export function resolveOptionalFeatureEvents(
+  character: Character,
+  feature: OptionalClassFeature,
+  rulepack: Rulepack,
+): LevelUpEvent[] {
+  const events: LevelUpEvent[] = []
+
+  for (const eventDef of feature.levelUpEvents ?? []) {
+    switch (eventDef.type) {
+      case 'GRANT_SPELLS': {
+        const grant = grantSpellsEvent(
+          { ...eventDef, addTo: eventDef.addTo || feature.classId },
+          character,
+          rulepack,
+          { origin: 'class', label: feature.name },
+        )
+        if (grant) events.push(grant)
+        break
+      }
+      case 'CHOOSE_SPELL': {
+        const choice = chooseSpellEvent(
+          eventDef,
+          character,
+          { addTo: feature.classId, origin: 'class', label: feature.name },
+        )
+        if (choice) events.push(choice)
+        break
+      }
+      case 'CHOOSE_SPELLCASTING_ABILITY': {
+        const choice = resolveSpellcastingAbilityChoice(
+          { ...eventDef, addTo: eventDef.addTo || feature.classId, origin: eventDef.origin ?? 'class' },
+          character,
+          feature.name,
+        )
+        if (choice) events.push(choice)
+        break
+      }
+      case 'GRANT_SPELLCASTING':
+        events.push(grantSpellcastingEvent(
+          { ...eventDef, addTo: eventDef.addTo || feature.classId, origin: eventDef.origin ?? 'class' },
+          feature.name,
+        ))
+        break
+      case 'EXPAND_SPELL_LIST': {
+        const expand = expandSpellListEvent(eventDef, character, feature.name)
+        if (expand) events.push(expand)
+        break
+      }
+      case 'GAIN_PROFICIENCY': {
+        const proficiency = gainProficiencyEvent(eventDef, character)
+        if (proficiency) events.push(proficiency)
+        break
+      }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        const save = gainSaveProficiencyEvent(eventDef, character)
+        if (save) events.push(save)
+        break
+      }
+      case 'SET_SPEED': {
+        const speed = setSpeedEvent(eventDef, character)
+        if (speed) events.push(speed)
+        break
+      }
+      case 'SET_SENSE': {
+        const sense = setSenseEvent(eventDef, character)
+        if (sense) events.push(sense)
+        break
+      }
+      case 'CHOOSE_EXPERTISE':
+        events.push({
+          type: 'CHOOSE_EXPERTISE',
+          label: eventDef.label,
+          options: eventDef.options,
+          count: eventDef.count,
+        } satisfies ChooseExpertiseEvent)
+        break
+      case 'CHOOSE_SKILL': {
+        const skills = chooseSkillEvent(eventDef, character)
+        if (skills) events.push(skills)
+        break
+      }
+      case 'CHOOSE_OPTION': {
+        // Skip a choice already answered, so an optional feature offered again at a
+        // later level (still declared, still eligible) does not re-ask.
+        if (character.chosenOptions?.[eventDef.id] === undefined) {
+          const choice = resolveOptionChoice(eventDef, character, rulepack)
+          if (choice) events.push(choice)
+        }
+        break
+      }
+      case 'UPDATE_FEATURE_USES':
+        events.push({
+          type: 'UPDATE_FEATURE_USES',
+          featureName: eventDef.featureName,
+          usesMax: eventDef.usesMax,
+        } satisfies UpdateFeatureUsesEvent)
+        break
+      case 'ABILITY_SCORE_IMPROVEMENT':
+        events.push({ type: 'ABILITY_SCORE_IMPROVEMENT', points: eventDef.points })
+        break
+      case 'GRANT_FEAT':
+        events.push(...resolveGrantFeat(eventDef, character, rulepack, feature.name))
+        break
+    }
+  }
+
+  return events
+}
+
+/**
+ * Translate a GRANT_FEAT definition into the events that take the feat.
+ *
+ * Everything the feat does without the player is denormalized into one automatic
+ * GRANT_FEAT event, the same way GRANT_SPELLS is: applyAutomaticEvents has no rulepack to
+ * look the feat back up in. `withOption` pre-answers the feat's own CHOOSE_OPTION (Magic
+ * Initiate's class), so the character view passed to resolveFeatEvents already carries
+ * that answer — its guarded CHOOSE_SPELLs come back unlocked, its CHOOSE_OPTION is skipped
+ * because resolveFeatEvents finds an answer already recorded, and everything either
+ * produces (automatic or choice alike) is simply appended: it needs no different handling
+ * than a class or race's own events do, since resolveFeatEvents already denormalized it.
+ *
+ * A feat id the pack does not have, or a feat the character already carries, produces no
+ * events at all — a feat is not gained twice, and an unresolvable grant should not break
+ * the level-up around it.
+ */
+function resolveGrantFeat(
+  eventDef: Extract<LevelUpEventDef, { type: 'GRANT_FEAT' }>,
+  character: Character,
+  rulepack: Rulepack,
+  fallbackLabel?: string,
+): LevelUpEvent[] {
+  const feat = rulepack.feats.find(f => f.id === eventDef.featId)
+  if (!feat) return []
+  if (character.features.some(f => f.id === feat.id)) return []
+
+  const withOption = eventDef.withOption
+  const optionName = withOption && (feat.levelUpEvents ?? [])
+    .find((d): d is Extract<LevelUpEventDef, { type: 'CHOOSE_OPTION' }> =>
+      d.type === 'CHOOSE_OPTION' && d.id === withOption.choiceId)
+    ?.options.find(o => o.id === withOption.optionId)?.name
+
+  const answered: Character = withOption
+    ? { ...character, chosenOptions: { ...character.chosenOptions, [withOption.choiceId]: withOption.optionId } }
+    : character
+
+  const label = eventDef.label ?? fallbackLabel
+  const events: LevelUpEvent[] = [{
+    type: 'GRANT_FEAT',
+    featId: feat.id,
+    name: feat.name,
+    description: feat.description,
+    ...(feat.abilityScoreBonus ? { abilityScoreBonus: feat.abilityScoreBonus } : {}),
+    ...(feat.grantedSpells ? { grantedSpells: resolveGrantedSpells(feat.grantedSpells, rulepack) } : {}),
+    ...(feat.hpBonusPerLevel ? { hpBonusPerLevel: feat.hpBonusPerLevel } : {}),
+    // Only carried when the option is actually one of the feat's own — an id that named
+    // nothing is dropped rather than recorded as an answer nobody can trace back.
+    ...(withOption && optionName ? { withOption: { ...withOption, optionName } } : {}),
+    ...(label ? { label } : {}),
+  } satisfies GrantFeatEvent]
+
+  events.push(...resolveFeatEvents(answered, feat, rulepack))
+
+  if (feat.abilityScoreChoice) {
+    events.push({
+      type: 'CHOOSE_FEAT_ABILITY',
+      featId: feat.id,
+      label: label ?? feat.name,
+      choice: feat.abilityScoreChoice,
+    } satisfies ChooseFeatAbilityEvent)
   }
 
   return events
@@ -1357,7 +1941,7 @@ export function resolveUnlockedChoices(
 }
 
 export function isChoiceEvent(event: LevelUpEvent): event is ChoiceLevelUpEvent {
-  return ['CHOOSE_SPELL', 'CHOOSE_SPELLCASTING_ABILITY', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'REPLACE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
+  return ['CHOOSE_SPELL', 'CHOOSE_SPELLCASTING_ABILITY', 'CHANGE_SPELL', 'CHOOSE_EXPERTISE', 'CHOOSE_FEAT', 'CHOOSE_FEAT_ABILITY', 'ABILITY_SCORE_IMPROVEMENT', 'CHOOSE_SUBCLASS', 'CHOOSE_SKILL', 'CHOOSE_OPTION', 'REPLACE_OPTION', 'OFFER_OPTIONAL_FEATURES'].includes(event.type)
 }
 
 export function getChoiceEvents(events: LevelUpEvent[]): ChoiceLevelUpEvent[] {
@@ -1368,6 +1952,177 @@ export function getAutomaticEvents(events: LevelUpEvent[]): AutomaticLevelUpEven
   return events.filter(e => !isChoiceEvent(e)) as AutomaticLevelUpEvent[]
 }
 
+/**
+ * A flat HP bonus per level (Tough's +2), applied retroactively across every level the
+ * character already has. Shared by the automatic GRANT_FEAT event and RESOLVED_CHOOSE_FEAT
+ * — the same arithmetic whether the feat arrived from a source or from the player.
+ */
+function applyHpBonusPerLevel(character: Character, bonusPerLevel: number): void {
+  const totalLevel = character.classes.reduce((s, c) => s + c.level, 0)
+  const hpGain = bonusPerLevel * totalLevel
+  character.hp.max += hpGain
+  character.hp.current += hpGain
+  character.hpBonusPerLevel = (character.hpBonusPerLevel ?? 0) + bonusPerLevel
+}
+
+/**
+ * Corrects HP for a CON modifier change across everything a batch of events (or resolved
+ * choices) just did, comparing the modifier before the batch ran to the modifier after.
+ * One lump sum rather than a replay, since every level so far was rolled with the old one.
+ * Shared between applyAutomaticEvents (a GRANT_FEAT can carry a flat CON bonus) and
+ * applyResolvedChoices (an ASI or a feat can), so a CON change reads the same either way.
+ */
+function applyRetroactiveConHp(character: Character, oldConMod: number): void {
+  const newConMod = Math.floor((character.abilityScores.con - 10) / 2)
+  if (newConMod === oldConMod) return
+  const totalLevel = character.classes.reduce((s, c) => s + c.level, 0)
+  const hpDelta = (newConMod - oldConMod) * totalLevel
+  character.hp.max = Math.max(character.hp.max + hpDelta, totalLevel)
+  character.hp.current = Math.max(character.hp.current + hpDelta, 1)
+}
+
+/**
+ * Applies everything a GRANT_FEAT event carries on its own: the feature, the flat ability
+ * bonus, the granted spells, the retroactive HP bonus, and — when the source pre-answered
+ * the feat's own question — the recorded answer and the feature's renamed to match.
+ *
+ * Shared between the top-level automatic event (applyAutomaticEvents) and a nested one
+ * reached through another feat's own levelUpEvents (applyFeatAutomaticEvents, below):
+ * both are the exact same denormalized GrantFeatEvent shape, resolved once by
+ * resolveGrantFeat, so there is nothing about "nested" that needs different handling here.
+ * The CON→HP correction is the caller's job: both callers already wrap a whole batch in
+ * applyRetroactiveConHp, and this can be one of several ability-changing events in it.
+ */
+function applyGrantedFeat(character: Character, event: GrantFeatEvent): void {
+  if (character.features.some(f => f.id === event.featId)) return
+
+  character.features.push({ id: event.featId, name: event.name, source: 'Feat', description: event.description })
+
+  if (event.abilityScoreBonus) {
+    for (const [ability, bonus] of Object.entries(event.abilityScoreBonus)) {
+      const key = ability as AbilityKey
+      character.abilityScores[key] = Math.min(20, character.abilityScores[key] + (bonus ?? 0))
+    }
+  }
+  if (event.grantedSpells) {
+    for (const spell of event.grantedSpells) {
+      if (!character.spells.some(s => s.spellId === spell.spellId)) {
+        character.spells.push({
+          id: crypto.randomUUID(), spellId: spell.spellId, name: spell.name,
+          level: spell.level, prepared: spell.level === 0,
+        })
+      }
+    }
+  }
+  if (event.hpBonusPerLevel) applyHpBonusPerLevel(character, event.hpBonusPerLevel)
+  if (event.withOption) {
+    // The source pre-answered the feat's own question, so there is no RESOLVED_OPTION in
+    // this run to record the answer or rename the feature the usual way.
+    character.chosenOptions = { ...character.chosenOptions, [event.withOption.choiceId]: event.withOption.optionId }
+    const feature = character.features.find(f => f.id === event.featId)
+    if (feature) feature.name = `${event.name} (${event.withOption.optionName})`
+  }
+}
+
+/**
+ * Applies the automatic half of a feat's own levelUpEvents — what resolveFeatEvents
+ * produces once the feat, and (if it has one) the ability it left to the player, are both
+ * known. Shared by RESOLVED_CHOOSE_FEAT, which knows both the moment the feat is picked,
+ * and RESOLVED_FEAT_ABILITY, which re-runs this once an ability that was still pending at
+ * grant time is finally answered — a GRANT_FEAT'd feat's own spell keyed to 'increased'
+ * resolves to nothing until then, and replaying is how it gets fixed up. Safe to call more
+ * than once over the same feat: grantSpellsTo and registerSpellcasting both are.
+ *
+ * Includes GRANT_FEAT so a feat that grants another feat outright (rather than asking, as
+ * CHOOSE_FEAT's own list does) is not silently dropped — resolveFeatEvents already
+ * resolved it through resolveGrantFeat, so applying it is the same call every other
+ * GRANT_FEAT goes through.
+ *
+ * RESOLVED_OPTIONAL_FEATURES uses this too, over resolveOptionalFeatureEvents's output
+ * instead of resolveFeatEvents's, and RESOLVED_SUBCLASS over resolveSubclassLevelEvents's:
+ * the automatic event shapes they produce (GRANT_SPELLS, GAIN_PROFICIENCY, and the rest)
+ * are the same regardless of which kind of source resolved them, so applying them is not
+ * something an optional feature or a subclass needs its own copy of. Each copy that did
+ * exist was a whitelist of event types that grew one incident at a time and dropped the
+ * rest in silence.
+ *
+ * What it does *not* cover is what presupposes a level actually being gained — ADD_HP,
+ * hit dice, slots, ADD_FEATURE — since none of these sources resolve those.
+ */
+function applyFeatAutomaticEvents(character: Character, events: AutomaticLevelUpEvent[]): void {
+  for (const event of events) {
+    switch (event.type) {
+      case 'GRANT_SPELLS':
+        grantSpellsTo(character, event.addTo, event.spells, event.alwaysPrepared, {
+          ability: event.ability,
+          origin: event.origin,
+          label: event.label,
+          uses: event.uses,
+          cost: event.cost,
+          castAtLevel: event.castAtLevel,
+        })
+        break
+      // A feat can be what makes a character a caster at all. resolveFeatEvents emits
+      // this and feat events never reach applyAutomaticEvents, so without a case here
+      // the feat granted spells with no source behind them.
+      case 'GRANT_SPELLCASTING':
+        registerSpellcasting(character, event.addTo, event.ability, event)
+        break
+      case 'GAIN_PROFICIENCY':
+        applyGainProficiency(character, event.proficiency)
+        break
+      case 'GAIN_SAVE_PROFICIENCY':
+        applyGainSaveProficiency(character, event.ability)
+        break
+      case 'UPDATE_FEATURE_USES': {
+        const target = character.features.find(f => f.name === event.featureName)
+        if (target) {
+          if (event.usesMax === null) {
+            delete target.usesMax
+            delete target.usesRemaining
+          }
+          else {
+            target.usesMax = event.usesMax
+            target.usesRemaining = event.usesMax
+          }
+        }
+        break
+      }
+      case 'GRANT_FEAT':
+        applyGrantedFeat(character, event)
+        break
+      // The three a source can set outright. resolveFeatEvents has emitted SET_SPEED and
+      // SET_SENSE since Fleet of Foot and Custom Lineage were modelled, and a subclass
+      // confirmed at the level it declares SET_WILD_SHAPE_LIMITS on is a Moon druid —
+      // all three were dropped here for want of a case.
+      case 'SET_SPEED':
+        character.speeds = { ...character.speeds, [event.mode]: event.speed }
+        break
+      case 'SET_SENSE':
+        character.senses = { ...character.senses, [event.mode]: event.range }
+        break
+      case 'SET_WILD_SHAPE_LIMITS':
+        // Absolute, not a delta, exactly as applyAutomaticEvents writes it: a subclass
+        // replaces the class's limits rather than widening them by arithmetic.
+        character.wildShape = {
+          ...character.wildShape,
+          limits: {
+            maxCR: event.maxCR,
+            allowSwim: event.allowSwim,
+            allowFly: event.allowFly,
+            ...(event.types ? { types: [...event.types] } : {}),
+          },
+        }
+        break
+      case 'EXPAND_SPELL_LIST':
+        // Deliberately nothing, for the reason applyAutomaticEvents states: the rule
+        // lives on the source and is re-derived by expandedSpellIdsFor, so a snapshot
+        // written here would go stale the moment the character multiclassed.
+        break
+    }
+  }
+}
+
 export function applyAutomaticEvents(
   character: Character,
   events: AutomaticLevelUpEvent[],
@@ -1375,6 +2130,11 @@ export function applyAutomaticEvents(
   manualHp?: number,
 ): Character {
   const updated = structuredClone(character)
+  // Nothing here changed CON before GRANT_FEAT existed; kept at batch level rather than
+  // inline in that one case so a second ability-changing automatic event (were one ever
+  // added) is covered the same way, and to match applyResolvedChoices's own batch-level
+  // correction rather than duplicating the arithmetic per event.
+  const oldConMod = Math.floor((updated.abilityScores.con - 10) / 2)
 
   for (const event of events) {
     switch (event.type) {
@@ -1410,6 +2170,9 @@ export function applyAutomaticEvents(
         }
         break
       }
+      case 'GRANT_FEAT':
+        applyGrantedFeat(updated, event)
+        break
       case 'GRANT_SPELLCASTING':
         registerSpellcasting(updated, event.addTo, event.ability, event)
         break
@@ -1445,13 +2208,19 @@ export function applyAutomaticEvents(
         break
       }
       case 'GAIN_PROFICIENCY': {
-        if (!updated.otherProficiencies.includes(event.proficiency)) {
-          updated.otherProficiencies.push(event.proficiency)
-        }
+        applyGainProficiency(updated, event.proficiency)
+        break
+      }
+      case 'GAIN_SAVE_PROFICIENCY': {
+        applyGainSaveProficiency(updated, event.ability)
         break
       }
       case 'SET_SPEED': {
         updated.speeds = { ...updated.speeds, [event.mode]: event.speed }
+        break
+      }
+      case 'SET_SENSE': {
+        updated.senses = { ...updated.senses, [event.mode]: event.range }
         break
       }
       case 'SET_SPELLCASTING_ABILITY': {
@@ -1494,7 +2263,44 @@ export function applyAutomaticEvents(
     }
   }
 
+  applyRetroactiveConHp(updated, oldConMod)
   return updated
+}
+
+/**
+ * A newly created character's first class level: what is applied now, and what is left
+ * to ask.
+ *
+ * Creation has two endings. A level that raises a question — a cleric's cantrips, a
+ * domain — belongs to the level-up wizard, which asks it and applies the automatic half
+ * itself, so nothing is applied here and the character comes back untouched. A level
+ * that raises none is finished on the spot, and that is the path this exists for: it
+ * used to take the resolved events and push the ADD_FEATURE ones alone, so a
+ * background's granted feat, a race's skill proficiency, a granted spell, a sense and a
+ * speed were all resolved and then dropped on the floor — a whitelist of event types,
+ * the same shape of bug three other places in this pipeline have already been cured of.
+ * Everything automatic goes through the applier the wizard itself uses, so a type added
+ * later needs no second home.
+ *
+ * HP is taken at `max`, which is what the wizard forces on a character's first level.
+ * The caller therefore hands over a character with no hit points and no hit dice yet:
+ * ADD_HP and UPDATE_HIT_DIE are automatic events like any other, and computing either by
+ * hand as well would count it twice. `character.classes` carries the level being gained
+ * rather than the one before it, so a granted feat's retroactive hit points (Tough's +2
+ * per level) land on a 1st-level character.
+ */
+export function resolveFirstClassLevel(
+  character: Character,
+  classId: string,
+  rulepack: Rulepack,
+): { character: Character; choices: ChoiceLevelUpEvent[] } {
+  const events = resolveLevelUpEvents(character, classId, 1, rulepack)
+  const choices = getChoiceEvents(events)
+  if (choices.length > 0) return { character, choices }
+  return {
+    character: applyAutomaticEvents(character, getAutomaticEvents(events), 'max'),
+    choices,
+  }
 }
 
 export function applyResolvedChoices(
@@ -1511,6 +2317,25 @@ export function applyResolvedChoices(
         for (const [ability, bonus] of Object.entries(choice.bonuses)) {
           const key = ability as AbilityKey
           updated.abilityScores[key] = Math.min(20, updated.abilityScores[key] + (bonus ?? 0))
+        }
+        break
+      }
+      case 'RESOLVED_FEAT_ABILITY': {
+        // The feat itself was already applied by the automatic GRANT_FEAT event; this is
+        // only the ability increase it left to the player, e.g. Resilient's one of choice.
+        for (const [ability, bonus] of Object.entries(choice.bonuses)) {
+          const key = ability as AbilityKey
+          updated.abilityScores[key] = Math.min(20, updated.abilityScores[key] + (bonus ?? 0))
+        }
+        // GRANT_FEAT resolved the feat's own levelUpEvents before this answer existed, so
+        // anything keyed to 'increased' (a Touched feat's free spell) came back with no
+        // ability at all. Re-running now that it is known fixes that up — grantSpellsTo and
+        // registerSpellcasting are both safe to call again over the same grant, and
+        // whatever did not depend on 'increased' just re-applies to the same effect.
+        const feat = rulepack.feats.find(f => f.id === choice.featId)
+        if (feat) {
+          const increased = featIncreasedAbility(feat, choice.bonuses)
+          applyFeatAutomaticEvents(updated, getAutomaticEvents(resolveFeatEvents(updated, feat, rulepack, increased)))
         }
         break
       }
@@ -1561,60 +2386,16 @@ export function applyResolvedChoices(
             }
           }
           // Extra HP per level (retroactive for all current levels)
-          if (feat.hpBonusPerLevel) {
-            const totalLevel = updated.classes.reduce((s, c) => s + c.level, 0)
-            const hpGain = feat.hpBonusPerLevel * totalLevel
-            updated.hp.max += hpGain
-            updated.hp.current += hpGain
-            updated.hpBonusPerLevel = (updated.hpBonusPerLevel ?? 0) + feat.hpBonusPerLevel
-          }
+          if (feat.hpBonusPerLevel) applyHpBonusPerLevel(updated, feat.hpBonusPerLevel)
           // The feat's own levelUpEvents. Its automatic half is applied here rather than
           // by applyAutomaticEvents, which runs before the feat is even known — the same
           // reason RESOLVED_OPTION applies its deferred grants inline. The choices it
           // raises are collected by the wizard and arrive as later entries in `choices`.
+          // Includes a nested GRANT_FEAT (a feat granting another outright): resolveFeatEvents
+          // already resolved it through resolveGrantFeat, so applyFeatAutomaticEvents's own
+          // GRANT_FEAT case is the same call every other GRANT_FEAT goes through.
           const increased = featIncreasedAbility(feat, choice.abilityBonus)
-          for (const event of getAutomaticEvents(resolveFeatEvents(updated, feat, rulepack, increased))) {
-            switch (event.type) {
-              case 'GRANT_SPELLS':
-                grantSpellsTo(updated, event.addTo, event.spells, event.alwaysPrepared, {
-                  ability: event.ability,
-                  origin: event.origin,
-                  label: event.label,
-                  uses: event.uses,
-                  // Was missing while every other call site forwarded it, so a feat
-                  // granting a resource-metered spell stored no price and the sheet
-                  // offered no way to spend for it.
-                  cost: event.cost,
-                  castAtLevel: event.castAtLevel,
-                })
-                break
-              // A feat can be what makes a character a caster at all. resolveFeatEvents
-              // emits this and feat events never reach applyAutomaticEvents, so without
-              // a case here the feat granted spells with no source behind them.
-              case 'GRANT_SPELLCASTING':
-                registerSpellcasting(updated, event.addTo, event.ability, event)
-                break
-              case 'GAIN_PROFICIENCY':
-                if (!updated.otherProficiencies.includes(event.proficiency)) {
-                  updated.otherProficiencies.push(event.proficiency)
-                }
-                break
-              case 'UPDATE_FEATURE_USES': {
-                const target = updated.features.find(f => f.name === event.featureName)
-                if (target) {
-                  if (event.usesMax === null) {
-                    delete target.usesMax
-                    delete target.usesRemaining
-                  }
-                  else {
-                    target.usesMax = event.usesMax
-                    target.usesRemaining = event.usesMax
-                  }
-                }
-                break
-              }
-            }
-          }
+          applyFeatAutomaticEvents(updated, getAutomaticEvents(resolveFeatEvents(updated, feat, rulepack, increased)))
         }
         break
       }
@@ -1672,52 +2453,32 @@ export function applyResolvedChoices(
                 })
               }
             }
-            // The subclass was unchosen when resolveLevelUpEvents ran, so its own
-            // level events were never emitted. Apply the automatic ones here.
-            for (const evt of subclassLevel?.levelUpEvents ?? []) {
-              // A guarded grant belongs to RESOLVED_OPTION, which follows this in the
-              // same run. Circle of the Land never exposed this — a druid picks the
-              // Circle at 2nd and its guarded grants start at 3rd — but Divine Soul
-              // declares both on the level the subclass itself is chosen, and replaying
-              // them here handed out every affinity's spell at once.
-              if ('whenOption' in evt && evt.whenOption
-                && updated.chosenOptions?.[evt.whenOption.choiceId] !== evt.whenOption.optionId) {
-                continue
-              }
-              if (evt.type === 'GRANT_SPELLS') {
-                // Through grantSpellsTo rather than building entries by hand: the hand
-                // -rolled version silently dropped `uses`, `cost` and the source's
-                // ability/label, which a Way of Shadow monk needs — it grants its
-                // 2-Ki spells on the very level the subclass is chosen.
-                grantSpellsTo(
-                  updated,
-                  evt.addTo,
-                  resolveGrantedSpells(evt.spellIds, rulepack),
-                  evt.alwaysPrepared ?? false,
-                  {
-                    ability: resolveAbilityRef(evt.ability, undefined),
-                    origin: evt.origin,
-                    label: evt.label ?? subclassDef.name,
-                    uses: evt.uses,
-                    cost: evt.cost,
-                    castAtLevel: evt.castAtLevel,
-                  },
-                )
-              }
-              else if (evt.type === 'GAIN_PROFICIENCY') {
-                if (!updated.otherProficiencies.includes(evt.proficiency)) {
-                  updated.otherProficiencies.push(evt.proficiency)
-                }
-              }
-              else if (evt.type === 'GRANT_SPELLCASTING') {
-                // An Eldritch Knight starts casting at the very level it is chosen, so
-                // without this the fighter would gain slots with no DC behind them.
-                registerSpellcasting(updated, evt.addTo, evt.ability, {
-                  origin: evt.origin,
-                  label: evt.label ?? subclassDef.name,
-                })
-              }
-            }
+            // The subclass was unchosen when resolveLevelUpEvents ran, so its own level
+            // events were never emitted. Resolve them through the same switch every
+            // other caller uses and apply the automatic half through the shared appliers.
+            //
+            // This was a hand-rolled replay of three event types, and the list grew one
+            // incident at a time — a Way of Shadow monk grants its 2-Ki spells on the
+            // very level the subclass is picked, an Eldritch Knight starts casting on
+            // its own, and both had to be added after the fact. Everything else was
+            // dropped in silence: a Circle of the Moon druid picks the circle at 2nd,
+            // and its SET_WILD_SHAPE_LIMITS went with it, leaving a Moon druid on the
+            // druid class's own CR 1/4.
+            //
+            // Guarded grants stay out of it, as they did before. A `whenOption` answered
+            // in this same run is not on `updated` yet — RESOLVED_OPTION follows this in
+            // the list and applies them — and each resolver skips its own, so Divine
+            // Soul does not hand out every affinity's spells at once.
+            //
+            // Only the automatic half: the wizard already raised this level's subclass
+            // choices when the subclass was picked, and their answers arrive as their
+            // own ResolvedChoices. The features above are not double-added either, since
+            // nothing here emits ADD_FEATURE.
+            applyFeatAutomaticEvents(
+              updated,
+              getAutomaticEvents(resolveSubclassLevelEvents(
+                updated, choice.classId, choice.subclassId, currentLevel, rulepack)),
+            )
           }
         }
         break
@@ -1760,28 +2521,63 @@ export function applyResolvedChoices(
         for (const cls of rulepack.classes) {
           const entry = updated.classes.find(c => c.classId === cls.id)
           if (!entry) continue
+          // Each event is carried with the name it would have been labelled under had
+          // resolveLevelUpEvents emitted it — the subclass's, falling back to the class's,
+          // since a Divine Soul's affinity spell belongs to the archetype and not to
+          // "Sorcerer".
           const levelEvents = [
-            ...(cls.levels.find(l => l.level === entry.level)?.levelUpEvents ?? []),
+            ...(cls.levels.find(l => l.level === entry.level)?.levelUpEvents ?? [])
+              .map(evt => ({ evt, label: cls.name })),
             ...(cls.subclasses ?? [])
               .filter(sub => sub.id === entry.subclassId)
-              .flatMap(sub => sub.levels.find(l => l.level === entry.level)?.levelUpEvents ?? []),
+              .flatMap(sub => (sub.levels.find(l => l.level === entry.level)?.levelUpEvents ?? [])
+                .map(evt => ({ evt, label: sub.name }))),
           ]
-          for (const evt of levelEvents) {
-            if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY') continue
+          for (const { evt, label } of levelEvents) {
+            if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY'
+              && evt.type !== 'GAIN_SAVE_PROFICIENCY'
+              && evt.type !== 'SET_SPEED' && evt.type !== 'SET_SENSE') continue
             if (evt.whenOption?.choiceId !== choice.choiceId) continue
             if (evt.whenOption.optionId !== choice.optionId) continue
             if (evt.type === 'GAIN_PROFICIENCY') {
-              if (!updated.otherProficiencies.includes(evt.proficiency)) {
-                updated.otherProficiencies.push(evt.proficiency)
-              }
+              applyGainProficiency(updated, evt.proficiency)
               continue
             }
-            grantSpellsTo(
-              updated,
-              evt.addTo,
-              resolveGrantedSpells(evt.spellIds, rulepack),
-              evt.alwaysPrepared ?? false,
-            )
+            // Elegant Courtier's "Intelligence or Charisma" arm. `'increased'` cannot
+            // apply here — it is a feat's own increase, and no class level has one.
+            if (evt.type === 'GAIN_SAVE_PROFICIENCY') {
+              const ability = resolveAbilityRef(evt.ability, undefined)
+              if (ability) applyGainSaveProficiency(updated, ability)
+              continue
+            }
+            // No book declares a guarded speed or sense on a class level yet. They are
+            // accepted anyway because the race branch below accepts them, and a list of
+            // event types that differs between two branches of the same case is exactly
+            // the shape that left a Moon druid on the druid's own wild-shape limits.
+            if (evt.type === 'SET_SPEED') {
+              updated.speeds = { ...updated.speeds, [evt.mode]: evt.speed }
+              continue
+            }
+            if (evt.type === 'SET_SENSE') {
+              updated.senses = { ...updated.senses, [evt.mode]: evt.range }
+              continue
+            }
+            // Through grantSpellsEvent, as the race branch below does and as every
+            // resolver does: built by hand here, the grant lost its ability, origin,
+            // label, free casts, resource cost and fixed slot level on the floor.
+            const grant = grantSpellsEvent(evt, updated, rulepack, {
+              origin: 'class',
+              label,
+            })
+            if (!grant) continue
+            grantSpellsTo(updated, grant.addTo, grant.spells, grant.alwaysPrepared, {
+              ability: grant.ability,
+              origin: grant.origin,
+              label: grant.label,
+              uses: grant.uses,
+              cost: grant.cost,
+              castAtLevel: grant.castAtLevel,
+            })
           }
         }
 
@@ -1797,19 +2593,29 @@ export function applyResolvedChoices(
             if (group.level > totalLevel(updated)) continue
             for (const evt of group.levelUpEvents) {
               if (evt.type !== 'GRANT_SPELLS' && evt.type !== 'GAIN_PROFICIENCY'
-                && evt.type !== 'SET_SPEED') continue
+                && evt.type !== 'GAIN_SAVE_PROFICIENCY'
+                && evt.type !== 'SET_SPEED' && evt.type !== 'SET_SENSE') continue
               if (evt.whenOption?.choiceId !== choice.choiceId) continue
               if (evt.whenOption.optionId !== choice.optionId) continue
               // Elf Weapon Training and Fleet of Foot: the arm grants a proficiency or a
               // speed rather than spells, and the answer landed in this very run.
               if (evt.type === 'GAIN_PROFICIENCY') {
-                if (!updated.otherProficiencies.includes(evt.proficiency)) {
-                  updated.otherProficiencies.push(evt.proficiency)
-                }
+                applyGainProficiency(updated, evt.proficiency)
+                continue
+              }
+              if (evt.type === 'GAIN_SAVE_PROFICIENCY') {
+                const ability = resolveAbilityRef(evt.ability, undefined)
+                if (ability) applyGainSaveProficiency(updated, ability)
                 continue
               }
               if (evt.type === 'SET_SPEED') {
                 updated.speeds = { ...updated.speeds, [evt.mode]: evt.speed }
+                continue
+              }
+              // Custom Lineage's darkvision-or-skill arm: the answer landed in this run,
+              // same as Fleet of Foot's speed above.
+              if (evt.type === 'SET_SENSE') {
+                updated.senses = { ...updated.senses, [evt.mode]: evt.range }
                 continue
               }
               // Through grantSpellsEvent, not by hand: it is what resolves the ability,
@@ -1846,10 +2652,7 @@ export function applyResolvedChoices(
             // subclasses: "Scion of the Outer Planes (Good Outer Plane)".
             if (evt.type === 'CHOOSE_OPTION' && evt.id === choice.choiceId) {
               const opt = evt.options.find(o => o.id === choice.optionId)
-              if (opt) {
-                feature.name = `${feat.name} (${opt.name})`
-                if (opt.description) feature.description = opt.description
-              }
+              if (opt) annotateFeatureWithOption(feature, opt)
               continue
             }
             if (evt.type !== 'GRANT_SPELLS' || !evt.whenOption) continue
@@ -1875,29 +2678,17 @@ export function applyResolvedChoices(
           }
         }
 
-        // Find the option definition from the rulepack across all subclass level events
-        let optionName: string | undefined
-        let optionDescription: string | undefined
-        outer: for (const cls of rulepack.classes) {
-          for (const sub of cls.subclasses ?? []) {
-            for (const lvl of sub.levels) {
-              for (const evt of lvl.levelUpEvents ?? []) {
-                if (evt.type === 'CHOOSE_OPTION' && evt.id === choice.choiceId) {
-                  const opt = evt.options.find(o => o.id === choice.optionId)
-                  if (opt) { optionName = opt.name; optionDescription = opt.description; break outer }
-                }
-              }
-            }
-          }
-        }
-        if (optionName) {
-          // Update the feature whose id contains the choiceId (e.g. "totem-spirit" in the feature id)
-          const feat = updated.features.find(f =>
-            f.id !== poolFeatureId(choice.choiceId) && f.id.includes(choice.choiceId))
-          if (feat) {
-            feat.name = `${feat.name} (${optionName})`
-            feat.description = optionDescription ?? feat.description
-          }
+        // Name the pick on the feature that asked for it — a Totem Spirit, a Storm Aura's
+        // environment. A grouped pick is deliberately excluded: `poolPickFeature` above
+        // already gave it a feature of its own, and annotating as well showed a College
+        // of Swords bard its fighting style twice.
+        const site = findOptionChoiceSite(rulepack, choice.choiceId)
+        if (site && !site.def.group && site.featureId) {
+          const target = updated.features.find(f => f.id === site.featureId)
+          // Patched-in options too, for an ungrouped choice a book widened.
+          const option = site.def.options.find(o => o.id === choice.optionId)
+            ?? poolExtras(rulepack, site.def.group, site.def.id).find(o => o.id === choice.optionId)
+          if (target && option) annotateFeatureWithOption(target, option)
         }
         break
       }
@@ -1928,6 +2719,18 @@ export function applyResolvedChoices(
               usesRemaining: feat.usesMax,
               recharge: feat.recharge,
             })
+            // The feature's own levelUpEvents — Primal Awareness's always-prepared
+            // spells, Wild Companion's find familiar — fire the moment it is taken, the
+            // same path RESOLVED_CHOOSE_FEAT applies a feat's through. `taken` only
+            // carries the denormalized display shape (so the sheet still renders it with
+            // the pack gone), so the full definition is looked back up by id to find them.
+            const full = rulepack.optionalFeatures.find(f => f.id === feat.id)
+            if (full) {
+              applyFeatAutomaticEvents(
+                updated,
+                getAutomaticEvents(resolveOptionalFeatureEvents(updated, full, rulepack)),
+              )
+            }
           }
         }
         break
@@ -1935,15 +2738,8 @@ export function applyResolvedChoices(
     }
   }
 
-  // If the CON modifier changed (from ASI or feat), adjust HP for all existing levels.
-  // Each level's HP was calculated with the old modifier, so we compensate the delta.
-  const newConMod = Math.floor((updated.abilityScores.con - 10) / 2)
-  if (newConMod !== oldConMod) {
-    const totalLevel = updated.classes.reduce((s, c) => s + c.level, 0)
-    const hpDelta = (newConMod - oldConMod) * totalLevel
-    updated.hp.max = Math.max(updated.hp.max + hpDelta, totalLevel)
-    updated.hp.current = Math.max(updated.hp.current + hpDelta, 1)
-  }
+  // If the CON modifier changed (from an ASI or a feat), adjust HP for all existing levels.
+  applyRetroactiveConHp(updated, oldConMod)
 
   return updated
 }
