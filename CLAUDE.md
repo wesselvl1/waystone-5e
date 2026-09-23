@@ -118,6 +118,62 @@ Non-obvious rules encoded in that service:
 - **`GAIN_PROFICIENCY` and `SET_SPEED` take `whenOption` too**, so an arm of a choice can grant weapon proficiencies (Elf Weapon Training) or a speed (Fleet of Foot). `SET_SPEED` writes one movement mode on the character; a subrace that simply *has* the speed uses `speedOverrides` instead.
 - **`Subrace.speedOverrides` is merged over the race's speeds** by `raceSpeeds()` in `multiclass.ts`, key by key, and the sheet prints fly/swim/climb beside the walk box. The character's stored `speeds.walk` stays editable, so the sheet's backfill for older characters adds only the modes beyond walking.
 - **`Race.subraceOptional` makes the wizard offer "None".** A dwarf or an elf must pick a subrace; a half-elf, human, tiefling, half-orc or dragonborn is complete as printed, and once a sourcebook adds variants to one of those, forcing a pick made the plain race unbuildable.
+- **`GRANT_FEAT` names the feat where `CHOOSE_FEAT` asks for one** — thirteen backgrounds
+  across five books are printed "you gain the Tough feat". `resolveGrantFeat` denormalizes
+  everything the feat does without the player into one automatic event, the way
+  `GRANT_SPELLS` is denormalized, because `applyAutomaticEvents` has no rulepack to look
+  the feat back up in. `withOption` pre-answers a question the feat itself asks (Magic
+  Initiate's class) by recording the answer on the character view `resolveFeatEvents` is
+  handed, so the feat's guarded events come back unlocked and its `CHOOSE_OPTION` is not
+  asked a second time; the answer is written onto the feat's own feature name, since no
+  `RESOLVED_OPTION` in the run will do it. A feat the character already has, or an id the
+  pack lacks, emits nothing — an unresolvable grant must not break the level-up around it.
+  A granted feat carrying an `abilityScoreChoice` is still a *question*: the grant comes
+  with a `CHOOSE_FEAT_ABILITY` beside it, and `RESOLVED_FEAT_ABILITY` re-runs the feat's
+  automatic events once the answer is in, because a spell keyed to `'increased'` resolved
+  to nothing while the increase was pending. `CHOOSE_FEAT` from a *race* is the one arm
+  still missing: it is declarable, and Variant Human and Custom Lineage declare it, but the
+  race/subrace/background switch in `resolveLevelUpEvents` has no case for it, so that feat
+  is never asked.
+- **`Character.senses` and the three damage/condition lists merge unlike a speed does.**
+  `raceSenses()` takes the **larger** range per mode, because a subrace granting *less*
+  darkvision than its race is a variant widening one sense, not an instruction to blind the
+  character down to the smaller number. `raceResistances()` **unions**
+  `damageResistances` / `damageImmunities` / `conditionImmunities`, since Hellish
+  Resistance and a bloodline's own resistance were both printed. `Subrace.speedOverrides`
+  alone **overwrites**, which it can afford to because a race rarely prints two conflicting
+  speeds for one mode. Do not assume the three behave alike; `SET_SENSE` is the separate
+  event for a sense hanging off a choice (Custom Lineage's darkvision-or-skill arm), the
+  way `SET_SPEED` is for a speed.
+- **An optional class feature can carry mechanics.** `OptionalClassFeature.levelUpEvents`
+  is resolved by `resolveOptionalFeatureEvents`, with `addTo` defaulting to the feature's
+  own class and `origin` to `'class'` — without it a Tasha's feature was inert text the
+  wizard offered and the sheet listed while nothing it granted reached the character. Like
+  a feat it has no level of its own, so it fires everything the moment it is taken, and it
+  mirrors `resolveFeatEvents`'s excluded set for the same reason (`ADD_FEATURE`, slots,
+  `CHOOSE_SUBCLASS`, a nested `CHOOSE_FEAT` presuppose a level being gained). The
+  limitation that falls out: `GRANT_SPELLS` has no `minLevel`, so Primal Awareness can
+  express only its 3rd-level *speak with animals* — the 5th, 9th, 13th and 17th rows of its
+  table have nowhere to go.
+- **`applyFeatAutomaticEvents` is the single applier for the automatic half** of a feat, an
+  optional feature and a subclass's confirmation level. The shapes those three resolvers
+  produce are identical, so none of them needs a copy — and every copy that existed was a
+  whitelist of event types that grew one incident at a time and dropped the rest in
+  silence: a Moon druid lost `SET_WILD_SHAPE_LIMITS`, a granted feat's nested `GRANT_FEAT`
+  and a feat's `GRANT_SPELLCASTING` went the same way. Several bugs on this branch were
+  that one shape. Call it rather than listing types; what it does not cover is what
+  presupposes a level actually being gained — `ADD_HP`, hit dice, slots, `ADD_FEATURE`.
+- **Character creation applies the whole of level 1 through the pipeline**, via
+  `resolveFirstClassLevel`, which resolves the level once so the decision and the
+  application can never read it differently. It has two endings: a level that raises a
+  question returns the character untouched and hands the whole level to the level-up wizard
+  (stored back at `level: 0`), and a level that raises none is applied on the spot at `max`
+  hit points. **`new.vue` must hand it `hp {0,0,0}`, `hitDice []` and
+  `classes[0].level = 1`** — `ADD_HP` and `UPDATE_HIT_DIE` are automatic events like any
+  other and supply both, a figure worked out beside the pipeline is counted twice, and the
+  level being gained has to be on the character already or a granted feat's retroactive hit
+  points (Tough's +2 per level) miss the 1st level. That contract is guarded by comments in
+  a page file and nothing else: no test reaches into `new.vue`.
 
 ### Derived stats
 
