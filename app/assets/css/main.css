@@ -64,6 +64,13 @@
     @apply w-3 h-3 rounded-full border border-slate-500 flex-shrink-0 transition-colors cursor-pointer;
   }
 
+  /* Half a proficiency bonus: half the dot, on the diagonal so 12px still reads as
+     deliberate rather than as a clipped circle. Derived, never clicked into. */
+  .proficiency-dot.half {
+    @apply border-primary-500;
+    background: linear-gradient(135deg, theme(colors.primary.500) 0 50%, transparent 50% 100%);
+  }
+
   .proficiency-dot.active {
     @apply bg-primary-500 border-primary-500;
   }

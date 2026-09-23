@@ -237,6 +237,8 @@ export const CharacterSchema = z.object({
     minimum: z.number().int().optional(),
   }).nullable().optional(),
   skillProficiencies: SkillProficienciesSchema,
+  // Null and absent both mean "read it off the features"; false switches a misread off.
+  halfProficiencyChecks: z.boolean().nullable().optional(),
   otherProficiencies: z.array(z.string()),
   proficiencyGroups: z.record(z.string(), z.enum(['weapons-armor', 'languages', 'tools'])).optional(),
 

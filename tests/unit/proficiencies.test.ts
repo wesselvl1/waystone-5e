@@ -71,6 +71,13 @@ describe('proficiencyLabel', () => {
     expect(proficiencyLabel("thieves' tools")).toBe("Thieves' Tools")
   })
 
+  it('keeps a possessive inside the word it belongs to', () => {
+    expect(proficiencyLabel("smith's tools")).toBe("Smith's Tools")
+    expect(proficiencyLabel("brewer's supplies")).toBe("Brewer's Supplies")
+    expect(proficiencyLabel("mason's tools")).toBe("Mason's Tools")
+    expect(proficiencyLabel("tinker's tools")).toBe("Tinker's Tools")
+  })
+
   it('leaves a name the player typed exactly as typed', () => {
     expect(proficiencyLabel('Common')).toBe('Common')
     expect(proficiencyLabel('Zemnian')).toBe('Zemnian')

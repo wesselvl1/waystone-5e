@@ -431,6 +431,13 @@ export interface Character {
    */
   savingThrowAbilityBonus?: SavingThrowAbilityBonus | null
   skillProficiencies: Record<SkillKey, ProficiencyLevel>
+  /**
+   * Whether half a proficiency bonus reaches the checks that carry none — a bard's Jack
+   * of All Trades. Null or absent means read it off the features, which is a guess worth
+   * overriding; see `halfProficiency()`. Never stored as a proficiency level, because it
+   * applies only where there is no proficiency to begin with.
+   */
+  halfProficiencyChecks?: boolean | null
   otherProficiencies: string[]          // Languages, tools, weapons, armor
   /**
    * The group an entry was filed under, where the derived one is wrong — keyed by

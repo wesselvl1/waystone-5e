@@ -858,6 +858,24 @@ export interface ArmorDefinition {
   weight?: number
 }
 
+/**
+ * What a homebrew copy of a book's entry was copied from.
+ *
+ * An edit never writes to the book it came from, so the copy survives the book being
+ * re-imported and the bundled SRD being re-seeded. That is the point of it — and it is
+ * also what an update can leave behind: a forked class carries the level table as it was
+ * written the day it was copied, missing every fix since. `hash` is the source entry as
+ * it stood at that moment, so the app can say the book's version has moved on rather than
+ * quietly running a stale copy forever.
+ */
+export interface ForkOrigin {
+  packId: string
+  packName: string
+  packVersion: string
+  /** Hash of the source entry as it stood when it was copied. */
+  hash: string
+}
+
 export interface Rulepack {
   id: string
   name: string
@@ -883,6 +901,11 @@ export interface Rulepack {
   subraces?: SubracePatchEntry[]
   /** Entries this pack contributes to option pools owned by another pack. */
   optionPools?: OptionPoolPatch[]
+  /**
+   * Where each copied entry came from, keyed `<kind>:<id>`. Only a pack the player edits
+   * in the app carries this; a book has nothing to have been copied from.
+   */
+  forkedFrom?: Record<string, ForkOrigin>
 }
 
 /** A subclass entry in a patch file — carries the target classId alongside the subclass definition. */
@@ -921,4 +944,6 @@ export interface RulepackFragment {
   optionalFeatures?: OptionalClassFeature[]
   /** Options to add to a pool (`eldritch-invocation`) defined in another pack. */
   optionPools?: OptionPoolPatch[]
+  /** Provenance for entries copied out of another pack, keyed `<kind>:<id>`. */
+  forkedFrom?: Record<string, ForkOrigin>
 }

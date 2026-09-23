@@ -63,6 +63,63 @@ Because ids are the merge key, a custom pack is expected to **prefix its entry i
 
 `tests/unit/srdData.test.ts` validates every SRD JSON file against `RulepackSchema`, so schema-invalid data fails CI.
 
+### Editing content, and the homebrew pack
+
+Every rulepack entry is editable in the app, and nothing is ever written back to the pack
+it came from. A book is a document — re-imported whole, and the bundled SRD re-seeded from
+the build whenever `SRD_SEED_REVISION` moves — so an in-place edit would be lost the next
+time the app updated itself, silently. Editing an entry instead **copies it into a pack
+with id `homebrew`**, keeping the original id, and `app/services/homebrew.ts` is the whole
+of that mechanism.
+
+- **The homebrew pack shadows by id.** `inLookupOrder()` sorts it to the front, so every
+  singular getter in the rulepacks store finds it first; `claimedIds()` / `unshadowed()`
+  drop the book's version from every *list* getter and from `composedPack()`, so a
+  corrected healing word is one spell in the picker rather than two told apart by a source
+  label. Two **books** sharing an id are still two entries, as they always were — that is a
+  second take on the same content, where this is one take that has been edited.
+- **`Rulepack.forkedFrom` records what a copy was copied from**, keyed `<kind>:<id>`, with
+  an FNV-1a `hash` of the source entry as it stood at that moment. `forkStatuses()`
+  re-hashes the source and reports `changed` / `source-missing`, which is what the homebrew
+  page leads with. This matters because the rules data is still being corrected: a copy
+  taken today shadows tomorrow's fix with nothing on screen to say so. "Keep mine"
+  re-snapshots the hash; deleting the copy is the whole of the undo, since the book was
+  never touched.
+- **The editor exposes wording, not structure.** `ENTRY_KINDS` declares a short field list
+  per kind (the scalars printed beside the name), and `proseBlocks()` finds every
+  `{ name, description }` pair at any depth by *shape* — race traits, class features,
+  subclass features at 6th level, creature actions, pool options — so a book this app has
+  never read is editable without enumerating its paths. Level tables, `levelUpEvents` and
+  ability distributions are left to the JSON tab, validated by `EntrySchemas[kind]` (one
+  entry, not the whole file). A form that got those half-right would be worse than none.
+- **`optionPools` has no id**, so `poolKey()` (`group|choiceId`) stands in — the same key
+  `mergeOptionPools` already uses, so a copied pool patch shadows the one it came from
+  instead of arriving beside it. It cannot be duplicated for the same reason.
+- New entries mint `hb-<slug>` ids (`mintEntryId`), numbered only on a clash; a
+  **duplicate** blanks the id so it stands beside the original rather than replacing it.
+  Export on the pack page is the only way homebrew leaves the browser, since there is no
+  backend.
+
+### The service worker gates the re-seed
+
+The PWA registers with `registerType: 'prompt'`, **not** `autoUpdate`. That is a data
+decision, not a UX one: the re-seed above and `migrateCharacterShape` both run at boot, so
+a build that takes over unasked rewrites IndexedDB unasked. A new deploy precaches in the
+background and waits; `app/composables/usePwaUpdate.ts` owns the whole decision
+(`describeUpdateState` is pure and unit-tested, the rest needs Nuxt), `UpdateBanner.vue`
+offers it above the bottom nav, and the About page keeps the button after a "Later" —
+which is why the dismissal is a `ref` and never `localStorage`. Nothing else may call
+`updateServiceWorker()`.
+
+The version on the About page is `runtimeConfig.public.appVersion`, baked in at build time
+from `NUXT_PUBLIC_APP_VERSION`, which `deploy.yml` sets to the pushed tag. Outside that
+workflow it reads `dev`.
+
+One consequence worth remembering: a client running an older `autoUpdate` worker applies
+the *next* release unasked whatever this says, because that decision lives in the worker
+already installed. A release that changes stored data therefore wants a release of its own
+in front of it.
+
 ### Non-SRD books
 
 `scripts/book-manifest.mjs` is a names-only table of contents per sourcebook;
@@ -253,6 +310,24 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   `Magic (Constitution only)` so two `Magic` rows do not read as a bug, and
   `compactBonusesByAbility()` drops the abilities nobody singled out, so opening the
   editor on all six leaves nothing behind in the record.
+- **Half a proficiency bonus is derived too, and never stored as a proficiency level.**
+  `app/services/halfProficiency.ts` reads a bard's Jack of All Trades off the wording the
+  way an aura is read: the sentence has to name half a proficiency bonus *and* a check, so
+  a half that goes to a saving throw or to damage is not one. The sniff also carries what
+  the sentence scopes it to — a Champion's Remarkable Athlete names Strength, Dexterity
+  and Constitution and rounds *up*, where Jack of All Trades names no ability and rounds
+  down — which is why the abilities and the rounding are read per feature rather than
+  hard-coded; two features covering the same check take the better rounding rather than
+  stacking. `Character.halfProficiencyChecks` overrides it (null = derive, false switches
+  a misread off, true turns it on for all six), the `carryingCapacityMultiplier` idiom.
+  Nothing about it is persisted and `ProficiencyLevel` stays `0 | 1 | 2`: it applies only
+  where there is no proficiency, so it can never stack with the whole, and the skill dot's
+  click cycle stays none → proficient → expertise. The half shows as a diagonally
+  half-filled dot (`.proficiency-dot.half`), since a hollow ring is already the "none"
+  state. Initiative gets it as well — it is a Dexterity check — added in
+  `initiativeBreakdown` rather than by the feature sniff, and suppressed when a part on
+  the roll already carries a whole proficiency bonus (a harengon's trait).
+
 - **Carrying capacity is derived, and what doubles it is found by wording.**
   `app/services/equipment.ts` builds it from Strength × 15, doubled once per feature
   whose text both mentions carrying capacity and says it is doubled or counts you one size

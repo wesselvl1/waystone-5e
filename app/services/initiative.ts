@@ -1,5 +1,6 @@
 import type { AbilityKey, Character, InitiativeBonuses } from '~/types/character'
 import { sumBonusSet } from '~/services/attacks'
+import { halfProficiency, halfProficiencyBonus } from '~/services/halfProficiency'
 
 /**
  * Initiative, derived the way carrying capacity is.
@@ -39,6 +40,11 @@ export interface InitiativeContext {
 export interface InitiativePart {
   label: string
   value: number
+  /**
+   * Set on the line that puts a whole proficiency bonus on the roll. Half a proficiency
+   * bonus only reaches a check that has none, so the half has to know this line is there.
+   */
+  proficiency?: true
 }
 
 export interface InitiativeBreakdown {
@@ -60,7 +66,11 @@ const ABILITY_WORDS: Record<string, { key: AbilityKey; label: string }> = {
 const MENTIONS_INITIATIVE = /\binitiative\b/i
 const ADDS_ABILITY = /add(?:ing)?\s+your\s+(strength|dexterity|constitution|intelligence|wisdom|charisma)\s+modifier/i
 const ADDS_PROFICIENCY = /add(?:ing)?\s+your\s+proficiency\s+bonus/i
-/** Half a proficiency bonus is Jack of All Trades, which is not an initiative feature. */
+/**
+ * Half a proficiency bonus is not a whole one. It reaches the roll by the other route —
+ * initiative is an ability check, so `halfProficiency()` below puts it on — and reading
+ * it here as well would add the bonus twice at twice the size.
+ */
 const HALF_PROFICIENCY = /half\s+your\s+proficiency/i
 const FLAT_BONUS = /([+-]\s*\d+)\s+bonus\s+to\s+(?:your\s+)?initiative/i
 
@@ -100,7 +110,7 @@ function initiativePart(
     }
 
     if (ADDS_PROFICIENCY.test(sentence) && !HALF_PROFICIENCY.test(sentence)) {
-      return { label: `${name} (proficiency)`, value: ctx.proficiencyBonus }
+      return { label: `${name} (proficiency)`, value: ctx.proficiencyBonus, proficiency: true }
     }
   }
   return undefined
@@ -134,12 +144,32 @@ export function initiativeBreakdown(
     return { total: character.initiative, parts: [], manual: true }
   }
 
+  const featureParts = initiativeParts(character, ctx)
   const parts = [
     { label: 'Dexterity', value: dex },
-    ...initiativeParts(character, ctx),
+    ...featureParts,
+    ...halfProficiencyPart(character, ctx, featureParts),
     ...bonusParts(character.initiativeBonuses),
   ]
   return { total: parts.reduce((sum, p) => sum + p.value, 0), parts, manual: false }
+}
+
+/**
+ * Jack of All Trades on the roll, because initiative is a Dexterity check.
+ *
+ * "That doesn't already include your proficiency bonus" is the whole of the condition, so
+ * a harengon who already adds the whole bonus adds no half on top — which is why this
+ * reads the lines already on the roll rather than the character's skill list.
+ */
+function halfProficiencyPart(
+  character: Character,
+  ctx: InitiativeContext,
+  featureParts: InitiativePart[],
+): InitiativePart[] {
+  if (featureParts.some(p => p.proficiency)) return []
+  const half = halfProficiencyBonus(halfProficiency(character), 'dex', ctx.proficiencyBonus)
+  if (!half.value || !half.source) return []
+  return [{ label: `${half.source} (half proficiency)`, value: half.value }]
 }
 
 /** The hand-entered slots, listed one per line so the sheet shows where each came from. */

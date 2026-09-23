@@ -186,6 +186,10 @@ export function classifyProficiency(
  * name a player typed is left exactly as typed, the way `cleanEquipmentName` leaves one
  * alone. A phrase keeps its sentence shape, since title-casing "1 extra language of your
  * choice" produces something no book prints.
+ *
+ * A word starts after a space or a bracket, not after an apostrophe: the possessive
+ * in "smith's tools" is part of the word before it, where a word boundary saw a
+ * fresh word and printed "Smith'S Tools".
  */
 export function proficiencyLabel(name: string): string {
   const trimmed = name.trim()
@@ -193,7 +197,7 @@ export function proficiencyLabel(name: string): string {
   if (category) return category
   if (/[A-Z]/.test(trimmed)) return trimmed
   if (PHRASE.test(trimmed)) return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
-  return trimmed.replace(/\b[a-z]/g, c => c.toUpperCase())
+  return trimmed.replace(/(^|[\s([/-])([a-z])/g, (_, lead, c) => lead + c.toUpperCase())
 }
 
 /** Whether the entry is a prompt to pick something rather than a proficiency. */

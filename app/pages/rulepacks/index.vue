@@ -3,8 +3,21 @@ import { useRulepacksStore } from '~/stores/rulepacks'
 import { importFromFile, importFromUrl } from '~/services/rulepackImport'
 import type { Rulepack } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
+import { HOMEBREW_PACK_ID } from '~/services/homebrew'
 
 const rulepackStore = useRulepacksStore()
+const router = useRouter()
+
+/**
+ * Open the pack the in-app editor writes to, creating it empty if this is the first time.
+ *
+ * It is made here rather than seeded at startup so a player who never writes anything
+ * never sees an empty pack in this list.
+ */
+async function openHomebrew() {
+  await rulepackStore.ensureHomebrewPack()
+  await router.push(`/rulepacks/${HOMEBREW_PACK_ID}`)
+}
 
 onMounted(() => rulepackStore.loadAll())
 
@@ -84,6 +97,9 @@ function packContents(pack: Rulepack) {
     { label: 'backgrounds', count: pack.backgrounds.length },
     { label: 'feats', count: pack.feats.length },
     { label: 'spells', count: pack.spells.length },
+    { label: 'creatures', count: pack.creatures?.length ?? 0 },
+    { label: 'weapons', count: pack.weapons?.length ?? 0 },
+    { label: 'armour', count: pack.armor?.length ?? 0 },
     { label: 'optional features', count: pack.optionalFeatures.length },
     {
       // Counted as options rather than as pools: "1 option pool" is a shape of the file,
@@ -132,6 +148,12 @@ async function confirmRemoval() {
     <header class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-surface-900/95 backdrop-blur border-b border-surface-700/60">
       <h1 class="font-display text-lg font-semibold text-primary-400 tracking-wide">Rulepacks</h1>
       <div class="flex gap-2">
+        <button class="btn-ghost text-xs" @click="openHomebrew">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Homebrew
+        </button>
         <button class="btn-ghost text-xs" @click="fileInput?.click()">
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -161,14 +183,20 @@ async function confirmRemoval() {
         </div>
         <div>
           <p class="text-slate-300 font-medium">No rulepacks loaded</p>
-          <p class="text-slate-500 text-sm mt-1">Import a rulepack — a JSON file, a zip of several — or paste a URL.</p>
+          <p class="text-slate-500 text-sm mt-1">Import a rulepack — a JSON file, a zip of several — or paste a URL. Homebrew starts one of your own.</p>
         </div>
       </div>
 
       <div v-for="pack in rulepackStore.rulepacks" :key="pack.id" class="card">
         <div class="flex items-start justify-between gap-3">
           <NuxtLink :to="`/rulepacks/${pack.id}`" class="flex-1 min-w-0">
-            <p class="font-semibold text-white">{{ pack.name }}</p>
+            <p class="font-semibold text-white">
+              {{ pack.name }}
+              <span
+                v-if="pack.id === HOMEBREW_PACK_ID"
+                class="ml-1.5 align-middle text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent-900/40 text-accent-400"
+              >Yours</span>
+            </p>
             <p class="text-xs text-slate-500 mt-0.5">v{{ pack.version }}<span v-if="pack.author"> · {{ pack.author }}</span></p>
             <p v-if="pack.description" class="text-xs text-slate-400 mt-1">{{ pack.description }}</p>
             <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-slate-500">

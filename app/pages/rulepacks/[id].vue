@@ -1,6 +1,20 @@
 <script setup lang="ts">
 import { useRulepacksStore } from '~/stores/rulepacks'
 import type { SpellDefinition } from '~/types/rulepack'
+import type { EntryKind, ProseBlock } from '~/services/homebrew'
+import {
+  ENTRY_KINDS,
+  HOMEBREW_PACK_ID,
+  blankHomebrewPack,
+  entryId,
+  entryKindMeta,
+  entryName,
+  fieldValue,
+  forkKey,
+  listEntries,
+  mintEntryId,
+  proseBlocks,
+} from '~/services/homebrew'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,22 +25,30 @@ onMounted(async () => {
   if (!pack.value) router.replace('/rulepacks')
 })
 
-const pack = computed(() => rulepackStore.getById(route.params.id as string))
+const packId = computed(() => route.params.id as string)
+const pack = computed(() => rulepackStore.getById(packId.value))
+const isHomebrew = computed(() => packId.value === HOMEBREW_PACK_ID)
 
-const TABS = [
-  { key: 'races', label: 'Races' },
-  { key: 'classes', label: 'Classes' },
-  { key: 'backgrounds', label: 'Backgrounds' },
-  { key: 'feats', label: 'Feats' },
-  { key: 'spells', label: 'Spells' },
-] as const
+/**
+ * The kinds this pack gets a tab for: whatever it holds, plus — in the player's own pack
+ * — every kind there is, since an empty tab is where a new entry is created.
+ */
+const TABS = computed(() =>
+  ENTRY_KINDS.filter(meta =>
+    isHomebrew.value || (pack.value ? listEntries(pack.value, meta.key).length > 0 : false)))
 
-type TabKey = 'races' | 'classes' | 'backgrounds' | 'feats' | 'spells'
+/** The five kinds this page renders in full; the rest share one card. */
+const BESPOKE = new Set<EntryKind>(['races', 'classes', 'backgrounds', 'feats', 'spells'])
 
-const activeTab = ref<TabKey>('races')
+const activeTab = ref<EntryKind>('races')
 const expanded = ref<string | null>(null)
 
-function setTab(key: TabKey) {
+// A pack with no races opens on whatever it does have.
+watch(TABS, (tabs) => {
+  if (tabs.length && !tabs.some(tab => tab.key === activeTab.value)) activeTab.value = tabs[0]!.key
+}, { immediate: true })
+
+function setTab(key: EntryKind) {
   activeTab.value = key
   expanded.value = null
   spellSearch.value = ''
@@ -35,6 +57,10 @@ function setTab(key: TabKey) {
 
 function toggle(id: string) {
   expanded.value = expanded.value === id ? null : id
+}
+
+function entriesOf(kind: EntryKind): Record<string, unknown>[] {
+  return pack.value ? listEntries(pack.value, kind) : []
 }
 
 // Spell filters
@@ -76,6 +102,187 @@ function formatASI(bonuses: Partial<Record<string, number>>): string {
 function levelLabel(l: number): string {
   return l === 0 ? 'Cantrips' : `Level ${l} Spells`
 }
+
+// ---------------------------------------------------------------------------
+// Editing
+// ---------------------------------------------------------------------------
+
+interface EditorState {
+  kind: EntryKind
+  entry: Record<string, unknown>
+  mode: 'edit' | 'duplicate' | 'new'
+  sourcePackName?: string
+  copiesOnSave: boolean
+}
+
+const editing = ref<EditorState | null>(null)
+/** Shown after a book's entry has been copied, so the edit is not silently elsewhere. */
+const savedNotice = ref('')
+
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+function openEdit(kind: EntryKind, entry: Record<string, unknown>) {
+  savedNotice.value = ''
+  editing.value = {
+    kind,
+    entry: clone(entry),
+    mode: 'edit',
+    sourcePackName: pack.value?.name,
+    // A book is never written to: editing one of its entries copies it out.
+    copiesOnSave: !isHomebrew.value,
+  }
+}
+
+function openDuplicate(kind: EntryKind, entry: Record<string, unknown>) {
+  savedNotice.value = ''
+  editing.value = {
+    kind,
+    // Blank id and a marked name: this stands beside the original rather than replacing
+    // it, so it must not inherit the id the original is looked up by.
+    entry: { ...clone(entry), id: '', name: `${entryName(kind, entry)} (copy)` },
+    mode: 'duplicate',
+    sourcePackName: pack.value?.name,
+    copiesOnSave: false,
+  }
+}
+
+function openNew(kind: EntryKind) {
+  savedNotice.value = ''
+  editing.value = { kind, entry: entryKindMeta(kind).blank(), mode: 'new', copiesOnSave: false }
+}
+
+async function onSave(saved: Record<string, unknown>) {
+  const state = editing.value
+  if (!state) return
+
+  let entry = saved
+  if (state.mode !== 'edit' && state.kind !== 'optionPools' && !entry.id) {
+    const target = rulepackStore.homebrewPack() ?? blankHomebrewPack()
+    entry = { ...entry, id: mintEntryId(target, state.kind, String(entry.name ?? '')) }
+  }
+
+  const origin = state.copiesOnSave
+    ? rulepackStore.forkOriginFor(packId.value, state.kind, entryId(state.kind, entry))
+    : undefined
+
+  await rulepackStore.saveHomebrewEntry(state.kind, entry, origin)
+
+  savedNotice.value = isHomebrew.value
+    ? ''
+    : `Saved “${entryName(state.kind, entry)}” to your Homebrew pack. It is what the app uses now.`
+  editing.value = null
+}
+
+// ---------------------------------------------------------------------------
+// Deleting, and copies whose book has moved on
+// ---------------------------------------------------------------------------
+
+const pendingDelete = ref<{ kind: EntryKind; id: string; name: string } | null>(null)
+
+const deletePrompt = computed(() => {
+  const pending = pendingDelete.value
+  if (!pending) return null
+  const status = forkStatusFor(pending.kind, pending.id)
+  return {
+    title: `Delete “${pending.name}”?`,
+    message: status
+      ? `This is your copy of an entry from ${status.origin.packName}. Deleting it brings that `
+        + 'version back.'
+      : 'Characters already using it keep the name on the sheet, but lookups will break.',
+  }
+})
+
+async function confirmDelete() {
+  const pending = pendingDelete.value
+  pendingDelete.value = null
+  if (!pending) return
+  await rulepackStore.removeHomebrewEntry(pending.kind, pending.id)
+}
+
+const forkStatuses = computed(() => rulepackStore.homebrewForkStatuses())
+
+function forkStatusFor(kind: EntryKind, id: string) {
+  return forkStatuses.value.find(status => status.kind === kind && status.id === id)
+}
+
+/** Copies the book has moved on underneath — the notice the homebrew pack leads with. */
+const staleForks = computed(() => forkStatuses.value.filter(status => status.state !== 'current'))
+
+/**
+ * Keep this copy as it is, and stop saying the book has changed.
+ *
+ * Re-saving with a fresh origin re-snapshots the source hash, so the notice returns only
+ * the next time the book itself moves — which is the honest behaviour: the reader has
+ * seen this change and decided.
+ */
+async function keepCopy(kind: EntryKind, id: string) {
+  const homebrew = rulepackStore.homebrewPack()
+  const entry = homebrew && listEntries(homebrew, kind).find(candidate => entryId(kind, candidate) === id)
+  if (!entry) return
+  const status = forkStatusFor(kind, id)
+  const origin = status ? rulepackStore.forkOriginFor(status.origin.packId, kind, id) : undefined
+  await rulepackStore.saveHomebrewEntry(kind, clone(entry), origin)
+}
+
+/**
+ * Which of this book's entries the player has already copied and edited.
+ *
+ * Shown as a chip on the book's own page: the entry on screen is not the one the app is
+ * using, and nothing else would say so.
+ */
+const homebrewClaims = computed(() => {
+  const claims = new Set<string>()
+  const homebrew = rulepackStore.homebrewPack()
+  if (!homebrew || isHomebrew.value) return claims
+  for (const meta of ENTRY_KINDS) {
+    for (const entry of listEntries(homebrew, meta.key)) {
+      claims.add(forkKey(meta.key, entryId(meta.key, entry)))
+    }
+  }
+  return claims
+})
+
+function isEdited(kind: EntryKind, entry: unknown): boolean {
+  return homebrewClaims.value.has(forkKey(kind, entryId(kind, entry)))
+}
+
+// ---------------------------------------------------------------------------
+// The shared card, for the kinds this page does not render in full
+// ---------------------------------------------------------------------------
+
+/** A one-line "simple · melee · 1d8 · slashing", built from the kind's own field list. */
+function summaryOf(kind: EntryKind, entry: Record<string, unknown>): string {
+  return entryKindMeta(kind).fields
+    .filter(field => field.key !== 'name' && field.kind !== 'multiline')
+    .map(field => String(fieldValue(entry, field)))
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function proseOf(entry: Record<string, unknown>): ProseBlock[] {
+  return proseBlocks(entry)
+}
+
+function descriptionOf(entry: Record<string, unknown>): string {
+  return typeof entry.description === 'string' ? entry.description : ''
+}
+
+// ---------------------------------------------------------------------------
+// Export — the only way a pack written here leaves this browser
+// ---------------------------------------------------------------------------
+
+function exportPack() {
+  if (!pack.value) return
+  const blob = new Blob([JSON.stringify(pack.value, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${pack.value.id}.json`
+  link.click()
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <template>
@@ -93,6 +300,12 @@ function levelLabel(l: number): string {
           v{{ pack.version }}<span v-if="pack.author"> · {{ pack.author }}</span>
         </p>
       </div>
+      <button v-if="pack" class="btn-ghost text-xs flex-shrink-0" @click="exportPack">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        Export
+      </button>
     </header>
 
     <template v-if="pack">
@@ -108,6 +321,52 @@ function levelLabel(l: number): string {
         </div>
       </div>
 
+      <!-- What a copy costs: it stops receiving the book's own corrections -->
+      <div v-if="isHomebrew" class="px-4 pt-3">
+        <p class="text-xs text-slate-400 bg-surface-800 border border-surface-700/50 rounded-lg px-3 py-2">
+          Entries here replace the book's version wherever the app looks one up, and they do
+          <em>not</em> update with it. The app's rules data is still being corrected, so a copy taken
+          today can be missing a fix made tomorrow — you will be told below when the book one of
+          these came from has changed.
+        </p>
+      </div>
+
+      <!-- Copies whose source has moved on -->
+      <div v-if="isHomebrew && staleForks.length" class="px-4 pt-3 space-y-2">
+        <div
+          v-for="status in staleForks"
+          :key="`${status.kind}:${status.id}`"
+          class="rounded-lg bg-accent-900/20 border border-accent-700/40 px-3 py-2.5 space-y-2"
+        >
+          <p class="text-xs text-accent-200">
+            <span class="font-semibold">{{ status.name }}</span>
+            <template v-if="status.state === 'changed'">
+              — {{ status.origin.packName }} has changed this since you copied it (v{{ status.origin.packVersion }}).
+              Your copy is what the app uses.
+            </template>
+            <template v-else>
+              — {{ status.origin.packName }} no longer has this entry, so your copy is the only
+              version left.
+            </template>
+          </p>
+          <div v-if="status.state === 'changed'" class="flex gap-2">
+            <button
+              class="btn-ghost text-xs py-1"
+              @click="pendingDelete = { kind: status.kind, id: status.id, name: status.name }"
+            >Take the book's version</button>
+            <button class="btn-ghost text-xs py-1" @click="keepCopy(status.kind, status.id)">Keep mine</button>
+          </div>
+        </div>
+      </div>
+
+      <p
+        v-if="savedNotice"
+        class="mx-4 mt-3 text-xs text-slate-300 bg-primary-900/30 border border-primary-700/40 rounded-lg px-3 py-2"
+      >
+        {{ savedNotice }}
+        <NuxtLink :to="`/rulepacks/${HOMEBREW_PACK_ID}`" class="text-primary-400 underline">Open Homebrew</NuxtLink>
+      </p>
+
       <!-- Tabs -->
       <div class="sticky top-[53px] z-30 flex gap-1 px-4 py-2 mt-2 bg-surface-900/95 backdrop-blur border-b border-surface-700/40 overflow-x-auto" style="scrollbar-width: none;">
         <button
@@ -122,28 +381,47 @@ function levelLabel(l: number): string {
       </div>
 
       <main class="px-4 pt-4 space-y-2">
+        <!-- New, in the player's own pack -->
+        <div v-if="isHomebrew" class="flex justify-end">
+          <button class="btn-primary text-xs" @click="openNew(activeTab)">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            New {{ entryKindMeta(activeTab).singular }}
+          </button>
+        </div>
+
         <!-- ========== RACES ========== -->
         <template v-if="activeTab === 'races'">
           <p v-if="pack.races.length === 0" class="text-slate-500 text-sm text-center py-8">No races in this pack.</p>
           <div v-for="race in pack.races" :key="race.id" class="card">
-            <button class="w-full flex items-start justify-between gap-3 text-left" @click="toggle(race.id)">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-semibold text-white">{{ race.name }}</span>
-                  <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-700 text-slate-400">{{ race.size }}</span>
+            <div class="flex items-start justify-between gap-3">
+              <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(race.id)">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-white">{{ race.name }}</span>
+                    <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-700 text-slate-400">{{ race.size }}</span>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1">
+                    {{ formatASI(race.abilityScoreBonuses) || 'No ASI' }} · Walk {{ race.speeds.walk }}ft<template v-if="race.speeds.fly">, Fly {{ race.speeds.fly }}ft</template><template v-if="race.speeds.swim">, Swim {{ race.speeds.swim }}ft</template><template v-if="race.speeds.climb">, Climb {{ race.speeds.climb }}ft</template> · {{ race.languages.join(', ') }}
+                  </p>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">
-                  {{ formatASI(race.abilityScoreBonuses) || 'No ASI' }} · Walk {{ race.speeds.walk }}ft<template v-if="race.speeds.fly">, Fly {{ race.speeds.fly }}ft</template><template v-if="race.speeds.swim">, Swim {{ race.speeds.swim }}ft</template><template v-if="race.speeds.climb">, Climb {{ race.speeds.climb }}ft</template> · {{ race.languages.join(', ') }}
-                </p>
-              </div>
-              <svg
-                class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
-                :class="expanded === race.id ? 'rotate-180' : ''"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                <svg
+                  class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
+                  :class="expanded === race.id ? 'rotate-180' : ''"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <RulepackEntryActions
+                :can-delete="isHomebrew"
+                :edited="isEdited('races', race)"
+                @edit="openEdit('races', race as unknown as Record<string, unknown>)"
+                @duplicate="openDuplicate('races', race as unknown as Record<string, unknown>)"
+                @delete="pendingDelete = { kind: 'races', id: race.id, name: race.name }"
+              />
+            </div>
 
             <div v-if="expanded === race.id" class="mt-3 pt-3 border-t border-surface-700/50 space-y-4">
               <!-- Traits -->
@@ -180,28 +458,37 @@ function levelLabel(l: number): string {
         <template v-if="activeTab === 'classes'">
           <p v-if="pack.classes.length === 0" class="text-slate-500 text-sm text-center py-8">No classes in this pack.</p>
           <div v-for="cls in pack.classes" :key="cls.id" class="card">
-            <button class="w-full flex items-start justify-between gap-3 text-left" @click="toggle(cls.id)">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-semibold text-white">{{ cls.name }}</span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-slate-400">{{ cls.hitDie }}</span>
-                  <span v-if="cls.spellcastingAbility" class="text-[10px] px-1.5 py-0.5 rounded bg-primary-900/50 text-primary-400">
-                    {{ ABILITY_LABELS[cls.spellcastingAbility] ?? cls.spellcastingAbility }} caster
-                  </span>
+            <div class="flex items-start justify-between gap-3">
+              <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(cls.id)">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-white">{{ cls.name }}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-slate-400">{{ cls.hitDie }}</span>
+                    <span v-if="cls.spellcastingAbility" class="text-[10px] px-1.5 py-0.5 rounded bg-primary-900/50 text-primary-400">
+                      {{ ABILITY_LABELS[cls.spellcastingAbility] ?? cls.spellcastingAbility }} caster
+                    </span>
+                  </div>
+                  <p class="text-xs text-slate-400 mt-1">
+                    Saves: {{ cls.savingThrowProficiencies.map(a => ABILITY_LABELS[a] ?? a).join(', ') }}
+                    <span v-if="cls.primaryAbility.length"> · Primary: {{ cls.primaryAbility.map(a => ABILITY_LABELS[a] ?? a).join('/') }}</span>
+                  </p>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">
-                  Saves: {{ cls.savingThrowProficiencies.map(a => ABILITY_LABELS[a] ?? a).join(', ') }}
-                  <span v-if="cls.primaryAbility.length"> · Primary: {{ cls.primaryAbility.map(a => ABILITY_LABELS[a] ?? a).join('/') }}</span>
-                </p>
-              </div>
-              <svg
-                class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
-                :class="expanded === cls.id ? 'rotate-180' : ''"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                <svg
+                  class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
+                  :class="expanded === cls.id ? 'rotate-180' : ''"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <RulepackEntryActions
+                :can-delete="isHomebrew"
+                :edited="isEdited('classes', cls)"
+                @edit="openEdit('classes', cls as unknown as Record<string, unknown>)"
+                @duplicate="openDuplicate('classes', cls as unknown as Record<string, unknown>)"
+                @delete="pendingDelete = { kind: 'classes', id: cls.id, name: cls.name }"
+              />
+            </div>
 
             <div v-if="expanded === cls.id" class="mt-3 pt-3 border-t border-surface-700/50 space-y-4">
               <!-- Proficiencies -->
@@ -266,21 +553,30 @@ function levelLabel(l: number): string {
         <template v-if="activeTab === 'backgrounds'">
           <p v-if="pack.backgrounds.length === 0" class="text-slate-500 text-sm text-center py-8">No backgrounds in this pack.</p>
           <div v-for="bg in pack.backgrounds" :key="bg.id" class="card">
-            <button class="w-full flex items-start justify-between gap-3 text-left" @click="toggle(bg.id)">
-              <div class="flex-1 min-w-0">
-                <p class="font-semibold text-white">{{ bg.name }}</p>
-                <p class="text-xs text-slate-400 mt-1">
-                  Skills: {{ bg.skillProficiencies.join(', ') || 'None' }}
-                </p>
-              </div>
-              <svg
-                class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
-                :class="expanded === bg.id ? 'rotate-180' : ''"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+            <div class="flex items-start justify-between gap-3">
+              <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(bg.id)">
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-white">{{ bg.name }}</p>
+                  <p class="text-xs text-slate-400 mt-1">
+                    Skills: {{ bg.skillProficiencies.join(', ') || 'None' }}
+                  </p>
+                </div>
+                <svg
+                  class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
+                  :class="expanded === bg.id ? 'rotate-180' : ''"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <RulepackEntryActions
+                :can-delete="isHomebrew"
+                :edited="isEdited('backgrounds', bg)"
+                @edit="openEdit('backgrounds', bg as unknown as Record<string, unknown>)"
+                @duplicate="openDuplicate('backgrounds', bg as unknown as Record<string, unknown>)"
+                @delete="pendingDelete = { kind: 'backgrounds', id: bg.id, name: bg.name }"
+              />
+            </div>
 
             <div v-if="expanded === bg.id" class="mt-3 pt-3 border-t border-surface-700/50 space-y-3">
               <p v-if="bg.description" class="text-sm text-slate-400 leading-relaxed">{{ bg.description }}</p>
@@ -307,26 +603,35 @@ function levelLabel(l: number): string {
         <template v-if="activeTab === 'feats'">
           <p v-if="pack.feats.length === 0" class="text-slate-500 text-sm text-center py-8">No feats in this pack.</p>
           <div v-for="feat in pack.feats" :key="feat.id" class="card">
-            <button class="w-full flex items-start justify-between gap-3 text-left" @click="toggle(feat.id)">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-semibold text-white">{{ feat.name }}</span>
-                  <span v-if="feat.prerequisite" class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-slate-500">
-                    Req: {{ feat.prerequisite }}
-                  </span>
+            <div class="flex items-start justify-between gap-3">
+              <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(feat.id)">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-white">{{ feat.name }}</span>
+                    <span v-if="feat.prerequisite" class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-slate-500">
+                      Req: {{ feat.prerequisite }}
+                    </span>
+                  </div>
+                  <p v-if="feat.abilityScoreBonus && Object.keys(feat.abilityScoreBonus).length" class="text-xs text-slate-400 mt-1">
+                    ASI: {{ formatASI(feat.abilityScoreBonus) }}
+                  </p>
                 </div>
-                <p v-if="feat.abilityScoreBonus && Object.keys(feat.abilityScoreBonus).length" class="text-xs text-slate-400 mt-1">
-                  ASI: {{ formatASI(feat.abilityScoreBonus) }}
-                </p>
-              </div>
-              <svg
-                class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
-                :class="expanded === feat.id ? 'rotate-180' : ''"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+                <svg
+                  class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
+                  :class="expanded === feat.id ? 'rotate-180' : ''"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <RulepackEntryActions
+                :can-delete="isHomebrew"
+                :edited="isEdited('feats', feat)"
+                @edit="openEdit('feats', feat as unknown as Record<string, unknown>)"
+                @duplicate="openDuplicate('feats', feat as unknown as Record<string, unknown>)"
+                @delete="pendingDelete = { kind: 'feats', id: feat.id, name: feat.name }"
+              />
+            </div>
             <div v-if="expanded === feat.id" class="mt-3 pt-3 border-t border-surface-700/50">
               <p class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{{ feat.description }}</p>
             </div>
@@ -359,29 +664,95 @@ function levelLabel(l: number): string {
           <div v-for="[level, spells] in spellsByLevel" :key="level" class="space-y-2">
             <p class="section-header pt-2">{{ levelLabel(level) }}</p>
             <div v-for="spell in spells" :key="spell.id" class="card">
-              <button class="w-full flex items-start justify-between gap-3 text-left" @click="toggle(spell.id)">
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="font-medium text-white">{{ spell.name }}</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-slate-400 capitalize">{{ spell.school }}</span>
-                    <span v-if="spell.ritual" class="text-[10px] px-1.5 py-0.5 rounded bg-accent-900/40 text-accent-400">Ritual</span>
-                    <span v-if="spell.concentration" class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-slate-500">Conc.</span>
-                    <SpellRollBadge :spell-id="spell.id" />
+              <div class="flex items-start justify-between gap-3">
+                <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(spell.id)">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="font-medium text-white">{{ spell.name }}</span>
+                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-slate-400 capitalize">{{ spell.school }}</span>
+                      <span v-if="spell.ritual" class="text-[10px] px-1.5 py-0.5 rounded bg-accent-900/40 text-accent-400">Ritual</span>
+                      <span v-if="spell.concentration" class="text-[10px] px-1.5 py-0.5 rounded bg-surface-700 text-slate-500">Conc.</span>
+                      <SpellRollBadge :spell-id="spell.id" />
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">{{ spell.castingTime }} · {{ spell.range }} · {{ spell.duration }}</p>
                   </div>
-                  <p class="text-xs text-slate-500 mt-0.5">{{ spell.castingTime }} · {{ spell.range }} · {{ spell.duration }}</p>
+                  <svg
+                    class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
+                    :class="expanded === spell.id ? 'rotate-180' : ''"
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <RulepackEntryActions
+                  :can-delete="isHomebrew"
+                  :edited="isEdited('spells', spell)"
+                  @edit="openEdit('spells', spell as unknown as Record<string, unknown>)"
+                  @duplicate="openDuplicate('spells', spell as unknown as Record<string, unknown>)"
+                  @delete="pendingDelete = { kind: 'spells', id: spell.id, name: spell.name }"
+                />
+              </div>
+              <div v-if="expanded === spell.id" class="mt-3 pt-3 border-t border-surface-700/50 space-y-2">
+                <p class="text-xs text-slate-400"><span class="text-slate-300">Components: </span>{{ spell.components }}</p>
+                <p class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{{ spell.description }}</p>
+                <p v-if="spell.classes.length" class="text-xs text-slate-500">Classes: {{ spell.classes.join(', ') }}</p>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- ========== EVERYTHING ELSE ========== -->
+        <template v-if="!BESPOKE.has(activeTab)">
+          <p v-if="entriesOf(activeTab).length === 0" class="text-slate-500 text-sm text-center py-8">
+            No {{ entryKindMeta(activeTab).label.toLowerCase() }} in this pack.
+          </p>
+          <div
+            v-for="entry in entriesOf(activeTab)"
+            :key="`${activeTab}:${entryId(activeTab, entry)}`"
+            class="card"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <button
+                class="flex-1 min-w-0 flex items-start gap-3 text-left"
+                @click="toggle(`${activeTab}:${entryId(activeTab, entry)}`)"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-white">{{ entryName(activeTab, entry) }}</p>
+                  <p v-if="summaryOf(activeTab, entry)" class="text-xs text-slate-400 mt-1">
+                    {{ summaryOf(activeTab, entry) }}
+                  </p>
                 </div>
                 <svg
                   class="w-4 h-4 flex-shrink-0 text-slate-500 transition-transform mt-0.5"
-                  :class="expanded === spell.id ? 'rotate-180' : ''"
+                  :class="expanded === `${activeTab}:${entryId(activeTab, entry)}` ? 'rotate-180' : ''"
                   fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
                 >
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
-              <div v-if="expanded === spell.id" class="mt-3 pt-3 border-t border-surface-700/50 space-y-2">
-                <p class="text-xs text-slate-400"><span class="text-slate-300">Components: </span>{{ spell.components }}</p>
-                <p class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">{{ spell.description }}</p>
-                <p v-if="spell.classes.length" class="text-xs text-slate-500">Classes: {{ spell.classes.join(', ') }}</p>
+              <RulepackEntryActions
+                :can-delete="isHomebrew"
+                :can-duplicate="activeTab !== 'optionPools'"
+                :edited="isEdited(activeTab, entry)"
+                @edit="openEdit(activeTab, entry)"
+                @duplicate="openDuplicate(activeTab, entry)"
+                @delete="pendingDelete = { kind: activeTab, id: entryId(activeTab, entry), name: entryName(activeTab, entry) }"
+              />
+            </div>
+
+            <div
+              v-if="expanded === `${activeTab}:${entryId(activeTab, entry)}`"
+              class="mt-3 pt-3 border-t border-surface-700/50 space-y-3"
+            >
+              <p v-if="descriptionOf(entry)" class="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
+                {{ descriptionOf(entry) }}
+              </p>
+              <div v-for="block in proseOf(entry)" :key="block.path.join('.')">
+                <p class="text-sm font-medium text-slate-200">
+                  {{ block.name }}
+                  <span v-if="block.context" class="text-[11px] text-slate-500 font-normal">· {{ block.context }}</span>
+                </p>
+                <p class="text-xs text-slate-400 mt-0.5 whitespace-pre-wrap leading-relaxed">{{ block.value }}</p>
               </div>
             </div>
           </div>
@@ -393,5 +764,27 @@ function levelLabel(l: number): string {
     <div v-if="!pack && rulepackStore.loading" class="flex justify-center pt-24">
       <p class="text-slate-500 text-sm animate-pulse">Loading…</p>
     </div>
+
+    <RulepackEntryEditor
+      v-if="editing"
+      :open="!!editing"
+      :kind="editing.kind"
+      :entry="editing.entry"
+      :mode="editing.mode"
+      :source-pack-name="editing.sourcePackName"
+      :copies-on-save="editing.copiesOnSave"
+      @save="onSave"
+      @close="editing = null"
+    />
+
+    <ConfirmDialog
+      :open="!!deletePrompt"
+      :title="deletePrompt?.title ?? ''"
+      :message="deletePrompt?.message"
+      confirm-label="Delete"
+      danger
+      @confirm="confirmDelete"
+      @cancel="pendingDelete = null"
+    />
   </div>
 </template>
