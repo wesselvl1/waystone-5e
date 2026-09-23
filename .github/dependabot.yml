@@ -1,0 +1,29 @@
+version: 2
+
+updates:
+  # pnpm is detected from pnpm-lock.yaml; the "npm" ecosystem covers it.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      # One PR for everything that should not break anything, so a quiet week is one review.
+      minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps
+
+  # Keeps actions/checkout, pnpm/action-setup, setup-node and wrangler-action current
+  # in both ci.yml and deploy.yml.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
