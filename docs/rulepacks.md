@@ -342,6 +342,11 @@ How the pieces fit:
   level are columns in the class table, and `spellsKnown` is also the cap for a class whose
   `spellPreparation.kind` is `known`. A `prepared` class has no `CHOOSE_SPELL` for levelled
   spells: it prepares from its whole list, as the SRD cleric and paladin do.
+- **Swapping a known spell.** A `known` class whose rules let the player trade one spell
+  for another on each new level declares `CHANGE_SPELL` on every level that allows it:
+  `{ "type": "CHANGE_SPELL", "addTo": "tol-lampwright", "amount": 1 }`. The SRD bard,
+  ranger, sorcerer and warlock declare it on levels 2 to 20. It's optional for the player,
+  and it isn't asked at all until the class knows a spell to give up.
 - **A new class starts with an empty spell list**, because no spell names it in `classes`.
   `EXPAND_SPELL_LIST` (above) gives it another class's list, or specific `spellIds`.
 - **Subclass placeholders.** When a level's subclass feature has no name of its own, write
@@ -580,13 +585,21 @@ simply *has* one uses `speeds`, `senses` or `speedOverrides`.
 |---|---|---|
 | `GRANT_SPELLS` | `addTo`, `spellIds`, `alwaysPrepared?`, `uses?`, `cost?`, `castAtLevel?`, `whenOption?`, source fields | Gives specific spells |
 | `CHOOSE_SPELL` | `addTo`, `count`, filters, `maxLevel?`, `uses?`, `whenOption?`, source fields | The player picks spells |
+| `CHANGE_SPELL` | `addTo`, `amount`, `classes?`, `schools?`, `cantrip?`, `label?` | Offers to trade a known spell for another |
 | `EXPAND_SPELL_LIST` | `addTo` (class id or `"all"`), `spellIds?` and/or `classes?`, `minLevel?`, `whenOption?`, `label?` | Widens a spell list without granting anything to cast |
 | `GRANT_SPELLCASTING` | `addTo`, `ability`, `list?` | Makes a non-caster class a caster (subclass spellcasting) |
 | `CHOOSE_SPELLCASTING_ABILITY` | `addTo`, `from` | The player picks which ability casts a source's spells |
 
-- `CHOOSE_SPELL` filters narrow one another: `classes` (class lists), `fromList` (spell
-  ids), `cantrip`, `schools`, `ritual`, `attackRoll`. `maxLevel` caps the spell level for a
-  source with no class level of its own, such as a feat.
+- `CHOOSE_SPELL` picks its list with **one** of `fromList` (spell ids), `classes` (class
+  lists) or `schools`, checked in that order: the first one present decides, so `classes`
+  and `schools` together ignore `schools`. `cantrip`, `ritual` and `attackRoll` then narrow
+  whichever list that is. `maxLevel` caps the spell level for a source with no class level
+  of its own, such as a feat.
+- `CHANGE_SPELL` offers the spells known through `addTo` (not cantrips, unless
+  `"cantrip": true`, and never a spell a trait granted) against replacements chosen the way
+  `CHOOSE_SPELL` chooses them, up to the class's own maximum spell level. With neither
+  `classes` nor `schools` the replacement comes from the `addTo` class's list. Each
+  `amount` is a separate trade, and only a spell known before this level can be given up.
 - `uses: { "max": 1, "recharge": "long" }` makes a free cast. `castAtLevel` fixes the
   level of that cast (a 2nd-level *hellish rebuke*). `cost: { "resource": "Ki", "amount": 2 }`
   makes the spell cost a feature's resource instead.
@@ -606,7 +619,6 @@ simply *has* one uses `speeds`, `senses` or `speedOverrides`.
 |---|---|
 | `ADD_FEATURE`, `UPDATE_SPELL_SLOTS` | Ignored. Features come from `features` and slots from `spellSlots`. |
 | `UPDATE_HIT_DIE` | Redundant; the class's `hitDie` is applied every level. |
-| `CHANGE_SPELL` | Accepted but not implemented: nothing is asked. |
 
 ## Choices that do something
 
@@ -706,7 +718,9 @@ Things a pack can declare that the app doesn't act on yet:
 
 - **`CHOOSE_FEAT` on a race, subrace or background** is never asked. It works on a class
   level. `GRANT_FEAT` (a named feat) does work from a race or background.
-- **`CHANGE_SPELL`** (swapping a known spell on level-up) does nothing.
+- **A spell choice can't combine a class list with a school.** `classes` wins over
+  `schools` in `CHOOSE_SPELL` and `CHANGE_SPELL`, so "an abjuration or evocation spell from
+  the wizard list" can only be written as one or the other, or as a `fromList` of the ids.
 - **An optional class feature's spells can't scale with level.** Its events all fire when
   it's taken, and `GRANT_SPELLS` has no minimum level, so one that grants more spells at
   higher levels can express only the first.
