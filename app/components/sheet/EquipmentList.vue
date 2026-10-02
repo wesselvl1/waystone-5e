@@ -317,7 +317,7 @@ const CURRENCY: { key: keyof Currency; label: string; color: string }[] = [
             </div>
             <div>
               <label class="label">Notes</label>
-              <input v-model="draft.notes" class="input" placeholder="optional" @keydown.enter="saveEdit" />
+              <textarea v-model="draft.notes" rows="3" class="input resize-none min-h-[4.5rem] max-h-60 [field-sizing:content]" placeholder="optional" />
             </div>
             <div class="flex gap-2 justify-end">
               <button class="btn-ghost text-xs" @click="editingId = null">Cancel</button>
@@ -343,7 +343,7 @@ const CURRENCY: { key: keyof Currency; label: string; color: string }[] = [
           </div>
           <div>
             <label class="label">Notes</label>
-            <input v-model="newItem.notes" class="input" placeholder="optional" />
+            <textarea v-model="newItem.notes" rows="3" class="input resize-none min-h-[4.5rem] max-h-60 [field-sizing:content]" placeholder="optional" />
           </div>
           <div class="flex gap-2 justify-end">
             <button class="btn-ghost text-xs" @click="showAddForm = false">Cancel</button>
