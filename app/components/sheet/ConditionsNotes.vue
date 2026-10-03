@@ -111,7 +111,7 @@ function saveAppearance() {
       <textarea
         v-model="draftAppearance"
         rows="3"
-        class="input resize-none"
+        class="input input-autogrow min-h-[4.5rem]"
         placeholder="Age, height, weight, eyes, hair…"
         @blur="saveAppearance"
       />
@@ -126,7 +126,7 @@ function saveAppearance() {
       <textarea
         v-model="draftNotes"
         rows="6"
-        class="input resize-none"
+        class="input input-autogrow min-h-[8.25rem]"
         placeholder="Session notes, backstory, reminders…"
         @blur="saveNotes"
       />
