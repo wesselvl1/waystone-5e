@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
+import { spellMatchesChoice } from '~/services/spellcasting'
 import type { SpellDefinition } from '~/types/rulepack'
 import type { ChooseSpellEvent } from '~/types/events'
 import druidFragment from '~/data/srd/druid.json'
@@ -9,20 +10,14 @@ const druid = RulepackSchema.parse(druidFragment).classes.find(c => c.id === 'dr
 const allSpells = RulepackSchema.parse(spellFragment).spells as SpellDefinition[]
 
 /**
- * Mirrors availableSpells in app/pages/characters/[id]/levelup.vue. Note the fall-through:
+ * Mirrors availableSpells in app/pages/characters/[id]/levelup.vue, through the same
+ * `spellMatchesChoice` the page calls rather than a copy of it. Note the fall-through:
  * with neither fromList, classes nor schools set, every spell in every pack is offered.
  * That is why a CHOOSE_SPELL event must never lose its restriction on the way to the UI.
  */
 function availableSpells(event: ChooseSpellEvent, known: string[] = []): SpellDefinition[] {
   const existing = new Set(known)
-  return allSpells.filter((s) => {
-    if (existing.has(s.id)) return false
-    if (event.cantrip !== (s.level === 0)) return false
-    if (event.fromList?.length) return event.fromList.includes(s.id)
-    if (event.classes?.length) return s.classes.some(c => event.classes!.includes(c))
-    if (event.schools?.length) return event.schools.includes(s.school)
-    return true
-  })
+  return allSpells.filter(s => !existing.has(s.id) && spellMatchesChoice(s, event, { levelCap: 9 }))
 }
 
 /**

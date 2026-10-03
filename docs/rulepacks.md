@@ -590,11 +590,11 @@ simply *has* one uses `speeds`, `senses` or `speedOverrides`.
 | `GRANT_SPELLCASTING` | `addTo`, `ability`, `list?` | Makes a non-caster class a caster (subclass spellcasting) |
 | `CHOOSE_SPELLCASTING_ABILITY` | `addTo`, `from` | The player picks which ability casts a source's spells |
 
-- `CHOOSE_SPELL` picks its list with **one** of `fromList` (spell ids), `classes` (class
-  lists) or `schools`, checked in that order: the first one present decides, so `classes`
-  and `schools` together ignore `schools`. `cantrip`, `ritual` and `attackRoll` then narrow
-  whichever list that is. `maxLevel` caps the spell level for a source with no class level
-  of its own, such as a feat.
+- `CHOOSE_SPELL`'s filters all narrow one another: `fromList` (spell ids), `classes` (class
+  lists), `schools`, `cantrip`, `ritual` and `attackRoll`. A spell is offered only if it
+  passes every filter the event sets, so "an abjuration or evocation spell from the wizard
+  list" is `"classes": ["wizard"], "schools": ["abjuration", "evocation"]`. `maxLevel` caps
+  the spell level for a source with no class level of its own, such as a feat.
 - `CHANGE_SPELL` offers the spells known through `addTo` (not cantrips, unless
   `"cantrip": true`, and never a spell a trait granted) against replacements chosen the way
   `CHOOSE_SPELL` chooses them, up to the class's own maximum spell level. With neither
@@ -718,9 +718,6 @@ Things a pack can declare that the app doesn't act on yet:
 
 - **`CHOOSE_FEAT` on a race, subrace or background** is never asked. It works on a class
   level. `GRANT_FEAT` (a named feat) does work from a race or background.
-- **A spell choice can't combine a class list with a school.** `classes` wins over
-  `schools` in `CHOOSE_SPELL` and `CHANGE_SPELL`, so "an abjuration or evocation spell from
-  the wizard list" can only be written as one or the other, or as a `fromList` of the ids.
 - **An optional class feature's spells can't scale with level.** Its events all fire when
   it's taken, and `GRANT_SPELLS` has no minimum level, so one that grants more spells at
   higher levels can express only the first.

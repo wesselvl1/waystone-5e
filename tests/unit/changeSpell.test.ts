@@ -143,6 +143,14 @@ describe('offering a known-spell swap', () => {
     expect(offer.options).not.toContain('misty-step')
   })
 
+  it('narrows the class list by school when the pack names both', () => {
+    const c = char([{ classId: 'sorcerer', level: 2 }], [known('shield', { classId: 'sorcerer' })])
+    const offer = resolveSpellChange({ ...sorcererSwap, schools: ['evocation'] }, c, rulepack, 3)!
+    const offered = offer.options.map(id => rulepack.spells.find(s => s.id === id)!)
+    expect(offered.map(s => s.id)).toContain('magic-missile')
+    expect(offered.every(s => s.school === 'evocation' && s.classes.includes('sorcerer'))).toBe(true)
+  })
+
   it('carries the pack’s label, with a default', () => {
     const c = char([{ classId: 'sorcerer', level: 2 }], [known('magic-missile', { classId: 'sorcerer' })])
     expect(resolveSpellChange(sorcererSwap, c, rulepack, 3)!.label).toBe('Replace a spell')
