@@ -3,6 +3,7 @@ import type { Character, ActiveCreatureForm } from '~/types/character'
 import type { CreatureDefinition, CreatureFilter, CreatureType } from '~/types/rulepack'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { abilityMod } from '~/composables/useCharacterStats'
+import { evaluateAmount } from '~/services/hpMath'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -128,11 +129,13 @@ const draftFormHp = ref(0)
 // Damage/Heal modal, mirroring the character's own. Typing an amount beats clicking
 // a tick button once for every point of a 22-damage hit.
 const hpModalMode = ref<'damage' | 'heal' | null>(null)
-const hpModalAmount = ref(0)
+/** What was typed, which may be a sum (`8+7/2`); the amount is what it comes to. */
+const hpModalInput = ref('')
+const hpModalAmount = computed(() => evaluateAmount(hpModalInput.value) ?? 0)
 
 function openHpModal(mode: 'damage' | 'heal') {
   hpModalMode.value = mode
-  hpModalAmount.value = 0
+  hpModalInput.value = ''
   nextTick(() => document.getElementById('form-hp-modal-input')?.focus())
 }
 
@@ -143,7 +146,7 @@ function closeHpModal() {
 const hpModalNewCurrent = computed(() => {
   const hp = active.value?.hp
   if (!hp) return 0
-  const amount = hpModalAmount.value || 0
+  const amount = hpModalAmount.value
   if (hpModalMode.value === 'damage') return Math.max(0, hp.current - amount)
   if (hpModalMode.value === 'heal') return Math.min(hp.max, hp.current + amount)
   return hp.current
@@ -153,7 +156,7 @@ const hpModalNewCurrent = computed(() => {
 const carryOverDamage = computed(() => {
   const hp = active.value?.hp
   if (!hp || hpModalMode.value !== 'damage') return 0
-  return Math.max(0, (hpModalAmount.value || 0) - hp.current)
+  return Math.max(0, hpModalAmount.value - hp.current)
 })
 
 function applyHpChange() {
@@ -398,15 +401,12 @@ function signed(n: number): string {
           {{ hpModalMode === 'damage' ? '⚔ Damage' : '✚ Heal' }} {{ active.name }}
         </p>
         <p class="text-[10px] text-slate-500 mb-3">Applies to the form, not your own hit points.</p>
-        <input
-          id="form-hp-modal-input"
-          v-model.number="hpModalAmount"
-          type="number"
-          min="0"
-          class="input w-full text-center text-2xl font-bold mb-3"
-          @keydown.enter="applyHpChange"
-          @keydown.esc="closeHpModal"
-        >
+        <SheetHpAmountInput
+          v-model="hpModalInput"
+          input-id="form-hp-modal-input"
+          @submit="applyHpChange"
+          @cancel="closeHpModal"
+        />
         <div class="flex items-center justify-between text-xs mb-1 px-1">
           <div class="text-center">
             <p class="text-slate-500 uppercase tracking-wider mb-0.5">Current</p>

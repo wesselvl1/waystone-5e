@@ -2,6 +2,7 @@
 import type { Character, FeatureUsesBonusSource } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useRulepacksStore } from '~/stores/rulepacks'
+import { evaluateAmount } from '~/services/hpMath'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -151,11 +152,13 @@ function restoreBardicInspiration() {
 
 // ── Damage / Heal modal ───────────────────────────────────────────────────────
 const hpModalMode = ref<'damage' | 'heal' | null>(null)
-const hpModalAmount = ref(0)
+/** What was typed, which may be a sum (`8+7/2`); the amount is what it comes to. */
+const hpModalInput = ref('')
+const hpModalAmount = computed(() => evaluateAmount(hpModalInput.value) ?? 0)
 
 function openHpModal(mode: 'damage' | 'heal') {
   hpModalMode.value = mode
-  hpModalAmount.value = 0
+  hpModalInput.value = ''
   nextTick(() => {
     const el = document.getElementById('hp-modal-input')
     el?.focus()
@@ -168,7 +171,7 @@ function closeHpModal() {
 
 const hpModalNewCurrent = computed(() => {
   const { current, max } = props.character.hp
-  const amount = hpModalAmount.value || 0
+  const amount = hpModalAmount.value
   if (hpModalMode.value === 'damage') return Math.max(0, current - amount)
   if (hpModalMode.value === 'heal') return Math.min(max, current + amount)
   return current
@@ -469,14 +472,11 @@ function applyHpChange() {
           <p class="text-sm font-semibold mb-3" :class="hpModalMode === 'damage' ? 'text-danger-300' : 'text-success-300'">
             {{ hpModalMode === 'damage' ? '⚔ Apply Damage' : '✚ Heal' }}
           </p>
-          <input
-            id="hp-modal-input"
-            v-model.number="hpModalAmount"
-            type="number"
-            min="0"
-            class="input w-full text-center text-2xl font-bold mb-3"
-            @keydown.enter="applyHpChange"
-            @keydown.esc="closeHpModal"
+          <SheetHpAmountInput
+            v-model="hpModalInput"
+            input-id="hp-modal-input"
+            @submit="applyHpChange"
+            @cancel="closeHpModal"
           />
           <div class="flex items-center justify-between text-xs mb-4 px-1">
             <div class="text-center">
