@@ -394,7 +394,7 @@ function abilityHint(ability: AttackAbility): string {
 
             <div>
               <label class="label">Notes</label>
-              <input v-model="draft.notes" class="input" placeholder="optional" />
+              <textarea v-model="draft.notes" rows="3" class="input input-autogrow min-h-[4.5rem] max-h-60" placeholder="optional" />
             </div>
 
             <!-- The escape hatch, folded away: a total that ignores everything above. -->

@@ -40,6 +40,14 @@
       focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors;
   }
 
+  /* A textarea that grows to show all of its text. Where field-sizing is unsupported
+     the rows attribute sets a fixed height and the text scrolls inside it instead;
+     pair it with a min-h so an empty field is not one line tall. */
+  .input-autogrow {
+    @apply resize-none;
+    field-sizing: content;
+  }
+
   .label {
     @apply block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1;
   }
