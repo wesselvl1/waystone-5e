@@ -89,10 +89,12 @@ function raceName(raceId: string) {
 
       <!-- Character list -->
       <div v-else class="grid gap-3">
+        <!-- select-none: the route change lands after the tap, so Chrome on Android reads
+             it as a tap on plain text and opens Touch to Search on the name it hit -->
         <div
           v-for="character in characterStore.characters"
           :key="character.id"
-          class="card flex items-center gap-4 overflow-hidden cursor-pointer hover:border-primary-500/40 transition-colors active:scale-[0.99]"
+          class="card flex items-center gap-4 overflow-hidden cursor-pointer select-none hover:border-primary-500/40 transition-colors active:scale-[0.99]"
           @click="$router.push(`/characters/${character.id}`)"
         >
           <!-- Level badge -->
