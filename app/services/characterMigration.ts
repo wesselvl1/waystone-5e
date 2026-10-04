@@ -37,8 +37,21 @@ export function migrateCharacterShape<T extends object>(raw: T): T {
   out.features = dedupeFeatures(src.features)
   out.attacks = migrateAttacks(src.attacks, src)
   out.equipment = migrateEquipment(src.equipment)
+  if (src.hp !== undefined) out.hp = migrateHp(src.hp)
 
   return out as T
+}
+
+/**
+ * Turn a cleared temp box back into 0. The sheet used to store whatever a cleared
+ * number input handed it, which is an empty string, and `CharacterSchema` rejects that
+ * on the next import.
+ */
+function migrateHp(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value
+  const hp = value as { temp?: unknown }
+  if (typeof hp.temp === 'number' && Number.isFinite(hp.temp)) return value
+  return { ...hp, temp: 0 }
 }
 
 /**

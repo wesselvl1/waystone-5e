@@ -2,7 +2,7 @@
 import type { Character, FeatureUsesBonusSource } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useRulepacksStore } from '~/stores/rulepacks'
-import { evaluateAmount } from '~/services/hpMath'
+import { applyDamage, applyHealing, evaluateAmount, hpFieldValue } from '~/services/hpMath'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -27,7 +27,8 @@ function startHPEdit(field: 'current' | 'max' | 'temp') {
 }
 
 function commitHPEdit(field: 'current' | 'max' | 'temp') {
-  emit('update', { hp: { ...props.character.hp, [field]: draftHP.value } })
+  const fallback = field === 'temp' ? 0 : props.character.hp[field]
+  emit('update', { hp: { ...props.character.hp, [field]: hpFieldValue(draftHP.value, fallback) } })
   editingHP.value = null
 }
 
@@ -169,17 +170,17 @@ function closeHpModal() {
   hpModalMode.value = null
 }
 
-const hpModalNewCurrent = computed(() => {
-  const { current, max } = props.character.hp
-  const amount = hpModalAmount.value
-  if (hpModalMode.value === 'damage') return Math.max(0, current - amount)
-  if (hpModalMode.value === 'heal') return Math.min(max, current + amount)
-  return current
+/** Temporary hit points soak damage before `current` does; healing leaves them alone. */
+const hpModalResult = computed(() => {
+  const hp = props.character.hp
+  if (hpModalMode.value === 'damage') return applyDamage(hp, hpModalAmount.value)
+  return applyHealing(hp, hpModalMode.value === 'heal' ? hpModalAmount.value : 0)
 })
 
 function applyHpChange() {
   if (!hpModalMode.value || hpModalAmount.value <= 0) { closeHpModal(); return }
-  emit('update', { hp: { ...props.character.hp, current: hpModalNewCurrent.value } })
+  const { current, temp } = hpModalResult.value
+  emit('update', { hp: { ...props.character.hp, current, temp } })
   closeHpModal()
 }
 </script>
@@ -217,7 +218,7 @@ function applyHpChange() {
         <div class="stat-box cursor-pointer" @click="startHPEdit('temp')">
           <span class="stat-label">Temp</span>
           <template v-if="editingHP === 'temp'">
-            <input v-model.number="draftHP" type="number" class="input text-center text-lg w-16 px-1 py-0" autofocus @blur="commitHPEdit('temp')" @keydown.enter="commitHPEdit('temp')" @click.stop />
+            <input v-model.number="draftHP" type="number" placeholder="—" class="input text-center text-lg w-16 px-1 py-0" autofocus @blur="commitHPEdit('temp')" @keydown.enter="commitHPEdit('temp')" @click.stop />
           </template>
           <span v-else class="stat-value text-accent-400">{{ character.hp.temp || '—' }}</span>
         </div>
@@ -488,11 +489,13 @@ function applyHpChange() {
             <div class="text-center">
               <p class="text-slate-500 uppercase tracking-wider mb-0.5">Current</p>
               <p class="text-lg font-bold text-slate-200">{{ character.hp.current }}</p>
+              <p v-if="character.hp.temp" class="text-accent-400">+{{ character.hp.temp }} temp</p>
             </div>
             <div class="text-slate-500 text-base">&rarr;</div>
             <div class="text-center">
               <p class="text-slate-500 uppercase tracking-wider mb-0.5">New</p>
-              <p class="text-lg font-bold" :class="hpModalMode === 'damage' ? 'text-danger-300' : 'text-success-300'">{{ hpModalNewCurrent }}</p>
+              <p class="text-lg font-bold" :class="hpModalMode === 'damage' ? 'text-danger-300' : 'text-success-300'">{{ hpModalResult.current }}</p>
+              <p v-if="character.hp.temp" class="text-accent-400">+{{ hpModalResult.temp }} temp</p>
             </div>
           </div>
           <div class="flex gap-2">

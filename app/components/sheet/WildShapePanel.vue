@@ -3,7 +3,7 @@ import type { Character, ActiveCreatureForm } from '~/types/character'
 import type { CreatureDefinition, CreatureFilter, CreatureType } from '~/types/rulepack'
 import { useRulepacksStore } from '~/stores/rulepacks'
 import { abilityMod } from '~/composables/useCharacterStats'
-import { evaluateAmount } from '~/services/hpMath'
+import { applyDamage, applyHealing, evaluateAmount, hpFieldValue } from '~/services/hpMath'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -143,26 +143,21 @@ function closeHpModal() {
   hpModalMode.value = null
 }
 
-const hpModalNewCurrent = computed(() => {
-  const hp = active.value?.hp
-  if (!hp) return 0
-  const amount = hpModalAmount.value
-  if (hpModalMode.value === 'damage') return Math.max(0, hp.current - amount)
-  if (hpModalMode.value === 'heal') return Math.min(hp.max, hp.current + amount)
-  return hp.current
+/** The form's temporary hit points soak damage first, as the character's own do. */
+const hpModalResult = computed(() => {
+  const hp = active.value?.hp ?? { max: 0, current: 0, temp: 0 }
+  if (hpModalMode.value === 'damage') return applyDamage(hp, hpModalAmount.value)
+  return { ...applyHealing(hp, hpModalMode.value === 'heal' ? hpModalAmount.value : 0), overflow: 0 }
 })
 
 /** Damage beyond the form's hit points carries over to the character (SRD Wild Shape). */
-const carryOverDamage = computed(() => {
-  const hp = active.value?.hp
-  if (!hp || hpModalMode.value !== 'damage') return 0
-  return Math.max(0, hpModalAmount.value - hp.current)
-})
+const carryOverDamage = computed(() => hpModalResult.value.overflow)
 
 function applyHpChange() {
   const a = active.value
   if (!a || !hpModalMode.value || hpModalAmount.value <= 0) { closeHpModal(); return }
-  setFormHp({ ...a.hp, current: hpModalNewCurrent.value })
+  const { current, temp } = hpModalResult.value
+  setFormHp({ ...a.hp, current, temp })
   closeHpModal()
 }
 function startFormHpEdit(field: 'current' | 'max' | 'temp') {
@@ -174,7 +169,7 @@ function startFormHpEdit(field: 'current' | 'max' | 'temp') {
 function commitFormHpEdit(field: 'current' | 'max' | 'temp') {
   const a = active.value
   if (!a) { editingFormHp.value = null; return }
-  setFormHp({ ...a.hp, [field]: draftFormHp.value })
+  setFormHp({ ...a.hp, [field]: hpFieldValue(draftFormHp.value, field === 'temp' ? 0 : a.hp[field]) })
   editingFormHp.value = null
 }
 
@@ -278,6 +273,7 @@ function signed(n: number): string {
                 type="number"
                 class="input text-center text-lg w-16 px-1 py-0"
                 autofocus
+                placeholder="—"
                 @blur="commitFormHpEdit('temp')"
                 @keydown.enter="commitFormHpEdit('temp')"
                 @click.stop
@@ -411,11 +407,13 @@ function signed(n: number): string {
           <div class="text-center">
             <p class="text-slate-500 uppercase tracking-wider mb-0.5">Current</p>
             <p class="text-lg font-bold text-slate-200">{{ active.hp.current }}</p>
+            <p v-if="active.hp.temp" class="text-accent-400">+{{ active.hp.temp }} temp</p>
           </div>
           <div class="text-slate-500 text-base">&rarr;</div>
           <div class="text-center">
             <p class="text-slate-500 uppercase tracking-wider mb-0.5">New</p>
-            <p class="text-lg font-bold" :class="hpModalMode === 'damage' ? 'text-danger-300' : 'text-success-300'">{{ hpModalNewCurrent }}</p>
+            <p class="text-lg font-bold" :class="hpModalMode === 'damage' ? 'text-danger-300' : 'text-success-300'">{{ hpModalResult.current }}</p>
+            <p v-if="active.hp.temp" class="text-accent-400">+{{ hpModalResult.temp }} temp</p>
           </div>
         </div>
         <p v-if="carryOverDamage > 0" class="text-[10px] text-danger-400 mb-3 px-1">
