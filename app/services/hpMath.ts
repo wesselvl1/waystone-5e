@@ -129,3 +129,43 @@ export function halveExpression(input: string): string {
   if (!trimmed) return ''
   return /^\d+(\.\d+)?$/.test(trimmed) ? `${trimmed}/2` : `(${trimmed})/2`
 }
+
+export interface HitPointPool { max: number; current: number; temp: number }
+
+/**
+ * Damage after it has gone through temporary hit points. The temporary pool absorbs
+ * first and only what is left comes off `current` (SRD, "Temporary Hit Points"), so a
+ * 12-point hit on 5 temp and 20 current leaves 0 and 13. `overflow` is the damage past
+ * both, which is what a Wild Shape form carries over to the druid.
+ */
+export function applyDamage(hp: HitPointPool, amount: number): { current: number; temp: number; overflow: number } {
+  const damage = Math.max(0, amount)
+  const temp = Math.max(0, Number(hp.temp) || 0)
+  const absorbed = Math.min(temp, damage)
+  const rest = damage - absorbed
+  return {
+    current: Math.max(0, hp.current - rest),
+    temp: temp - absorbed,
+    overflow: Math.max(0, rest - hp.current),
+  }
+}
+
+/** Healing restores `current` up to `max` and never touches temporary hit points. */
+export function applyHealing(hp: HitPointPool, amount: number): { current: number; temp: number } {
+  return {
+    current: Math.min(hp.max, hp.current + Math.max(0, amount)),
+    temp: Math.max(0, Number(hp.temp) || 0),
+  }
+}
+
+/**
+ * What an HP box commits. A cleared `type="number"` input hands `v-model` an empty
+ * string, which was stored as-is — the sheet then held `temp: ""`, which no longer
+ * matches the type and fails `CharacterSchema` on the next import. Anything that is not
+ * a number falls back (to 0 for temp, the old value otherwise); the rest is a whole,
+ * non-negative number.
+ */
+export function hpFieldValue(raw: unknown, fallback: number): number {
+  const n = typeof raw === 'number' ? raw : Number.NaN
+  return Number.isFinite(n) ? Math.max(0, Math.round(n)) : fallback
+}

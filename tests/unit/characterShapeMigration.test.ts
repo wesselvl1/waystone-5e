@@ -65,3 +65,15 @@ describe('duplicate features', () => {
     expect((migrateCharacterShape(raw) as { features: unknown[] }).features).toHaveLength(2)
   })
 })
+
+describe('a cleared temp hit point box', () => {
+  it('is stored as 0 again', () => {
+    const out = migrateCharacterShape({ hp: { max: 12, current: 12, temp: '' } }) as { hp: { temp: number } }
+    expect(out.hp).toEqual({ max: 12, current: 12, temp: 0 })
+  })
+
+  it('leaves a numeric temp alone', () => {
+    const out = migrateCharacterShape({ hp: { max: 12, current: 12, temp: 4 } }) as { hp: { temp: number } }
+    expect(out.hp.temp).toBe(4)
+  })
+})

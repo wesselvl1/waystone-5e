@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluateAmount, halveExpression, isExpression } from '~/services/hpMath'
+import { applyDamage, applyHealing, evaluateAmount, halveExpression, hpFieldValue, isExpression } from '~/services/hpMath'
 
 describe('evaluateAmount', () => {
   it('reads a bare number', () => {
@@ -75,5 +75,46 @@ describe('halveExpression', () => {
 
   it('leaves an empty box empty', () => {
     expect(halveExpression('  ')).toBe('')
+  })
+})
+
+describe('applyDamage', () => {
+  it('takes damage out of temporary hit points first', () => {
+    expect(applyDamage({ max: 30, current: 20, temp: 5 }, 3)).toEqual({ current: 20, temp: 2, overflow: 0 })
+  })
+
+  it('carries what the temporary pool cannot absorb over to current', () => {
+    expect(applyDamage({ max: 30, current: 20, temp: 5 }, 12)).toEqual({ current: 13, temp: 0, overflow: 0 })
+  })
+
+  it('works without temporary hit points', () => {
+    expect(applyDamage({ max: 30, current: 20, temp: 0 }, 7)).toEqual({ current: 13, temp: 0, overflow: 0 })
+  })
+
+  it('stops at 0 and reports the damage past both pools', () => {
+    expect(applyDamage({ max: 30, current: 4, temp: 3 }, 10)).toEqual({ current: 0, temp: 0, overflow: 3 })
+  })
+
+  it('treats a cleared temp box as no temporary hit points', () => {
+    expect(applyDamage({ max: 30, current: 20, temp: '' as unknown as number }, 5)).toEqual({ current: 15, temp: 0, overflow: 0 })
+  })
+})
+
+describe('applyHealing', () => {
+  it('heals current up to max and leaves temporary hit points alone', () => {
+    expect(applyHealing({ max: 30, current: 25, temp: 4 }, 10)).toEqual({ current: 30, temp: 4 })
+  })
+})
+
+describe('hpFieldValue', () => {
+  it('falls back when the box was cleared', () => {
+    expect(hpFieldValue('', 0)).toBe(0)
+    expect(hpFieldValue('', 12)).toBe(12)
+  })
+
+  it('keeps a whole, non-negative number', () => {
+    expect(hpFieldValue(7, 0)).toBe(7)
+    expect(hpFieldValue(-3, 0)).toBe(0)
+    expect(hpFieldValue(2.6, 0)).toBe(3)
   })
 })
