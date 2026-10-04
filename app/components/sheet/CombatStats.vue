@@ -224,8 +224,9 @@ function applyHpChange() {
       </div>
     </div>
 
-    <!-- Combat stats grid -->
-    <div class="grid grid-cols-4 gap-2">
+    <!-- Combat stats grid. Five across on a phone, so the boxes give up some side
+         padding: the labels are what fill the width, not the numbers. -->
+    <div class="grid grid-cols-5 gap-1.5 [&>.stat-box]:px-1">
       <div class="stat-box cursor-pointer col-span-1" @click="acModalOpen = true">
         <span class="stat-label">AC</span>
         <span class="stat-value">{{ stats.armorClass.value }}</span>
@@ -244,6 +245,11 @@ function applyHpChange() {
       <div class="stat-box col-span-1">
         <span class="stat-label">Passive</span>
         <span class="stat-value">{{ stats.passivePerception.value }}</span>
+      </div>
+      <!-- Derived from total level and never overridden, so read-only like Passive. -->
+      <div class="stat-box col-span-1" title="Proficiency bonus">
+        <span class="stat-label">Prof</span>
+        <span class="stat-value">+{{ stats.profBonus.value }}</span>
       </div>
     </div>
 
