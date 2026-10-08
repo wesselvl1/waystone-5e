@@ -1,5 +1,10 @@
 import type { Config } from 'tailwindcss'
 
+/** A colour read from a custom property, so Tailwind can still apply its own alpha. */
+function themed(color: string, shade: number) {
+  return `rgb(var(--color-${color}-${shade}) / <alpha-value>)`
+}
+
 export default {
   content: [
     './app/**/*.{vue,ts}',
@@ -17,14 +22,16 @@ export default {
           700: '#243044',
           600: '#2e3d55',
         },
+        // Primary and accent are player-chosen (app/services/theme.ts): the built-in
+        // values are the defaults on :root in main.css, and a theme overrides them.
         primary: {
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
+          400: themed('primary', 400),
+          500: themed('primary', 500),
+          600: themed('primary', 600),
         },
         accent: {
-          400: '#f59e0b',
-          500: '#d97706',
+          400: themed('accent', 400),
+          500: themed('accent', 500),
         },
         danger: {
           400: '#f87171',

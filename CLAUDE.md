@@ -267,6 +267,15 @@ All external JSON (character import, rulepack import from file or URL) goes thro
 - `classSpellcasting` is keyed by *source*, not strictly by class: entries carry `origin` (`class` | `race` | `background` | `feat`), an optional `label`, and `abilityChosen`, so a race or background grant can use its own ability without another shape change.
 - `Character.hitDice` is one pool **per class** (`HitDicePool[]`), because a fighter/wizard spends d10s and d6s separately. A long rest recovers half the character's total, largest die first.
 - Tailwind uses a custom dark palette (`surface`, `primary`, `accent`, `danger`, `success`) in `tailwind.config.ts` with `darkMode: 'class'`; the app is dark-only in practice. Prefer these tokens over raw hex/slate values in new components.
+- **`primary` and `accent` are player-chosen**, per character (`Character.theme`) over a
+  per-device default (localStorage, `useTheme.ts`) over the built-in palette, resolved per
+  colour by `resolveTheme()` in `app/services/theme.ts`. Tailwind reads both from CSS
+  custom properties, the built-in values sit on `:root` in `main.css` (a test keeps the
+  two in step), and a theme is one swatch per colour with the other shades derived. Only
+  the shades the config defines exist — `primary-300`, `accent-600` and friends generate
+  no CSS — so adding a shade means adding it in all three places. The sheet calls the
+  accent "Secondary". In CSS, write `rgb(var(--color-primary-500))`, not
+  `theme(colors.primary.500)`.
 - **An attack is derived the way a save is.** `app/services/attacks.ts` computes the roll
   from `ability` + proficiency + three named bonus slots (`magic`, `feat`, `misc`), with
   the same three again on damage and its own `damageAbility` — a thrown finesse weapon

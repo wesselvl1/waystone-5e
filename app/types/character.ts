@@ -321,6 +321,18 @@ export interface CharacterImage {
   data: string
 }
 
+/**
+ * The sheet's two colours for this character, as `#rrggbb`. Each is optional and falls
+ * back to the player's default and then the built-in palette — see `resolveTheme()` in
+ * `app/services/theme.ts`, which also explains what each colour paints.
+ */
+export interface CharacterTheme {
+  /** Violet as shipped: proficiency, buttons, the active tab. */
+  primary?: string
+  /** Amber as shipped, and "secondary" on the sheet: expertise, inspiration, temp HP. */
+  accent?: string
+}
+
 export interface EquipmentEntry {
   id: string
   name: string
@@ -495,6 +507,8 @@ export interface Character {
   appearance?: string
   /** Character art, in the order the player added it. Absent until they upload one. */
   images?: CharacterImage[]
+  /** The sheet's colours for this character. Absent means it follows the default. */
+  theme?: CharacterTheme
 
   // Metadata
   createdAt: string                     // ISO date
