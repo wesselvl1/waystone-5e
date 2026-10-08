@@ -40,7 +40,7 @@ const { pressing, bind: bindHold } = useLongPress<SkillKey>(key => editing.value
 
 const editingLabel = computed(() => SKILLS.find(s => s.key === editing.value)?.label ?? '')
 
-function saveSkill(patch: Pick<Character, 'skillProficiencies' | 'skillBonuses'>) {
+function saveSkill(patch: Pick<Character, 'skillProficiencies' | 'skillBonuses' | 'skillHalfProficiency'>) {
   emit('update', patch)
 }
 
@@ -53,9 +53,8 @@ function profLevel(key: SkillKey): ProficiencyLevel {
 /**
  * The feature lending this skill half a proficiency bonus, or null.
  *
- * Derived, so it is not a fourth stop on the cycle — the dot shows it, the modal still
- * steps none → proficient → expertise, and a bard who takes the proficiency loses the
- * half on its own.
+ * Derived unless the player ticked or cleared Half for this skill in its modal, and never
+ * a proficiency level — a bard who takes the proficiency loses the half on its own.
  */
 function halfSource(key: SkillKey): string | null {
   return stats.skillHalfProficiency.value[key] ?? null

@@ -449,6 +449,12 @@ export interface Character {
    */
   skillBonuses?: Partial<Record<SkillKey, number>>
   /**
+   * Half a proficiency bonus on one skill, where the player says otherwise than the
+   * features — true turns it on, false switches a misread off, absent derives it. The
+   * `halfProficiencyChecks` idiom, one skill at a time; still never a proficiency level.
+   */
+  skillHalfProficiency?: Partial<Record<SkillKey, boolean>>
+  /**
    * Whether half a proficiency bonus reaches the checks that carry none — a bard's Jack
    * of All Trades. Null or absent means read it off the features, which is a guess worth
    * overriding; see `halfProficiency()`. Never stored as a proficiency level, because it

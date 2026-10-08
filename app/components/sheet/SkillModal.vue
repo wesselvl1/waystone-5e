@@ -5,8 +5,9 @@
  * A tap on the Skills card's dot used to cycle it, and a thumb scrolling the sheet tapped
  * them by accident; the card now opens this on a hold. The proficiency, the ability and
  * the bonus are laid out the way the total adds them up, and the total moves as the
- * boxes are ticked. There is no Cancel: whatever is on screen when it closes is kept,
- * since it was opened on purpose and Done is the only way out it offers.
+ * boxes are ticked. Half, whole and expertise are three boxes but one answer, so ticking
+ * one clears the other two. There is no Cancel: whatever is on screen when it closes is
+ * kept, since it was opened on purpose and Done is the only way out it offers.
  */
 import type { Character, ProficiencyLevel, SkillKey } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
@@ -20,55 +21,84 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  save: [Pick<Character, 'skillProficiencies' | 'skillBonuses'>]
+  save: [Pick<Character, 'skillProficiencies' | 'skillBonuses' | 'skillHalfProficiency'>]
   close: []
 }>()
 
-const level = ref<ProficiencyLevel>(0)
+/**
+ * One of four, since the three boxes are one answer: ticking one clears the others, and
+ * clearing the ticked one leaves none.
+ */
+type Mode = 'none' | 'half' | 'full' | 'expertise'
+const mode = ref<Mode>('none')
 const misc = ref<number | ''>('')
+
+const stats = useCharacterStats(computed(() => props.character))
 
 watch(() => props.open, (open) => {
   if (!open) return
-  level.value = (props.character.skillProficiencies[props.skill] ?? 0) as ProficiencyLevel
+  const level = props.character.skillProficiencies[props.skill] ?? 0
+  mode.value = level === 2
+    ? 'expertise'
+    : level === 1
+      ? 'full'
+      : stats.skillHalfProficiency.value[props.skill] ? 'half' : 'none'
   misc.value = props.character.skillBonuses?.[props.skill] || ''
 }, { immediate: true })
 
+function toggle(next: Exclude<Mode, 'none'>) {
+  mode.value = mode.value === next ? 'none' : next
+}
+
 const miscValue = computed(() => typeof misc.value === 'number' && Number.isFinite(misc.value) ? misc.value : 0)
 
+/** Whether the features alone give this skill half — what "derived" means for the box. */
+const featureHalf = computed(() => stats.skillBreakdowns.value[props.skill]?.featureHalf ?? false)
+
+/**
+ * What the draft writes. Half is stored only where it disagrees with the features, so a
+ * bard's Jack of All Trades stays derived and a later level that changes it still shows;
+ * a whole proficiency leaves the half setting alone, since half never applies under it.
+ */
+const patch = computed<Pick<Character, 'skillProficiencies' | 'skillBonuses' | 'skillHalfProficiency'>>(() => {
+  const level: ProficiencyLevel = mode.value === 'expertise' ? 2 : mode.value === 'full' ? 1 : 0
+
+  const bonuses = { ...props.character.skillBonuses }
+  if (miscValue.value) bonuses[props.skill] = miscValue.value
+  else delete bonuses[props.skill]
+
+  const halves = { ...props.character.skillHalfProficiency }
+  if (mode.value === 'half' || mode.value === 'none') {
+    const wanted = mode.value === 'half'
+    if (wanted === featureHalf.value) delete halves[props.skill]
+    else halves[props.skill] = wanted
+  }
+
+  return {
+    skillProficiencies: { ...props.character.skillProficiencies, [props.skill]: level },
+    skillBonuses: Object.keys(bonuses).length > 0 ? bonuses : undefined,
+    skillHalfProficiency: Object.keys(halves).length > 0 ? halves : undefined,
+  }
+})
+
 /** The character as the draft would leave it, so the total moves while boxes are ticked. */
-const preview = computed<Character>(() => ({
-  ...props.character,
-  skillProficiencies: { ...props.character.skillProficiencies, [props.skill]: level.value },
-  skillBonuses: { ...props.character.skillBonuses, [props.skill]: miscValue.value },
-}))
-const stats = useCharacterStats(preview)
+const preview = computed<Character>(() => ({ ...props.character, ...patch.value }))
+const previewStats = useCharacterStats(preview)
 
-const parts = computed(() => stats.skillBreakdowns.value[props.skill])
-const halfSource = computed(() => stats.skillHalfProficiency.value[props.skill] ?? null)
-
-const proficient = computed({
-  get: () => level.value >= 1,
-  // Expertise is double the proficiency, so it goes with it
-  set: (on: boolean) => { level.value = on ? Math.max(level.value, 1) as ProficiencyLevel : 0 },
-})
-
-const expertise = computed({
-  get: () => level.value === 2,
-  set: (on: boolean) => { level.value = on ? 2 : 1 },
-})
+const parts = computed(() => previewStats.skillBreakdowns.value[props.skill])
 
 function close() {
-  const storedLevel = props.character.skillProficiencies[props.skill] ?? 0
-  const storedMisc = props.character.skillBonuses?.[props.skill] ?? 0
-  if (level.value !== storedLevel || miscValue.value !== storedMisc) {
-    const bonuses = { ...props.character.skillBonuses }
-    if (miscValue.value) bonuses[props.skill] = miscValue.value
-    else delete bonuses[props.skill]
-    emit('save', {
-      skillProficiencies: { ...props.character.skillProficiencies, [props.skill]: level.value },
-      skillBonuses: Object.keys(bonuses).length > 0 ? bonuses : undefined,
-    })
-  }
+  const before = JSON.stringify([
+    props.character.skillProficiencies[props.skill] ?? 0,
+    props.character.skillBonuses?.[props.skill] ?? 0,
+    props.character.skillHalfProficiency?.[props.skill],
+  ])
+  const after = JSON.stringify([
+    patch.value.skillProficiencies[props.skill],
+    patch.value.skillBonuses?.[props.skill] ?? 0,
+    patch.value.skillHalfProficiency?.[props.skill],
+  ])
+  if (before !== after) emit('save', patch.value)
   emit('close')
 }
 
@@ -78,6 +108,12 @@ function onKeydown(e: KeyboardEvent) {
 
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+const BOXES: { mode: Exclude<Mode, 'none'>, label: string, hint?: string }[] = [
+  { mode: 'half', label: 'Half Proficiency' },
+  { mode: 'full', label: 'Proficiency' },
+  { mode: 'expertise', label: 'Expertise', hint: '(double proficiency)' },
+]
 
 const ABILITY_SHORT: Record<string, string> = {
   str: 'Str', dex: 'Dex', con: 'Con', int: 'Int', wis: 'Wis', cha: 'Cha',
@@ -103,7 +139,7 @@ const ABILITY_SHORT: Record<string, string> = {
                 <p class="font-mono text-lg pb-1 border-b border-surface-600" :class="parts.proficiency ? 'text-slate-100' : 'text-slate-500'">
                   {{ parts.proficiency }}
                 </p>
-                <p class="text-[11px] text-slate-400 mt-1 leading-tight">{{ halfSource ? 'Half Prof' : 'Prof Bonus' }}</p>
+                <p class="text-[11px] text-slate-400 mt-1 leading-tight">{{ mode === 'half' ? 'Half Prof' : 'Prof Bonus' }}</p>
               </div>
               <div>
                 <p class="font-mono text-lg pb-1 border-b border-surface-600 text-slate-500">
@@ -127,21 +163,25 @@ const ABILITY_SHORT: Record<string, string> = {
             </div>
 
             <div class="mt-5 space-y-3 text-left inline-block">
-              <label class="flex items-center gap-3 text-sm text-slate-200 cursor-pointer">
-                <input v-model="proficient" type="checkbox" class="w-5 h-5 rounded accent-primary-500" />
-                Skill Proficiency
-              </label>
               <label
-                class="flex items-center gap-3 text-sm cursor-pointer"
-                :class="proficient ? 'text-slate-200' : 'text-slate-500'"
+                v-for="box in BOXES"
+                :key="box.mode"
+                class="flex items-center gap-3 text-sm text-slate-200 cursor-pointer"
               >
-                <input v-model="expertise" type="checkbox" class="w-5 h-5 rounded accent-accent-400" :disabled="!proficient" />
-                Expertise <span class="text-[11px] text-slate-500">(double proficiency)</span>
+                <input
+                  type="checkbox"
+                  class="w-5 h-5 rounded"
+                  :class="box.mode === 'expertise' ? 'accent-accent-400' : 'accent-primary-500'"
+                  :checked="mode === box.mode"
+                  @change="toggle(box.mode)"
+                />
+                {{ box.label }}
+                <span v-if="box.hint" class="text-[11px] text-slate-500">{{ box.hint }}</span>
               </label>
             </div>
 
-            <p v-if="halfSource" class="text-[11px] text-slate-500 mt-3">
-              {{ halfSource }} adds half your proficiency bonus while you have none.
+            <p v-if="featureHalf" class="text-[11px] text-slate-500 mt-3">
+              Your features give this skill half proficiency while it has none.
             </p>
           </div>
 

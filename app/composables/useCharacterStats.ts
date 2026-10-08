@@ -2,7 +2,7 @@ import type { Character, AbilityKey, AbilityScores, SkillKey } from '~/types/cha
 import { characterArmorClass } from '~/services/armorClass'
 import { initiativeBreakdown } from '~/services/initiative'
 import { savingThrowTotals } from '~/services/savingThrows'
-import { halfProficiency, halfProficiencyBonus } from '~/services/halfProficiency'
+import { halfProficiency, halfProficiencyBonus, skillHalfProficiencyBonus } from '~/services/halfProficiency'
 
 export const SKILL_ABILITY: Record<SkillKey, AbilityKey> = {
   acrobatics: 'dex',
@@ -29,6 +29,10 @@ export interface SkillBreakdown {
   ability: AbilityKey
   /** What proficiency adds: nothing, the bonus, twice it, or half of it. */
   proficiency: number
+  /** What lends the half, where it is half; null otherwise. */
+  halfSource: string | null
+  /** Whether the features alone would give this skill half, whatever the player said. */
+  featureHalf: boolean
   abilityMod: number
   misc: number
   total: number
@@ -83,32 +87,13 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
   const halfProf = computed(() => halfProficiency(characterRef.value))
 
   /**
-   * The feature lending each unproficient skill half a proficiency bonus, or null.
-   *
-   * Only the skills the character has no proficiency in appear: "that doesn't already
-   * include your proficiency bonus" is the rule, so a proficient skill is never half.
-   */
-  const skillHalfProficiency = computed<Record<SkillKey, string | null>>(() => {
-    const c = characterRef.value
-    const prof = profBonus.value
-    const skillProfs = c?.skillProficiencies ?? {}
-
-    const result = {} as Record<SkillKey, string | null>
-    for (const [skill, ability] of Object.entries(SKILL_ABILITY) as [SkillKey, AbilityKey][]) {
-      const profLevel = (skillProfs as Record<string, number>)[skill] ?? 0
-      if (profLevel > 0) {
-        result[skill] = null
-        continue
-      }
-      const half = halfProficiencyBonus(halfProf.value, ability, prof)
-      result[skill] = half.value ? half.source : null
-    }
-    return result
-  })
-
-  /**
    * What each skill is made of: the proficiency it adds (none, whole, double or half),
    * the ability modifier and the hand-entered bonus. The skill modal shows these parts.
+   *
+   * Half comes from the features unless the player has said otherwise for that skill
+   * (`skillHalfProficiency`), and only where there is no proficiency: "that doesn't
+   * already include your proficiency bonus" is the rule, so a proficient skill is never
+   * half.
    */
   const skillBreakdowns = computed<Record<SkillKey, SkillBreakdown>>(() => {
     const c = characterRef.value
@@ -119,17 +104,29 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     const result = {} as Record<SkillKey, SkillBreakdown>
     for (const [skill, ability] of Object.entries(SKILL_ABILITY) as [SkillKey, AbilityKey][]) {
       const profLevel = ((skillProfs as Record<string, number>)[skill] ?? 0) as 0 | 1 | 2
-      const half = profLevel === 0 ? halfProficiencyBonus(halfProf.value, ability, prof).value : 0
-      const proficiency = profLevel * prof + half
+      const half = profLevel === 0
+        ? skillHalfProficiencyBonus(halfProf.value, ability, prof, c?.skillHalfProficiency?.[skill])
+        : { value: 0, source: null }
+      const proficiency = profLevel * prof + half.value
       const misc = c?.skillBonuses?.[skill] ?? 0
       result[skill] = {
         ability,
         proficiency,
+        halfSource: half.value ? half.source : null,
+        featureHalf: halfProficiencyBonus(halfProf.value, ability, prof).value > 0,
         abilityMod: mods[ability],
         misc,
         total: mods[ability] + proficiency + misc,
       }
     }
+    return result
+  })
+
+  /** The feature lending each unproficient skill half a proficiency bonus, or null. */
+  const skillHalfProficiency = computed<Record<SkillKey, string | null>>(() => {
+    const result = {} as Record<SkillKey, string | null>
+    for (const [skill, parts] of Object.entries(skillBreakdowns.value) as [SkillKey, SkillBreakdown][])
+      result[skill] = parts.halfSource
     return result
   })
 

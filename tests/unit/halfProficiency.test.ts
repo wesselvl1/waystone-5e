@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { halfProficiency, halfProficiencyBonus } from '~/services/halfProficiency'
+import { halfProficiency, halfProficiencyBonus, skillHalfProficiencyBonus } from '~/services/halfProficiency'
 import { validCharacter } from '../fixtures'
 import type { Character, Feature } from '~/types/character'
 
@@ -122,5 +122,29 @@ describe('the override, for what the sniff gets wrong', () => {
     const said = withFeatures([JACK_OF_ALL_TRADES], { halfProficiencyChecks: null })
     expect(halfProficiency(said).manual).toBe(false)
     expect(halfProficiencyBonus(halfProficiency(said), 'int', 4).value).toBe(2)
+  })
+})
+
+describe('half a proficiency bonus on one skill, with the player\'s say', () => {
+  const jack = halfProficiency(withFeatures([JACK_OF_ALL_TRADES]))
+  const athlete = halfProficiency(withFeatures([REMARKABLE_ATHLETE]))
+  const nothing = halfProficiency(withFeatures([]))
+
+  it('derives it from the features when the player has said nothing', () => {
+    expect(skillHalfProficiencyBonus(jack, 'int', 3)).toEqual({ value: 1, source: 'Jack of All Trades' })
+    expect(skillHalfProficiencyBonus(nothing, 'int', 3)).toEqual({ value: 0, source: null })
+  })
+
+  it('switches a feature\'s half off for the one skill', () => {
+    expect(skillHalfProficiencyBonus(jack, 'int', 3, false)).toEqual({ value: 0, source: null })
+  })
+
+  it('turns it on, rounded down, where no feature covers the skill', () => {
+    expect(skillHalfProficiencyBonus(nothing, 'wis', 3, true)).toEqual({ value: 1, source: 'Half proficiency' })
+    expect(skillHalfProficiencyBonus(athlete, 'wis', 3, true)).toEqual({ value: 1, source: 'Half proficiency' })
+  })
+
+  it('keeps the feature\'s own rounding where one already covers it', () => {
+    expect(skillHalfProficiencyBonus(athlete, 'dex', 3, true)).toEqual({ value: 2, source: 'Remarkable Athlete' })
   })
 })
