@@ -133,3 +133,24 @@ export function halfProficiencyBonus(
   }
   return best
 }
+
+/**
+ * Half a proficiency bonus on one skill, with the player's say on that skill alone.
+ *
+ * `override` is `Character.skillHalfProficiency[skill]`: absent derives it from the
+ * features as `halfProficiencyBonus` does, false switches it off for this skill, and true
+ * switches it on — at the features' own rounding where one covers the skill, rounded down
+ * as Jack of All Trades is where none does. The caller still drops it from a skill that
+ * has the whole bonus, since half applies only where there is no proficiency.
+ */
+export function skillHalfProficiencyBonus(
+  half: HalfProficiency,
+  ability: AbilityKey,
+  proficiencyBonus: number,
+  override?: boolean,
+): { value: number; source: string | null } {
+  if (override === false) return { value: 0, source: null }
+  const derived = halfProficiencyBonus(half, ability, proficiencyBonus)
+  if (override !== true || derived.value) return derived
+  return { value: Math.floor(proficiencyBonus / 2), source: 'Half proficiency' }
+}

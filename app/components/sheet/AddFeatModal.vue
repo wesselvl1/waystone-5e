@@ -95,10 +95,10 @@ function pendingLabel(event: ChoiceLevelUpEvent): string {
       return 'a spellcasting ability — set it from the Spells tab'
     case 'CHOOSE_SKILL':
       return event.count > 1
-        ? `${event.count} skill proficiencies — tap them on the Skills card`
-        : '1 skill proficiency — tap it on the Skills card'
+        ? `${event.count} skill proficiencies — hold each skill on the Skills card`
+        : '1 skill proficiency — hold the skill on the Skills card'
     case 'CHOOSE_EXPERTISE':
-      return `${event.label.toLowerCase()} — tap those skills again for expertise`
+      return `${event.label.toLowerCase()} — hold those skills again for expertise`
     case 'ABILITY_SCORE_IMPROVEMENT':
       return `${event.points} more ability points — set them on the Ability Scores card`
     case 'CHOOSE_OPTION':

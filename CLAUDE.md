@@ -342,8 +342,10 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   stacking. `Character.halfProficiencyChecks` overrides it (null = derive, false switches
   a misread off, true turns it on for all six), the `carryingCapacityMultiplier` idiom.
   Nothing about it is persisted and `ProficiencyLevel` stays `0 | 1 | 2`: it applies only
-  where there is no proficiency, so it can never stack with the whole, and the skill dot's
-  click cycle stays none → proficient → expertise. The half shows as a diagonally
+  where there is no proficiency, so it can never stack with the whole. The skill modal's
+  three boxes (half, proficient, expertise) are one answer and clear each other; Half
+  writes `Character.skillHalfProficiency[skill]` only where it disagrees with the
+  features (`skillHalfProficiencyBonus`), the same override idiom one skill at a time. The half shows as a diagonally
   half-filled dot (`.proficiency-dot.half`), since a hollow ring is already the "none"
   state. Initiative gets it as well — it is a Dexterity check — added in
   `initiativeBreakdown` rather than by the feature sniff, and suppressed when a part on
@@ -386,4 +388,11 @@ All external JSON (character import, rulepack import from file or URL) goes thro
 - Tailwind's `capitalize` title-cases *every* word, so it belongs only on values the
   schema stores lowercase — a damage type, a weapon property. Over a range or free text it
   produces "150/600 Ft." and re-cases whatever the player typed.
+- **The skill and saving-throw dots only display.** A single tap used to change them and a
+  thumb scrolling the sheet tapped them by accident, so holding a row (`useLongPress`)
+  opens that one skill's `SkillModal.vue` or that save's `SavingThrowsModal.vue`, where
+  proficiency is a checkbox (three exclusive ones for a skill: half, proficient,
+  expertise). A tap on a save's number still opens its modal too.
+  `Character.skillBonuses` is the per-skill misc bonus the skill modal edits, sparse and
+  added in `useCharacterStats`' `skillBreakdowns`.
 - The sheet is mobile-first: five tabs with touch-swipe navigation implemented in `app/pages/characters/[id]/index.vue`; tab components in `app/components/sheet/` receive the character and emit `update` patches upward (the page owns saving).

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Character, AbilityKey } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
+import { useLongPress } from '~/composables/useLongPress'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -20,14 +21,15 @@ const ABILITIES: { key: AbilityKey; label: string }[] = [
 /** A save is derived like an attack now, so its number opens the same kind of modal. */
 const editing = ref<AbilityKey | null>(null)
 
-function toggleSave(key: AbilityKey) {
-  const current = props.character.savingThrowProficiencies
-  const updated = current.includes(key) ? current.filter(k => k !== key) : [...current, key]
-  emit('update', { savingThrowProficiencies: updated })
-}
+/**
+ * The dots only show proficiency, since a tap on one used to toggle it and a thumb
+ * scrolling the sheet tapped them by accident. Holding a row opens the save's modal,
+ * where the proficiency is a checkbox beside the bonuses; a tap on the number still does.
+ */
+const { pressing, bind: bindHold } = useLongPress<AbilityKey>(key => editing.value = key)
 
 function saveBonuses(patch: Pick<Character,
-  'savingThrowBonuses' | 'savingThrowBonusesByAbility' | 'savingThrowAbilityBonus'>) {
+  'savingThrowProficiencies' | 'savingThrowBonuses' | 'savingThrowBonusesByAbility' | 'savingThrowAbilityBonus'>) {
   emit('update', patch)
   editing.value = null
 }
@@ -58,18 +60,20 @@ function fmt(n: number) { return n >= 0 ? `+${n}` : `${n}` }
         class="w-1.5 h-1.5 rounded-full bg-primary-400"
         title="A feature or a bonus is adding to these"
       />
+      <span class="ml-0.5 text-[10px] normal-case tracking-normal font-normal text-slate-600">hold to edit</span>
     </p>
     <div class="card divide-y divide-surface-700/50">
       <div
         v-for="{ key, label } in ABILITIES"
         :key="key"
-        class="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
+        class="flex items-center gap-3 py-2 first:pt-0 last:pb-0 -mx-2 px-2 rounded select-none transition-colors"
+        :class="pressing === key ? 'bg-surface-700' : ''"
+        :title="`Hold to edit the ${label} save`"
+        v-bind="bindHold(key)"
       >
-        <button
-          class="proficiency-dot"
+        <span
+          class="proficiency-dot cursor-default"
           :class="{ active: character.savingThrowProficiencies.includes(key) }"
-          :title="`Toggle ${label} save proficiency`"
-          @click="toggleSave(key)"
         />
         <span class="flex-1 text-sm text-slate-300">{{ label }}</span>
         <button

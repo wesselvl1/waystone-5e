@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Character, SkillKey, ProficiencyLevel } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
+import { useLongPress } from '~/composables/useLongPress'
 
 const props = defineProps<{ character: Character }>()
 const emit = defineEmits<{ update: [Partial<Character>] }>()
@@ -29,12 +30,18 @@ const SKILLS: { key: SkillKey; label: string; ability: string }[] = [
   { key: 'survival', label: 'Survival', ability: 'Wis' },
 ]
 
-function cycleProf(key: SkillKey) {
-  const current = (props.character.skillProficiencies[key] ?? 0) as ProficiencyLevel
-  const next: ProficiencyLevel = current === 0 ? 1 : current === 1 ? 2 : 0
-  emit('update', {
-    skillProficiencies: { ...props.character.skillProficiencies, [key]: next },
-  })
+/**
+ * The dots only show proficiency; changing it takes a hold on the skill, which opens its
+ * own modal. A single tap on a dot used to cycle it, and a thumb scrolling the sheet
+ * tapped them by accident.
+ */
+const editing = ref<SkillKey | null>(null)
+const { pressing, bind: bindHold } = useLongPress<SkillKey>(key => editing.value = key)
+
+const editingLabel = computed(() => SKILLS.find(s => s.key === editing.value)?.label ?? '')
+
+function saveSkill(patch: Pick<Character, 'skillProficiencies' | 'skillBonuses' | 'skillHalfProficiency'>) {
+  emit('update', patch)
 }
 
 function fmt(n: number) { return n >= 0 ? `+${n}` : `${n}` }
@@ -46,40 +53,42 @@ function profLevel(key: SkillKey): ProficiencyLevel {
 /**
  * The feature lending this skill half a proficiency bonus, or null.
  *
- * Derived, so it is not a fourth stop on the cycle — the dot shows it, the button still
- * steps none → proficient → expertise, and a bard who takes the proficiency loses the
- * half on its own.
+ * Derived unless the player ticked or cleared Half for this skill in its modal, and never
+ * a proficiency level — a bard who takes the proficiency loses the half on its own.
  */
 function halfSource(key: SkillKey): string | null {
   return stats.skillHalfProficiency.value[key] ?? null
 }
 
-function dotTitle(key: SkillKey): string {
+function dotTitle(key: SkillKey): string | undefined {
   const half = halfSource(key)
-  return half
-    ? `${half}: half proficiency. Click to cycle (none → prof → expertise)`
-    : 'Cycle proficiency (none → prof → expertise)'
+  return half ? `${half}: half proficiency` : undefined
 }
 </script>
 
 <template>
   <div>
-    <p class="section-header">Skills</p>
+    <p class="section-header flex items-baseline gap-2">
+      Skills
+      <span class="text-[10px] normal-case tracking-normal font-normal text-slate-600">hold to edit</span>
+    </p>
     <div class="card divide-y divide-surface-700/50">
       <div
         v-for="skill in SKILLS"
         :key="skill.key"
-        class="flex items-center gap-3 py-1.5 first:pt-0 last:pb-0"
+        class="flex items-center gap-3 py-1.5 first:pt-0 last:pb-0 -mx-2 px-2 rounded select-none transition-colors"
+        :class="pressing === skill.key ? 'bg-surface-700' : ''"
+        :title="`Hold to edit ${skill.label}`"
+        v-bind="bindHold(skill.key)"
       >
-        <button
-          class="proficiency-dot"
+        <span
+          class="proficiency-dot cursor-default"
           :class="{
             'half': halfSource(skill.key) !== null,
             'active': profLevel(skill.key) === 1,
             'expertise': profLevel(skill.key) === 2,
           }"
           :title="dotTitle(skill.key)"
-          @click="cycleProf(skill.key)"
         />
         <span class="flex-1 text-sm text-slate-300">{{ skill.label }}</span>
         <span class="text-[10px] text-slate-500 w-6 text-right">{{ skill.ability }}</span>
@@ -88,5 +97,15 @@ function dotTitle(key: SkillKey): string {
         </span>
       </div>
     </div>
+
+    <SheetSkillModal
+      v-if="editing"
+      :open="!!editing"
+      :character="character"
+      :skill="editing"
+      :label="editingLabel"
+      @save="saveSkill"
+      @close="editing = null"
+    />
   </div>
 </template>
