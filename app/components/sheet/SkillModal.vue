@@ -109,10 +109,10 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
-const BOXES: { mode: Exclude<Mode, 'none'>, label: string, hint?: string }[] = [
-  { mode: 'half', label: 'Half Proficiency' },
-  { mode: 'full', label: 'Proficiency' },
-  { mode: 'expertise', label: 'Expertise', hint: '(double proficiency)' },
+const BOXES: { mode: Exclude<Mode, 'none'>, label: string }[] = [
+  { mode: 'half', label: 'Half' },
+  { mode: 'full', label: 'Full' },
+  { mode: 'expertise', label: 'Expertise' },
 ]
 
 const ABILITY_SHORT: Record<string, string> = {
@@ -176,7 +176,6 @@ const ABILITY_SHORT: Record<string, string> = {
                   @change="toggle(box.mode)"
                 />
                 {{ box.label }}
-                <span v-if="box.hint" class="text-[11px] text-slate-500">{{ box.hint }}</span>
               </label>
             </div>
 
