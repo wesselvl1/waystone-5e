@@ -4,7 +4,8 @@ import { useRulepacksStore } from '~/stores/rulepacks'
 import { exportCharacter } from '~/services/characterIO'
 import { backfillRacialBonuses, backfillSensesAndResistances } from '~/services/characterMigration'
 import { backfillPoolPickFeatures, backfillSubclassFeatures } from '~/services/levelUpService'
-import type { Character } from '~/types/character'
+import { useCharacterTheme } from '~/composables/useTheme'
+import type { Character, CharacterTheme } from '~/types/character'
 import type { ClassDefinition } from '~/types/rulepack'
 
 const route = useRoute()
@@ -14,6 +15,11 @@ const rulepackStore = useRulepacksStore()
 
 const character = ref<Character | null>(null)
 const loading = ref(true)
+
+// The sheet is painted in the character's colours; the colour modal previews over them.
+const themePreview = ref<CharacterTheme | null>(null)
+const themeOpen = ref(false)
+useCharacterTheme(character, themePreview)
 
 onMounted(async () => {
   await Promise.all([characterStore.loadAll(), rulepackStore.loadAll()])
@@ -250,6 +256,16 @@ async function doLongRest() {
   await onUpdate({ features, hitDice, hp, spellSlots, spells, ...(warlockSlots ? { warlockSlots } : {}) })
 }
 
+function openTheme() {
+  closeMenu()
+  themeOpen.value = true
+}
+
+async function saveTheme(theme: CharacterTheme | undefined) {
+  themeOpen.value = false
+  await onUpdate({ theme })
+}
+
 function doLevelUp() {
   closeMenu()
   if (character.value) router.push(`/characters/${character.value.id}/levelup`)
@@ -290,6 +306,10 @@ function doLevelUp() {
                 Long Rest
               </button>
               <div class="border-t border-surface-700/60 my-1" />
+              <button class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-surface-700 transition-colors text-left" @click="openTheme">
+                <svg class="w-4 h-4 text-primary-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+                Colours
+              </button>
               <button class="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-200 hover:bg-surface-700 transition-colors text-left" @click="doLevelUp">
                 <svg class="w-4 h-4 text-success-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
                 Level Up
@@ -304,6 +324,15 @@ function doLevelUp() {
           <div v-if="menuOpen" class="fixed inset-0 z-40" @click="closeMenu" />
         </div>
       </header>
+
+      <SheetThemeModal
+        v-if="character"
+        :open="themeOpen"
+        :character="character"
+        @preview="themePreview = $event"
+        @save="saveTheme"
+        @close="themeOpen = false"
+      />
 
       <!-- Sheet header + tab bar (only when character is loaded) -->
       <template v-if="character">

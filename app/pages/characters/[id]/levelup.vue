@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
+import { useCharacterTheme } from '~/composables/useTheme'
 import { multiclassOptions, describeMulticlassPrerequisites, effectiveScores, projectClassLevel } from '~/services/multiclass'
 import { maxSpellLevelForClass, clampSpellSlots, spellSaveDCFor, spellAttackBonusFor, expandedSpellIdsFor, spellMatchesChoice } from '~/services/spellcasting'
 import { abilityMod, proficiencyBonus } from '~/composables/useCharacterStats'
@@ -51,6 +52,8 @@ const characterStore = useCharactersStore()
 const rulepackStore = useRulepacksStore()
 
 const character = ref<Character | null>(null)
+// Painted in the character's colours, like the sheet it came from.
+useCharacterTheme(character)
 const loading = ref(true)
 
 onMounted(async () => {

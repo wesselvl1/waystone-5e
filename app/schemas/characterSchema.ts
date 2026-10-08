@@ -150,6 +150,18 @@ const CharacterImageSchema = z.object({
   data: z.string().refine(isImageDataUrl, 'must be a base64 image data URL'),
 })
 
+/**
+ * A colour that does not parse is dropped rather than failing the import: it only ever
+ * reaches a CSS custom property as three numbers, and losing a character over its
+ * colour would be out of all proportion.
+ */
+const ThemeColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i).optional().catch(undefined)
+
+const CharacterThemeSchema = z.object({
+  primary: ThemeColorSchema,
+  accent: ThemeColorSchema,
+})
+
 const SkillProficienciesSchema = z.record(z.string(), z.union([z.literal(0), z.literal(1), z.literal(2)]))
 
 const WarlockSlotsSchema = z.object({
@@ -285,6 +297,7 @@ export const CharacterSchema = z.object({
   notes: z.string(),
   appearance: z.string().optional(),
   images: z.array(CharacterImageSchema).optional(),
+  theme: CharacterThemeSchema.optional(),
 
   createdAt: z.string(),
   updatedAt: z.string(),
