@@ -4,7 +4,7 @@ import { initiativeBreakdown } from '~/services/initiative'
 import { savingThrowTotals } from '~/services/savingThrows'
 import { halfProficiency, halfProficiencyBonus } from '~/services/halfProficiency'
 
-const SKILL_ABILITY: Record<SkillKey, AbilityKey> = {
+export const SKILL_ABILITY: Record<SkillKey, AbilityKey> = {
   acrobatics: 'dex',
   animalHandling: 'wis',
   arcana: 'int',
@@ -23,6 +23,15 @@ const SKILL_ABILITY: Record<SkillKey, AbilityKey> = {
   sleightOfHand: 'dex',
   stealth: 'dex',
   survival: 'wis',
+}
+
+export interface SkillBreakdown {
+  ability: AbilityKey
+  /** What proficiency adds: nothing, the bonus, twice it, or half of it. */
+  proficiency: number
+  abilityMod: number
+  misc: number
+  total: number
 }
 
 export function abilityMod(score: number): number {
@@ -97,18 +106,37 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     return result
   })
 
-  const skills = computed<Record<SkillKey, number>>(() => {
+  /**
+   * What each skill is made of: the proficiency it adds (none, whole, double or half),
+   * the ability modifier and the hand-entered bonus. The skill modal shows these parts.
+   */
+  const skillBreakdowns = computed<Record<SkillKey, SkillBreakdown>>(() => {
     const c = characterRef.value
     const mods = abilityModifiers.value
     const prof = profBonus.value
     const skillProfs = c?.skillProficiencies ?? {}
 
-    const result = {} as Record<SkillKey, number>
+    const result = {} as Record<SkillKey, SkillBreakdown>
     for (const [skill, ability] of Object.entries(SKILL_ABILITY) as [SkillKey, AbilityKey][]) {
       const profLevel = ((skillProfs as Record<string, number>)[skill] ?? 0) as 0 | 1 | 2
       const half = profLevel === 0 ? halfProficiencyBonus(halfProf.value, ability, prof).value : 0
-      result[skill] = mods[ability] + profLevel * prof + half
+      const proficiency = profLevel * prof + half
+      const misc = c?.skillBonuses?.[skill] ?? 0
+      result[skill] = {
+        ability,
+        proficiency,
+        abilityMod: mods[ability],
+        misc,
+        total: mods[ability] + proficiency + misc,
+      }
     }
+    return result
+  })
+
+  const skills = computed<Record<SkillKey, number>>(() => {
+    const result = {} as Record<SkillKey, number>
+    for (const [skill, parts] of Object.entries(skillBreakdowns.value) as [SkillKey, SkillBreakdown][])
+      result[skill] = parts.total
     return result
   })
 
@@ -165,6 +193,7 @@ export function useCharacterStats(characterRef: Ref<Character | null>) {
     abilityModifiers,
     savingThrows,
     skills,
+    skillBreakdowns,
     skillHalfProficiency,
     passivePerception,
     initiative,

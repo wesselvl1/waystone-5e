@@ -35,13 +35,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   save: [Pick<Character,
-    'savingThrowBonuses' | 'savingThrowBonusesByAbility' | 'savingThrowAbilityBonus'>]
+    'savingThrowProficiencies' | 'savingThrowBonuses' | 'savingThrowBonusesByAbility' | 'savingThrowAbilityBonus'>]
   close: []
 }>()
 
 const characterRef = computed(() => props.character)
 const stats = useCharacterStats(characterRef)
 
+/** Whether the class grants this save — the only place it changes, since a tap on the dot did. */
+const proficient = ref(false)
 const draft = ref<SavingThrowBonuses>({})
 /** The slots for the one save being edited, kept per ability so switching rows is safe. */
 const perAbilityDraft = ref<SavingThrowBonusesByAbility>({})
@@ -55,6 +57,7 @@ watch(() => props.open, (open) => {
   if (!open) return
   // Filled in rather than left sparse, so every number input has somewhere to write; the
   // zeroes are compacted away again on save.
+  proficient.value = props.character.savingThrowProficiencies.includes(props.ability)
   draft.value = { ...props.character.savingThrowBonuses }
   perAbilityDraft.value = Object.fromEntries(
     Object.entries(props.character.savingThrowBonusesByAbility ?? {})
@@ -88,8 +91,16 @@ const abilityBonusSetting = computed(() => {
  * The sum as the draft would leave it: the stored character with this editor's settings,
  * so the total moves while the player types rather than only after a save.
  */
+/** Kept in the sheet's order rather than the order they were ticked. */
+const proficiencies = computed(() => {
+  const others = props.character.savingThrowProficiencies.filter(k => k !== props.ability)
+  const held = new Set(proficient.value ? [...others, props.ability] : others)
+  return ABILITY_OPTIONS.map(([key]) => key).filter(k => held.has(k))
+})
+
 const preview = computed<Character>(() => ({
   ...props.character,
+  savingThrowProficiencies: proficiencies.value,
   savingThrowBonuses: draft.value,
   savingThrowBonusesByAbility: perAbilityDraft.value,
   savingThrowAbilityBonus: abilityBonusSetting.value,
@@ -113,6 +124,7 @@ const otherSaves = computed(() => ABILITY_OPTIONS
 
 function save() {
   emit('save', {
+    savingThrowProficiencies: proficiencies.value,
     savingThrowBonuses: compactBonusSet(draft.value),
     savingThrowBonusesByAbility: compactBonusesByAbility(perAbilityDraft.value),
     savingThrowAbilityBonus: abilityBonusSetting.value,
@@ -179,6 +191,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                 </span>
               </div>
             </div>
+
+            <label class="flex items-center gap-3 text-sm text-slate-200 cursor-pointer px-1">
+              <input v-model="proficient" type="checkbox" class="w-5 h-5 rounded accent-primary-500" />
+              Save Proficiency
+            </label>
 
             <!-- Bonuses: the same three slots an attack and an armour class keep apart -->
             <div class="space-y-2">

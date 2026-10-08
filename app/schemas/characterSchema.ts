@@ -249,6 +249,7 @@ export const CharacterSchema = z.object({
     minimum: z.number().int().optional(),
   }).nullable().optional(),
   skillProficiencies: SkillProficienciesSchema,
+  skillBonuses: z.record(z.string(), z.number()).optional(),
   // Null and absent both mean "read it off the features"; false switches a misread off.
   halfProficiencyChecks: z.boolean().nullable().optional(),
   otherProficiencies: z.array(z.string()),

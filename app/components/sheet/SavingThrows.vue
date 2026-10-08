@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Character, AbilityKey, ProficiencyLevel } from '~/types/character'
+import type { Character, AbilityKey } from '~/types/character'
 import { useCharacterStats } from '~/composables/useCharacterStats'
 import { useLongPress } from '~/composables/useLongPress'
 
@@ -22,27 +22,14 @@ const ABILITIES: { key: AbilityKey; label: string }[] = [
 const editing = ref<AbilityKey | null>(null)
 
 /**
- * The dots only show proficiency; changing it takes a hold on the card, the way the
- * Skills card does, since a tap on a dot used to toggle it. A tap on a number still opens
- * its breakdown — the hold swallows the click that ends it, so it never does both.
+ * The dots only show proficiency, since a tap on one used to toggle it and a thumb
+ * scrolling the sheet tapped them by accident. Holding a row opens the save's modal,
+ * where the proficiency is a checkbox beside the bonuses; a tap on the number still does.
  */
-const editingProficiencies = ref(false)
-const { pressing, bind: bindHold } = useLongPress<true>(() => editingProficiencies.value = true)
-
-const proficiencyLevels = computed(() => Object.fromEntries(
-  props.character.savingThrowProficiencies.map(k => [k, 1 as ProficiencyLevel]),
-) as Partial<Record<AbilityKey, ProficiencyLevel>>)
-
-/** Kept in the card's order rather than the order they were ticked. */
-function saveProficiencies(levels: Record<AbilityKey, ProficiencyLevel>) {
-  emit('update', {
-    savingThrowProficiencies: ABILITIES.map(a => a.key).filter(k => levels[k] > 0),
-  })
-  editingProficiencies.value = false
-}
+const { pressing, bind: bindHold } = useLongPress<AbilityKey>(key => editing.value = key)
 
 function saveBonuses(patch: Pick<Character,
-  'savingThrowBonuses' | 'savingThrowBonusesByAbility' | 'savingThrowAbilityBonus'>) {
+  'savingThrowProficiencies' | 'savingThrowBonuses' | 'savingThrowBonusesByAbility' | 'savingThrowAbilityBonus'>) {
   emit('update', patch)
   editing.value = null
 }
@@ -75,16 +62,14 @@ function fmt(n: number) { return n >= 0 ? `+${n}` : `${n}` }
       />
       <span class="ml-0.5 text-[10px] normal-case tracking-normal font-normal text-slate-600">hold to edit</span>
     </p>
-    <div
-      class="card divide-y divide-surface-700/50 select-none transition-shadow"
-      :class="pressing ? 'ring-1 ring-primary-500/60' : ''"
-      title="Hold to change proficiencies"
-      v-bind="bindHold(true)"
-    >
+    <div class="card divide-y divide-surface-700/50">
       <div
         v-for="{ key, label } in ABILITIES"
         :key="key"
-        class="flex items-center gap-3 py-2 first:pt-0 last:pb-0"
+        class="flex items-center gap-3 py-2 first:pt-0 last:pb-0 -mx-2 px-2 rounded select-none transition-colors"
+        :class="pressing === key ? 'bg-surface-700' : ''"
+        :title="`Hold to edit the ${label} save`"
+        v-bind="bindHold(key)"
       >
         <span
           class="proficiency-dot cursor-default"
@@ -109,16 +94,6 @@ function fmt(n: number) { return n >= 0 ? `+${n}` : `${n}` }
       :ability="editing"
       @save="saveBonuses"
       @close="editing = null"
-    />
-
-    <SheetProficiencyDotsModal
-      v-if="editingProficiencies"
-      :open="editingProficiencies"
-      title="Saving throw proficiencies"
-      :rows="ABILITIES"
-      :value="proficiencyLevels"
-      @save="saveProficiencies"
-      @close="editingProficiencies = false"
     />
   </div>
 </template>

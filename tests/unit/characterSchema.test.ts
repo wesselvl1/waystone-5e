@@ -8,6 +8,12 @@ describe('CharacterSchema', () => {
     expect(result.success).toBe(true)
   })
 
+  it('keeps a per-skill misc bonus through an import', () => {
+    const result = CharacterSchema.safeParse({ ...validCharacter, skillBonuses: { perception: 2 } })
+    expect(result.success).toBe(true)
+    expect(result.data?.skillBonuses).toEqual({ perception: 2 })
+  })
+
   it('rejects a character with no name', () => {
     const result = CharacterSchema.safeParse({ ...validCharacter, name: '' })
     expect(result.success).toBe(false)
