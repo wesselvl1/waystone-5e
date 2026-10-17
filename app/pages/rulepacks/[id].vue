@@ -23,6 +23,7 @@ const rulepackStore = useRulepacksStore()
 onMounted(async () => {
   await rulepackStore.loadAll()
   if (!pack.value) router.replace('/rulepacks')
+  else revealLinkedEntry()
 })
 
 const packId = computed(() => route.params.id as string)
@@ -40,8 +41,31 @@ const TABS = computed(() =>
 /** The five kinds this page renders in full; the rest share one card. */
 const BESPOKE = new Set<EntryKind>(['races', 'classes', 'backgrounds', 'feats', 'spells'])
 
-const activeTab = ref<EntryKind>('races')
-const expanded = ref<string | null>(null)
+/**
+ * `?tab=spells&open=fire-bolt` — how the rulepack search links to one entry. The tab is
+ * taken only when it names a kind; a pack lacking it falls back below like any other.
+ */
+const linkedTab = ENTRY_KINDS.find(meta => meta.key === route.query.tab)?.key
+const linkedId = typeof route.query.open === 'string' ? route.query.open : undefined
+
+/** What `expanded` holds for an entry: the bespoke cards key by id, the shared one by kind too. */
+function expandKey(kind: EntryKind, id: string): string {
+  return BESPOKE.has(kind) ? id : `${kind}:${id}`
+}
+
+const activeTab = ref<EntryKind>(linkedTab ?? 'races')
+const expanded = ref<string | null>(linkedTab && linkedId ? expandKey(linkedTab, linkedId) : null)
+
+/**
+ * Scroll the linked entry into view once the pack has rendered — a spell list is long. To
+ * the middle, since a sticky header and tab bar cover the top of the page.
+ */
+async function revealLinkedEntry() {
+  if (!linkedTab || !linkedId) return
+  await nextTick()
+  document.querySelector(`[data-entry="${CSS.escape(expandKey(linkedTab, linkedId))}"]`)
+    ?.scrollIntoView({ block: 'center' })
+}
 
 // A pack with no races opens on whatever it does have.
 watch(TABS, (tabs) => {
@@ -423,7 +447,7 @@ function exportPack() {
         <!-- ========== RACES ========== -->
         <template v-if="activeTab === 'races'">
           <p v-if="pack.races.length === 0" class="text-slate-500 text-sm text-center py-8">No races in this pack.</p>
-          <div v-for="race in pack.races" :key="race.id" class="card">
+          <div v-for="race in pack.races" :key="race.id" :data-entry="race.id" class="card">
             <div class="flex items-start justify-between gap-3">
               <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(race.id)">
                 <div class="flex-1 min-w-0">
@@ -486,7 +510,7 @@ function exportPack() {
         <!-- ========== CLASSES ========== -->
         <template v-if="activeTab === 'classes'">
           <p v-if="pack.classes.length === 0" class="text-slate-500 text-sm text-center py-8">No classes in this pack.</p>
-          <div v-for="cls in pack.classes" :key="cls.id" class="card">
+          <div v-for="cls in pack.classes" :key="cls.id" :data-entry="cls.id" class="card">
             <div class="flex items-start justify-between gap-3">
               <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(cls.id)">
                 <div class="flex-1 min-w-0">
@@ -581,7 +605,7 @@ function exportPack() {
         <!-- ========== BACKGROUNDS ========== -->
         <template v-if="activeTab === 'backgrounds'">
           <p v-if="pack.backgrounds.length === 0" class="text-slate-500 text-sm text-center py-8">No backgrounds in this pack.</p>
-          <div v-for="bg in pack.backgrounds" :key="bg.id" class="card">
+          <div v-for="bg in pack.backgrounds" :key="bg.id" :data-entry="bg.id" class="card">
             <div class="flex items-start justify-between gap-3">
               <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(bg.id)">
                 <div class="flex-1 min-w-0">
@@ -631,7 +655,7 @@ function exportPack() {
         <!-- ========== FEATS ========== -->
         <template v-if="activeTab === 'feats'">
           <p v-if="pack.feats.length === 0" class="text-slate-500 text-sm text-center py-8">No feats in this pack.</p>
-          <div v-for="feat in pack.feats" :key="feat.id" class="card">
+          <div v-for="feat in pack.feats" :key="feat.id" :data-entry="feat.id" class="card">
             <div class="flex items-start justify-between gap-3">
               <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(feat.id)">
                 <div class="flex-1 min-w-0">
@@ -692,7 +716,7 @@ function exportPack() {
 
           <div v-for="[level, spells] in spellsByLevel" :key="level" class="space-y-2">
             <p class="section-header pt-2">{{ levelLabel(level) }}</p>
-            <div v-for="spell in spells" :key="spell.id" class="card">
+            <div v-for="spell in spells" :key="spell.id" :data-entry="spell.id" class="card">
               <div class="flex items-start justify-between gap-3">
                 <button class="flex-1 min-w-0 flex items-start gap-3 text-left" @click="toggle(spell.id)">
                   <div class="flex-1 min-w-0">
@@ -738,6 +762,7 @@ function exportPack() {
           <div
             v-for="entry in entriesOf(activeTab)"
             :key="`${activeTab}:${entryId(activeTab, entry)}`"
+            :data-entry="`${activeTab}:${entryId(activeTab, entry)}`"
             class="card"
           >
             <div class="flex items-start justify-between gap-3">

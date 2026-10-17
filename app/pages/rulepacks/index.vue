@@ -4,6 +4,7 @@ import { importFromFile, importFromUrl } from '~/services/rulepackImport'
 import type { Rulepack } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
 import { HOMEBREW_PACK_ID } from '~/services/homebrew'
+import { searchRulepacks } from '~/services/rulepackSearch'
 
 const rulepackStore = useRulepacksStore()
 const router = useRouter()
@@ -21,6 +22,31 @@ async function openHomebrew() {
 }
 
 onMounted(() => rulepackStore.loadAll())
+
+// ---------------------------------------------------------------------------
+// Search across every pack — for a name whose book the player does not know
+// ---------------------------------------------------------------------------
+
+const route = useRoute()
+
+/** Kept in the URL, so going back from an opened pack returns to the same results. */
+const searchQuery = computed({
+  get: () => (typeof route.query.q === 'string' ? route.query.q : ''),
+  set: (q: string) => router.replace({ query: q ? { q } : {} }),
+})
+
+const searchHits = computed(() => searchRulepacks(rulepackStore.rulepacks, searchQuery.value))
+
+/** Enough to scroll; a longer list wants a longer query, not more cards. */
+const SEARCH_LIMIT = 50
+const shownHits = computed(() => searchHits.value.slice(0, SEARCH_LIMIT))
+
+const openHit = ref<string | null>(null)
+watch(searchQuery, () => { openHit.value = null })
+
+function toggleHit(key: string) {
+  openHit.value = openHit.value === key ? null : key
+}
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const urlInput = ref('')
@@ -170,57 +196,116 @@ async function confirmRemoval() {
       <p v-if="importing" class="text-slate-400 text-sm text-center py-4 animate-pulse">Importing…</p>
       <p v-if="error" class="text-danger-400 text-sm bg-danger-500/10 rounded-lg px-3 py-2 whitespace-pre-wrap">{{ error }}</p>
 
-      <div v-if="rulepackStore.rulepacks.length === 0 && !importing" class="flex flex-col items-center justify-center pt-24 gap-4 text-center">
-        <div class="w-16 h-16 rounded-full bg-surface-800 flex items-center justify-center">
-          <svg class="w-8 h-8 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-        </div>
-        <div>
-          <p class="text-slate-300 font-medium">No rulepacks loaded</p>
-          <p class="text-slate-500 text-sm mt-1">Import a rulepack — a JSON file, a zip of several — or paste a URL — or start a homebrew pack of your own.</p>
-        </div>
-      </div>
+      <SearchBox
+        v-if="rulepackStore.rulepacks.length > 0"
+        v-model="searchQuery"
+        placeholder="Search every pack — a spell, race, class, feat…"
+      />
 
-      <div v-for="pack in rulepackStore.rulepacks" :key="pack.id" class="card">
-        <div class="flex items-start justify-between gap-3">
-          <NuxtLink :to="`/rulepacks/${pack.id}`" class="flex-1 min-w-0">
-            <p class="font-semibold text-white">
-              {{ pack.name }}
-              <span
-                v-if="pack.id === HOMEBREW_PACK_ID"
-                class="ml-1.5 align-middle text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent-900/40 text-accent-400"
-              >Yours</span>
-            </p>
-            <p class="text-xs text-slate-500 mt-0.5">v{{ pack.version }}<span v-if="pack.author"> · {{ pack.author }}</span></p>
-            <p v-if="pack.description" class="text-xs text-slate-400 mt-1">{{ pack.description }}</p>
-            <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-slate-500">
-              <span v-for="entry in packContents(pack)" :key="entry.label">{{ entry.count }} {{ entry.label }}</span>
-              <span v-if="packContents(pack).length === 0">empty</span>
+      <!-- ========== SEARCH RESULTS ========== -->
+      <template v-if="searchQuery.trim()">
+        <p class="text-[11px] text-slate-500 px-1">
+          <template v-if="searchHits.length === 0">No name in any pack matches “{{ searchQuery.trim() }}”.</template>
+          <template v-else-if="searchHits.length > SEARCH_LIMIT">
+            Showing the best {{ SEARCH_LIMIT }} of {{ searchHits.length }} matches — type more to narrow it down.
+          </template>
+          <template v-else>{{ searchHits.length }} match{{ searchHits.length === 1 ? '' : 'es' }}</template>
+        </p>
+
+        <div v-for="hit in shownHits" :key="hit.key" class="card">
+          <button class="w-full flex items-start gap-3 text-left" @click="toggleHit(hit.key)">
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-white">
+                {{ hit.name }}
+                <span class="ml-1.5 align-middle text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-700 text-slate-300">{{ hit.label }}</span>
+              </p>
+              <p class="text-xs text-slate-500 mt-0.5 truncate">
+                <span class="text-primary-400">{{ hit.packName }}</span>
+                <span v-if="hit.parent"> · {{ hit.parent }}</span>
+              </p>
+              <p v-if="hit.summary" class="text-[11px] text-slate-400 mt-0.5 truncate">{{ hit.summary }}</p>
             </div>
-          </NuxtLink>
-          <button class="btn-danger flex-shrink-0 p-2" @click="pendingRemoval = { kind: 'one', id: pack.id, name: pack.name }">
+            <svg
+              class="w-4 h-4 mt-1 text-slate-500 flex-shrink-0 transition-transform"
+              :class="openHit === hit.key ? 'rotate-180' : ''"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div v-if="openHit === hit.key" class="mt-3 pt-3 border-t border-surface-700/50 space-y-3">
+            <p v-if="hit.description" class="text-sm text-slate-300 whitespace-pre-line">{{ hit.description }}</p>
+            <div v-for="block in hit.prose" :key="block.path.join('.')">
+              <p class="text-xs font-semibold text-slate-200">
+                {{ block.name }}
+                <span v-if="block.context" class="font-normal text-slate-500">· {{ block.context }}</span>
+              </p>
+              <p class="text-xs text-slate-400 mt-0.5 whitespace-pre-line">{{ block.value }}</p>
+            </div>
+            <p v-if="!hit.description && hit.prose.length === 0" class="text-xs text-slate-500">No text in this pack.</p>
+            <NuxtLink
+              :to="{ path: `/rulepacks/${hit.packId}`, query: { tab: hit.kind, open: hit.entryId } }"
+              class="inline-block text-xs text-primary-400 underline"
+            >Open in {{ hit.packName }}</NuxtLink>
+          </div>
+        </div>
+      </template>
+
+      <template v-else>
+
+        <div v-if="rulepackStore.rulepacks.length === 0 && !importing" class="flex flex-col items-center justify-center pt-24 gap-4 text-center">
+          <div class="w-16 h-16 rounded-full bg-surface-800 flex items-center justify-center">
+            <svg class="w-8 h-8 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
+          <div>
+            <p class="text-slate-300 font-medium">No rulepacks loaded</p>
+            <p class="text-slate-500 text-sm mt-1">Import a rulepack — a JSON file, a zip of several — or paste a URL — or start a homebrew pack of your own.</p>
+          </div>
+        </div>
+
+        <div v-for="pack in rulepackStore.rulepacks" :key="pack.id" class="card">
+          <div class="flex items-start justify-between gap-3">
+            <NuxtLink :to="`/rulepacks/${pack.id}`" class="flex-1 min-w-0">
+              <p class="font-semibold text-white">
+                {{ pack.name }}
+                <span
+                  v-if="pack.id === HOMEBREW_PACK_ID"
+                  class="ml-1.5 align-middle text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent-900/40 text-accent-400"
+                >Yours</span>
+              </p>
+              <p class="text-xs text-slate-500 mt-0.5">v{{ pack.version }}<span v-if="pack.author"> · {{ pack.author }}</span></p>
+              <p v-if="pack.description" class="text-xs text-slate-400 mt-1">{{ pack.description }}</p>
+              <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[11px] text-slate-500">
+                <span v-for="entry in packContents(pack)" :key="entry.label">{{ entry.count }} {{ entry.label }}</span>
+                <span v-if="packContents(pack).length === 0">empty</span>
+              </div>
+            </NuxtLink>
+            <button class="btn-danger flex-shrink-0 p-2" @click="pendingRemoval = { kind: 'one', id: pack.id, name: pack.name }">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-2 flex flex-wrap justify-center gap-2">
+          <button v-if="!rulepackStore.homebrewPack()" class="btn-ghost text-xs" @click="openHomebrew">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Start a homebrew pack
+          </button>
+          <button v-if="rulepackStore.rulepacks.length > 0" class="btn-danger text-xs" @click="pendingRemoval = { kind: 'all', count: rulepackStore.rulepacks.length }">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
+            Delete all rulepacks
           </button>
         </div>
-      </div>
-
-      <div class="pt-2 flex flex-wrap justify-center gap-2">
-        <button v-if="!rulepackStore.homebrewPack()" class="btn-ghost text-xs" @click="openHomebrew">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          Start a homebrew pack
-        </button>
-        <button v-if="rulepackStore.rulepacks.length > 0" class="btn-danger text-xs" @click="pendingRemoval = { kind: 'all', count: rulepackStore.rulepacks.length }">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-          Delete all rulepacks
-        </button>
-      </div>
+      </template>
     </main>
 
     <!-- URL confirmation modal -->
