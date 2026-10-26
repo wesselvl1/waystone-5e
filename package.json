@@ -28,7 +28,7 @@
     "@vite-pwa/nuxt": "^1.1.1",
     "@vue/test-utils": "^2.5.1",
     "eslint": "^10.13.0",
-    "happy-dom": "^20.14.6",
+    "happy-dom": "^21.0.4",
     "vitest": "^5.0.5",
     "vue-tsc": "^3.3.13"
   }
