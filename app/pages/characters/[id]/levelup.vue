@@ -46,6 +46,10 @@ import type {
   GrantFeatEvent,
 } from '~/types/events'
 
+// No bottom nav, as on the sheet this wizard is opened from: a stray tap on it abandoned
+// a half-answered level-up.
+definePageMeta({ hideNav: true })
+
 const route = useRoute()
 const router = useRouter()
 const characterStore = useCharactersStore()

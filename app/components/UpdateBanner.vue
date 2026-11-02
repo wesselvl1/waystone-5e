@@ -3,7 +3,7 @@
  * Says a new build is waiting, and never applies one on its own.
  *
  * Sits above the bottom nav rather than over the page, so it cannot cover what someone is
- * reading mid-session. "Later" hides it for this launch only — see `dismiss()` in
+ * reading mid-session; on a page that hides the nav it takes the nav's place instead. "Later" hides it for this launch only — see `dismiss()` in
  * `usePwaUpdate` — and the About page keeps the button either way, so waving it off is
  * never the last chance to update.
  */
@@ -15,6 +15,7 @@ import {
 
 const { showBanner, dismiss, applyUpdate } = usePwaUpdate()
 
+const route = useRoute()
 const confirming = ref(false)
 </script>
 
@@ -23,7 +24,8 @@ const confirming = ref(false)
     <Transition name="fade">
       <div
         v-if="showBanner"
-        class="fixed bottom-16 inset-x-0 z-40 px-2 pb-2"
+        class="fixed inset-x-0 z-40 px-2 pb-2"
+        :class="route.meta.hideNav ? 'bottom-0' : 'bottom-16'"
         role="status"
       >
         <div
