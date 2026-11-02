@@ -177,7 +177,8 @@ function save() {
     damageType: draft.value.damageType.trim(),
     attackBonuses: compactBonusSet(draft.value.attackBonuses),
     damageBonuses: compactBonusSet(draft.value.damageBonuses),
-    bonus: showOverride.value ? draft.value.bonus : null,
+    // An emptied override field holds "" (v-model.number); store that as no override.
+    bonus: showOverride.value && typeof draft.value.bonus === 'number' ? draft.value.bonus : null,
     notes: draft.value.notes?.trim() || undefined,
   }
   emit('save', entry)
@@ -339,12 +340,7 @@ function abilityHint(ability: AttackAbility): string {
               <div class="grid grid-cols-3 gap-2">
                 <div v-for="kind in ATTACK_BONUS_KINDS" :key="`hit-${kind}`">
                   <label class="label">{{ ATTACK_BONUS_LABELS[kind] }}</label>
-                  <input
-                    v-model.number="draft.attackBonuses![kind]"
-                    type="number"
-                    class="input"
-                    placeholder="0"
-                  />
+                  <SignedNumberInput v-model="draft.attackBonuses![kind]" />
                 </div>
               </div>
             </div>
@@ -382,12 +378,7 @@ function abilityHint(ability: AttackAbility): string {
               <div class="grid grid-cols-3 gap-2">
                 <div v-for="kind in ATTACK_BONUS_KINDS" :key="`dmg-${kind}`">
                   <label class="label">{{ ATTACK_BONUS_LABELS[kind] }}</label>
-                  <input
-                    v-model.number="draft.damageBonuses![kind]"
-                    type="number"
-                    class="input"
-                    placeholder="0"
-                  />
+                  <SignedNumberInput v-model="draft.damageBonuses![kind]" />
                 </div>
               </div>
             </div>
@@ -406,12 +397,7 @@ function abilityHint(ability: AttackAbility): string {
                 {{ showOverride ? 'Use the calculated attack bonus' : 'Override the attack bonus' }}
               </button>
               <div v-if="showOverride" class="mt-2">
-                <input
-                  v-model.number="draft.bonus"
-                  type="number"
-                  class="input"
-                  placeholder="e.g. 7"
-                />
+                <SignedNumberInput v-model="draft.bonus" placeholder="e.g. 7" />
                 <p class="text-[10px] text-slate-500 mt-1">
                   Replaces the ability, proficiency and bonuses above for the attack roll.
                   Damage still uses the fields above.

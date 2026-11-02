@@ -1,5 +1,5 @@
 import type { AbilityKey, Character, InitiativeBonuses } from '~/types/character'
-import { sumBonusSet } from '~/services/attacks'
+import { bonusNumber, sumBonusSet } from '~/services/attacks'
 import { halfProficiency, halfProficiencyBonus } from '~/services/halfProficiency'
 
 /**
@@ -175,8 +175,8 @@ function halfProficiencyPart(
 /** The hand-entered slots, listed one per line so the sheet shows where each came from. */
 function bonusParts(bonuses?: InitiativeBonuses): InitiativePart[] {
   return INITIATIVE_BONUS_KINDS
-    .filter(kind => (bonuses?.[kind] ?? 0) !== 0)
-    .map(kind => ({ label: INITIATIVE_BONUS_LABELS[kind].label, value: bonuses![kind]! }))
+    .filter(kind => bonusNumber(bonuses?.[kind]) !== 0)
+    .map(kind => ({ label: INITIATIVE_BONUS_LABELS[kind].label, value: bonusNumber(bonuses![kind]) }))
 }
 
 /** The slots alone, for anything that wants the number without the working. */

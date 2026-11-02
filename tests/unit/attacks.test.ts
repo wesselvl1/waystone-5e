@@ -113,6 +113,23 @@ describe('bonus sets', () => {
     expect(compactBonusSet({ magic: 0, feat: 0, misc: 0 })).toBeUndefined()
     expect(compactBonusSet({ magic: 1, feat: 0 })).toEqual({ magic: 1 })
   })
+
+  /**
+   * v-model.number leaves "" behind in a number field that was typed into and cleared.
+   * Summed raw, 5 + "" + 0 came out as the string "50".
+   */
+  it('treats a cleared field as zero rather than concatenating it', () => {
+    const cleared = { magic: 5, feat: '', misc: 0 } as unknown as Parameters<typeof sumBonusSet>[0]
+    expect(sumBonusSet(cleared)).toBe(5)
+    expect(compactBonusSet(cleared)).toEqual({ magic: 5 })
+    expect(damageBonus(attack({ damageAbility: 'none', damageBonuses: cleared }), ctx)).toBe(5)
+    expect(formatDamage(attack({ damageDice: '1d8', damageAbility: 'none', damageBonuses: cleared }), ctx)).toBe('1d8 + 5')
+  })
+
+  it('treats a cleared override as no override', () => {
+    const cleared = attack({ bonus: '' as unknown as number, ability: 'none', proficient: false, attackBonuses: { magic: 2 } })
+    expect(attackBonus(cleared, ctx)).toBe(2)
+  })
 })
 
 describe('signs', () => {
