@@ -1,11 +1,17 @@
+<script setup lang="ts">
+const route = useRoute()
+</script>
+
 <template>
   <div class="flex flex-col min-h-screen bg-surface-950">
     <NuxtRouteAnnouncer />
     <NuxtPage />
     <!-- A waiting build announces itself here; nothing applies it but the player -->
     <UpdateBanner />
-    <!-- Bottom nav bar -->
-    <nav class="fixed bottom-0 inset-x-0 z-50 flex h-16 items-center justify-around border-t border-surface-700/60 bg-surface-900/95 backdrop-blur-sm">
+    <!-- Bottom nav bar. A page opts out with `definePageMeta({ hideNav: true })` — the
+         character sheet does, because a thumb reaching for the last row of a tab kept
+         landing on Rulepacks; its own back arrow is the way out. -->
+    <nav v-if="!route.meta.hideNav" class="fixed bottom-0 inset-x-0 z-50 flex h-16 items-center justify-around border-t border-surface-700/60 bg-surface-900/95 backdrop-blur-sm">
       <NuxtLink
         to="/"
         class="nav-item"
@@ -28,7 +34,7 @@
       </NuxtLink>
     </nav>
     <!-- Spacer for bottom nav -->
-    <div class="h-16 flex-shrink-0" />
+    <div v-if="!route.meta.hideNav" class="h-16 flex-shrink-0" />
   </div>
 </template>
 

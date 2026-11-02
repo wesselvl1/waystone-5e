@@ -8,6 +8,10 @@ import { useCharacterTheme } from '~/composables/useTheme'
 import type { Character, CharacterTheme } from '~/types/character'
 import type { ClassDefinition } from '~/types/rulepack'
 
+// No bottom nav here: it sat under the last row of every tab, and a missed tap there
+// left the sheet for the Rulepacks page.
+definePageMeta({ hideNav: true })
+
 const route = useRoute()
 const router = useRouter()
 const characterStore = useCharactersStore()
@@ -365,7 +369,7 @@ function doLevelUp() {
       <!-- Tab content with swipe navigation -->
       <div class="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-none" @touchstart.passive="onTouchStart" @touchend.passive="onTouchEnd">
         <Transition :name="`slide-${slideDirection}`">
-          <div :key="activeTab" class="px-4 pt-4 pb-20 space-y-3 min-h-full">
+          <div :key="activeTab" class="px-4 pt-4 pb-8 space-y-3 min-h-full">
             <template v-if="activeTab === 'combat'">
               <SheetAbilityScores :character="character" @update="onUpdate" />
               <SheetSavingThrows :character="character" @update="onUpdate" />
