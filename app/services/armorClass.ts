@@ -5,7 +5,7 @@ import type {
   Character,
 } from '~/types/character'
 import type { ArmorDefinition } from '~/types/rulepack'
-import { sumBonusSet } from '~/services/attacks'
+import { bonusNumber, sumBonusSet } from '~/services/attacks'
 
 /**
  * Armour class, derived the way an attack roll is.
@@ -70,7 +70,7 @@ export function shieldAllowed(config: ArmorClassConfig): boolean {
 /** The shield's contribution, which is nothing unless it is both allowed and held. */
 export function shieldValue(config: ArmorClassConfig): number {
   if (!shieldAllowed(config) || !config.shield?.equipped) return 0
-  return config.shield.bonus
+  return bonusNumber(config.shield.bonus)
 }
 
 /** The Dexterity actually admitted, after the armour's cap. */
@@ -121,7 +121,7 @@ export function armorClassBreakdown(
   }
 
   for (const kind of AC_BONUS_KINDS) {
-    const value = config.bonuses?.[kind] ?? 0
+    const value = bonusNumber(config.bonuses?.[kind])
     if (value !== 0) parts.push({ label: AC_BONUS_LABELS[kind].label, value })
   }
 
@@ -252,7 +252,7 @@ const ABILITY_NAMES: Record<AbilityKey, string> = {
 export function compactAcBonuses(bonuses?: ArmorClassBonuses): ArmorClassBonuses | undefined {
   const out: ArmorClassBonuses = {}
   for (const kind of AC_BONUS_KINDS) {
-    const value = bonuses?.[kind] ?? 0
+    const value = bonusNumber(bonuses?.[kind])
     if (value !== 0) out[kind] = value
   }
   return Object.keys(out).length > 0 ? out : undefined

@@ -31,14 +31,27 @@ export interface AttackContext {
   proficiencyBonus: number
 }
 
+/**
+ * A bonus field read as a number, with anything else counting as nothing.
+ *
+ * Vue's `v-model.number` hands back the raw string when the input does not parse, so a
+ * field typed into and then cleared holds `""`, not `undefined`. Summed as-is that turned
+ * `5 + ""` into the string `"5"` and the next `+ 0` into `"50"`. Characters saved before
+ * this was caught can carry the `""` in storage, so the read is tolerant rather than only
+ * the editor.
+ */
+export function bonusNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
 export function sumBonusSet(bonuses?: AttackBonusSet): number {
   if (!bonuses) return 0
-  return ATTACK_BONUS_KINDS.reduce((sum, kind) => sum + (bonuses[kind] ?? 0), 0)
+  return ATTACK_BONUS_KINDS.reduce((sum, kind) => sum + bonusNumber(bonuses[kind]), 0)
 }
 
 /** True when a bonus set has something in it — the sheet only lists non-zero parts. */
 export function hasBonuses(bonuses?: AttackBonusSet): boolean {
-  return ATTACK_BONUS_KINDS.some(kind => (bonuses?.[kind] ?? 0) !== 0)
+  return ATTACK_BONUS_KINDS.some(kind => bonusNumber(bonuses?.[kind]) !== 0)
 }
 
 /**
@@ -50,7 +63,7 @@ export function compactBonusSet(bonuses?: AttackBonusSet): AttackBonusSet | unde
   if (!hasBonuses(bonuses)) return undefined
   const out: AttackBonusSet = {}
   for (const kind of ATTACK_BONUS_KINDS) {
-    const value = bonuses?.[kind] ?? 0
+    const value = bonusNumber(bonuses?.[kind])
     if (value !== 0) out[kind] = value
   }
   return out
@@ -69,7 +82,8 @@ function abilityValue(ability: AttackAbility | undefined, ctx: AttackContext): n
  * + the three bonus slots.
  */
 export function attackBonus(attack: AttackEntry, ctx: AttackContext): number {
-  if (attack.bonus !== null && attack.bonus !== undefined) return attack.bonus
+  // A cleared override field holds "" rather than null; that is no override at all.
+  if (typeof attack.bonus === 'number' && Number.isFinite(attack.bonus)) return attack.bonus
   return abilityValue(attack.ability, ctx)
     + (attack.proficient ? ctx.proficiencyBonus : 0)
     + sumBonusSet(attack.attackBonuses)

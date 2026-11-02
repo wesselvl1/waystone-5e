@@ -5,7 +5,7 @@ import type {
   SavingThrowBonuses,
   SavingThrowBonusesByAbility,
 } from '~/types/character'
-import { compactBonusSet, sumBonusSet } from '~/services/attacks'
+import { bonusNumber, compactBonusSet, sumBonusSet } from '~/services/attacks'
 
 /**
  * A saving throw, derived the way initiative is.
@@ -191,10 +191,10 @@ function manualAbilityPart(
  */
 function bonusParts(bonuses: SavingThrowBonuses | undefined, suffix = ''): SavingThrowPart[] {
   return SAVING_THROW_BONUS_KINDS
-    .filter(kind => (bonuses?.[kind] ?? 0) !== 0)
+    .filter(kind => bonusNumber(bonuses?.[kind]) !== 0)
     .map(kind => ({
       label: `${SAVING_THROW_BONUS_LABELS[kind].label}${suffix}`,
-      value: bonuses![kind]!,
+      value: bonusNumber(bonuses![kind]),
     }))
 }
 

@@ -350,12 +350,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <div class="grid grid-cols-3 gap-2">
                 <div v-for="kind in AC_BONUS_KINDS" :key="kind">
                   <label class="label" :title="AC_BONUS_LABELS[kind].hint">{{ AC_BONUS_LABELS[kind].label }}</label>
-                  <input
-                    v-model.number="draft.bonuses![kind]"
-                    type="number"
-                    class="input"
-                    placeholder="0"
-                  />
+                  <SignedNumberInput v-model="draft.bonuses![kind]" />
                 </div>
               </div>
               <p class="text-[10px] text-slate-500">

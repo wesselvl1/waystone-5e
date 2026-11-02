@@ -33,7 +33,7 @@ const stats = useCharacterStats(characterRef)
 const draft = ref<InitiativeBonuses>({})
 /** Shown once unfolded — a hand-entered total that ignores everything else. */
 const showOverride = ref(false)
-const overrideValue = ref(0)
+const overrideValue = ref<number | undefined>(0)
 
 watch(() => props.open, (open) => {
   if (!open) return
@@ -108,7 +108,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                   <label class="label" :title="INITIATIVE_BONUS_LABELS[kind].hint">
                     {{ INITIATIVE_BONUS_LABELS[kind].label }}
                   </label>
-                  <input v-model.number="draft[kind]" type="number" class="input" placeholder="0" />
+                  <SignedNumberInput v-model="draft[kind]" />
                 </div>
               </div>
               <p class="text-[10px] text-slate-500">
@@ -146,7 +146,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                 {{ showOverride ? 'Use the calculated initiative' : 'Override the initiative' }}
               </button>
               <div v-if="showOverride" class="mt-2">
-                <input v-model.number="overrideValue" type="number" class="input" placeholder="e.g. 5" />
+                <SignedNumberInput v-model="overrideValue" placeholder="e.g. 5" />
                 <p class="text-[10px] text-slate-500 mt-1">
                   Replaces everything above. The bonuses are kept, so you can switch back.
                 </p>

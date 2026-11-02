@@ -31,7 +31,7 @@ const emit = defineEmits<{
  */
 type Mode = 'none' | 'half' | 'full' | 'expertise'
 const mode = ref<Mode>('none')
-const misc = ref<number | ''>('')
+const misc = ref<number | '' | undefined>('')
 
 const stats = useCharacterStats(computed(() => props.character))
 
@@ -148,14 +148,10 @@ const ABILITY_SHORT: Record<string, string> = {
                 <p class="text-[11px] text-slate-400 mt-1 leading-tight">{{ ABILITY_SHORT[parts.ability] }}</p>
               </div>
               <div>
-                <input
-                  v-model.number="misc"
-                  type="number"
-                  inputmode="numeric"
-                  placeholder="0"
-                  class="w-full bg-transparent text-center font-mono text-lg text-slate-100 pb-1 border-b border-surface-600
-                    focus:border-primary-500 focus:outline-none placeholder:text-slate-500
-                    [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                <SignedNumberInput
+                  v-model="misc"
+                  input-class="w-full bg-transparent text-center font-mono text-lg text-slate-100 pb-1 border-b border-surface-600
+                    focus:border-primary-500 focus:outline-none placeholder:text-slate-500"
                   aria-label="Misc bonus"
                 />
                 <p class="text-[11px] text-slate-400 mt-1 leading-tight">Misc Bonus</p>

@@ -205,7 +205,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                   <label class="label" :title="SAVING_THROW_BONUS_LABELS[kind].hint">
                     {{ SAVING_THROW_BONUS_LABELS[kind].label }}
                   </label>
-                  <input v-model.number="draft[kind]" type="number" class="input" placeholder="0" />
+                  <SignedNumberInput v-model="draft[kind]" />
                 </div>
               </div>
               <p class="text-[10px] text-slate-500">
@@ -224,12 +224,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                   <label class="label" :title="SAVING_THROW_BONUS_LABELS[kind].hint">
                     {{ SAVING_THROW_BONUS_LABELS[kind].label }}
                   </label>
-                  <input
-                    :value="thisSave[kind]"
-                    type="number"
-                    class="input"
-                    placeholder="0"
-                    @input="thisSave = { ...thisSave, [kind]: Number(($event.target as HTMLInputElement).value) || 0 }"
+                  <SignedNumberInput
+                    :model-value="thisSave[kind]"
+                    @update:model-value="thisSave = { ...thisSave, [kind]: $event ?? 0 }"
                   />
                 </div>
               </div>
