@@ -15,7 +15,7 @@
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
     "@pinia/nuxt": "^1.0.3",
-    "dexie": "^4.4.6",
+    "dexie": "^4.4.7",
     "nuxt": "^4.6.2",
     "pinia": "^4.1.0",
     "vue": "^3.5.44",
