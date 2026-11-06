@@ -105,7 +105,6 @@ function rowArmorClass(armor: ArmorDefinition): number {
   return previewArmorClass(armor, draft.value, ctx.value)
 }
 
-/** The classes this character actually has, so a row can be marked as fitting the build. */
 /** A subclass-tagged row (Draconic Resilience) suits the build only with that subclass. */
 function suitsClass(armor: ArmorDefinition): boolean {
   if (!armor.classId) return false

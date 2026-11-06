@@ -533,6 +533,9 @@ option is a fixed grant; with several, the player picks. Packs live in `equipmen
 
 ```json
 {
+  "id": "tol-book",
+  "name": "Tales of the Lamp",
+  "version": "1.0",
   "equipmentPacks": [
     { "id": "tol-lamplighters-pack", "name": "Lamplighter's Pack", "cost": "12 gp",
       "contents": [
@@ -542,7 +545,16 @@ option is a fixed grant; with several, the player picks. Packs live in `equipmen
   ],
   "classes": [
     {
-      "id": "tol-lampwright",
+      "id": "tol-fighter",
+      "name": "Lamp Fighter",
+      "hitDie": "d10",
+      "primaryAbility": ["str"],
+      "savingThrowProficiencies": ["str", "con"],
+      "armorProficiencies": ["all armor", "shields"],
+      "weaponProficiencies": ["simple", "martial"],
+      "toolProficiencies": [],
+      "skillChoices": { "count": 2, "from": ["athletics", "perception"] },
+      "levels": [{ "level": 1, "features": ["Second Wind"], "levelUpEvents": [] }],
       "startingEquipment": [
         { "options": [
           { "label": "a longsword and a shield", "requiresProficiency": true,
