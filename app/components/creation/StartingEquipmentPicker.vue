@@ -81,7 +81,11 @@ function setPick(index: number, itemIndex: number, value: string) {
 
     <div v-for="(choice, ci) in choices" :key="ci" class="card space-y-2">
       <p class="section-header">{{ choice.options.length > 1 ? 'Choose one' : 'You get' }}</p>
-      <template v-if="choice.options.length > 1">
+      <!-- Every option "(if proficient)" and none of them yours: the bullet is skipped. -->
+      <p v-if="offered[ci]?.length === 0" class="text-sm text-slate-400">
+        None available — you aren't proficient with these.
+      </p>
+      <template v-else-if="choice.options.length > 1">
         <label
           v-for="oi in offered[ci]"
           :key="oi"
@@ -100,7 +104,7 @@ function setPick(index: number, itemIndex: number, value: string) {
       <p v-else class="text-sm text-slate-300 first-letter:uppercase">{{ choice.options[0]?.label }}</p>
 
       <!-- The slots of the option taken: "a martial weapon", "a holy symbol". -->
-      <template v-for="(item, ii) in chosenItems(ci)" :key="`${ci}-${ii}`">
+      <template v-for="(item, ii) in offered[ci]?.length ? chosenItems(ci) : []" :key="`${ci}-${ii}`">
         <select
           v-if="item.kind === 'weaponChoice'"
           class="input w-full"

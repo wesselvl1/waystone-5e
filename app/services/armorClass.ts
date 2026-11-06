@@ -278,7 +278,9 @@ export function unarmoredCandidates(
  * Armour the character is not proficient with is skipped, a held shield (only if
  * proficient) joins every candidate that allows one, and a tie goes to an unarmored
  * candidate — the kit's armour is then left to be worn or sold, where an unarmored
- * feature costs nothing to keep.
+ * feature costs nothing to keep. Among unarmored ties the class's own entry wins over
+ * plain `unarmored`: a monk with Wisdom 10 scores the same either way, and the sheet
+ * should still name the feature so a later Wisdom increase reaches it.
  */
 export function bestStartingArmorClass(
   worn: ArmorDefinition[],
@@ -295,9 +297,10 @@ export function bestStartingArmorClass(
     shield && shieldAllowed(config) ? { ...config, shield } : config
 
   const bodies = worn.filter(a => a.category !== 'shield' && isProficientWithArmor(a, proficiencies))
-  const candidates: { config: ArmorClassConfig, unarmored: boolean }[] = [
-    ...bodies.map(a => ({ config: withShield(configFromArmor(a)), unarmored: false })),
-    ...unarmored.map(a => ({ config: withShield(configFromArmor(a)), unarmored: true })),
+  // Tie-break rank: armour 0, plain unarmored 1, a class's (or subclass's) own entry 2.
+  const candidates: { config: ArmorClassConfig, rank: number }[] = [
+    ...bodies.map(a => ({ config: withShield(configFromArmor(a)), rank: 0 })),
+    ...unarmored.map(a => ({ config: withShield(configFromArmor(a)), rank: a.classId ? 2 : 1 })),
   ]
   if (candidates.length === 0) return withShield(defaultArmorClassConfig())
 
@@ -305,9 +308,8 @@ export function bestStartingArmorClass(
   let bestTotal = armorClassTotal(best.config, ctx)
   for (const candidate of candidates.slice(1)) {
     const total = armorClassTotal(candidate.config, ctx)
-    // Armour is listed first, so a tie must be won explicitly; among unarmored ties the
-    // earlier entry stays.
-    if (total > bestTotal || (total === bestTotal && candidate.unarmored && !best.unarmored)) {
+    // A tie must be won by rank, not by order; between equal ranks the earlier entry stays.
+    if (total > bestTotal || (total === bestTotal && candidate.rank > best.rank)) {
       best = candidate
       bestTotal = total
     }

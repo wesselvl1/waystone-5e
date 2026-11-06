@@ -152,6 +152,13 @@ describe('RulepackSchema starting equipment', () => {
     }
   })
 
+  it('rejects a startingWealth dice expression with a modifier', () => {
+    const cls = { ...fighterRulepack.classes[0], startingWealth: { dice: '5d4+10', multiplier: 10 } }
+    expect(RulepackSchema.safeParse({ ...minimalRulepack, classes: [cls] }).success).toBe(false)
+    const ok = { ...fighterRulepack.classes[0], startingWealth: { dice: '4D4', multiplier: 10 } }
+    expect(RulepackSchema.safeParse({ ...minimalRulepack, classes: [ok] }).success).toBe(true)
+  })
+
   it('defaults equipmentPacks to []', () => {
     const result = RulepackSchema.safeParse(minimalRulepack)
     expect(result.success && result.data.equipmentPacks).toEqual([])

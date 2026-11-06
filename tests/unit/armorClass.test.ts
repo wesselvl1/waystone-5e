@@ -301,6 +301,19 @@ describe('bestStartingArmorClass', () => {
     expect(cfg.armorId).toBe('unarmored-defense-barbarian')
   })
 
+  it("a tie with plain unarmored goes to the monk's Unarmored Defense", () => {
+    const c = mods(2, 0, 0)
+    const cfg = bestStartingArmorClass([], unarmoredCandidates(unarmoredAll, 'monk'), [], c)
+    expect(cfg.armorId).toBe('unarmored-defense-monk')
+    expect(armorClassTotal(cfg, c)).toBe(12)
+  })
+
+  it("a tie with plain unarmored goes to the barbarian's Unarmored Defense", () => {
+    const c = mods(2, 0)
+    const cfg = bestStartingArmorClass([], unarmoredCandidates(unarmoredAll, 'barbarian'), [], c)
+    expect(cfg.armorId).toBe('unarmored-defense-barbarian')
+  })
+
   it("a monk's Unarmored Defense drops the shield", () => {
     const c = mods(0, 0, 4)
     const cfg = bestStartingArmorClass(

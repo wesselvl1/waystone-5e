@@ -475,7 +475,8 @@ const StartingEquipmentChoiceSchema = z.object({
 })
 
 const StartingWealthSchema = z.object({
-  dice: z.string(),
+  // Bare NdM: rollStartingWealth reads nothing else, so "5d4+10" would roll as nothing.
+  dice: z.string().regex(/^\d+d\d+$/i),
   multiplier: z.number().min(0),
 })
 

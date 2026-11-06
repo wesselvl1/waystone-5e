@@ -76,7 +76,8 @@ export function weaponsForChoice(item: WeaponChoiceItem, all: WeaponDefinition[]
 /**
  * Whether every bullet has an answer the player may give: the right number of them, each
  * option actually offered, and every "any weapon" or free-text slot of the chosen option
- * filled in.
+ * filled in. A bullet offering nothing — every option "(if proficient)" and the character
+ * proficient with none — is answered by being skipped, or Next could never be pressed.
  */
 export function isSelectionComplete(
   choices: StartingEquipmentChoice[],
@@ -88,7 +89,9 @@ export function isSelectionComplete(
   return choices.every((choice, index) => {
     const pick = selection[index]
     if (!pick) return false
-    if (!availableOptions(choice, proficiencies, lookup).includes(pick.option)) return false
+    const offered = availableOptions(choice, proficiencies, lookup)
+    if (offered.length === 0) return true
+    if (!offered.includes(pick.option)) return false
     const option = choice.options[pick.option]
     if (!option) return false
     return option.items.every((item, itemIndex) => {
@@ -105,11 +108,16 @@ export function isSelectionComplete(
 /**
  * The picks expanded into things to carry. An id the books do not know is skipped rather
  * than thrown on, so one missing pack cannot take the rest of the kit with it.
+ *
+ * Given the proficiencies, a pick of an option not on offer contributes nothing — the
+ * wizard pre-answers a one-option bullet, and when that one option is "(if proficient)"
+ * and the character is not, the bullet is skipped rather than handed over anyway.
  */
 export function resolveStartingKit(
   choices: StartingEquipmentChoice[],
   selection: EquipmentSelection,
   lookup: EquipmentLookup,
+  proficiencies?: string[],
 ): StartingKit {
   const items = new Map<string, Omit<EquipmentEntry, 'id'>>()
   const weapons = new Map<string, { weapon: WeaponDefinition; quantity: number }>()
@@ -136,6 +144,7 @@ export function resolveStartingKit(
     const pick = selection[index]
     const option = pick ? choice.options[pick.option] : undefined
     if (!pick || !option) return
+    if (proficiencies && !availableOptions(choice, proficiencies, lookup).includes(pick.option)) return
     option.items.forEach((item, itemIndex) => {
       switch (item.kind) {
         case 'weapon': {
@@ -164,9 +173,12 @@ export function resolveStartingKit(
         case 'item':
           addItem(item.name, item.quantity ?? 1, item.weight)
           break
+        // A pick off a list names only the kind ("Amulet"), so it is stored under what it
+        // is — "Holy symbol (amulet)". A free-text answer is the player's own words.
         case 'itemChoice': {
           const name = pick.picks[itemIndex]?.trim()
-          if (name) addItem(name, 1)
+          if (!name) break
+          addItem(item.options?.length ? `${item.label} (${name.toLowerCase()})` : name, 1)
           break
         }
       }
@@ -237,6 +249,12 @@ export function rollStartingWealth(
   const sides = match?.[2] ? Number.parseInt(match[2]) : 0
   const rolls = Array.from({ length: count }, () => Math.floor(rng() * sides) + 1)
   return { rolls, total: rolls.reduce((a, b) => a + b, 0) * w.multiplier }
+}
+
+/** A roll shown as the sum it was: "(1 + 4 + 3 + 4 + 2) × 10 = 140 gp", unbracketed at × 1. */
+export function wealthRollLabel(roll: { rolls: number[]; total: number }, multiplier: number): string {
+  const sum = roll.rolls.join(' + ')
+  return multiplier === 1 ? `${sum} = ${roll.total} gp` : `(${sum}) × ${multiplier} = ${roll.total} gp`
 }
 
 /** A gold figure typed into a field: a whole number of at least zero, else null. */

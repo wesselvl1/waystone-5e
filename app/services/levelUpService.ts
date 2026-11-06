@@ -226,8 +226,10 @@ export function checkFeatPrerequisite(character: Character, feat: FeatDefinition
   return true
 }
 
-// Feature names in class level tables that are placeholders for subclass features
-const SUBCLASS_PLACEHOLDER_PATTERN = /\bpath\b|\barchetype\b|\bpatron\b|\bcircle\b|\bdomain\b|\bcollege\b|\bprimal path feature\b|\bsacred oath feature\b|\bwarlord presence\b| feature$/i
+// Feature names in class level tables that are placeholders for subclass features. The
+// last alternation is whole names only: "Sacred Oath" is the placeholder where "Oath
+// Spells" is a real feature, and "Arcane Tradition" must not reach "Arcane Recovery".
+const SUBCLASS_PLACEHOLDER_PATTERN = /\bpath\b|\barchetype\b|\bpatron\b|\bcircle\b|\bdomain\b|\bcollege\b|\bprimal path feature\b|\bsacred oath feature\b|\bwarlord presence\b| feature$|^(?:sorcerous origin|arcane tradition|monastic tradition|sacred oath|artificer specialist)$/i
 
 export function isSubclassPlaceholder(featureName: string): boolean {
   return SUBCLASS_PLACEHOLDER_PATTERN.test(featureName)

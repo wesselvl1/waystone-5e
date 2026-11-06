@@ -584,10 +584,14 @@ option is a fixed grant; with several, the player picks. Packs live in `equipmen
   `equipmentPacks`), `item` (a free-text `name`, with optional `quantity` and `weight`),
   `weaponChoice` (the player picks a weapon, optionally limited by `category` or
   `rangeType`) and `itemChoice` (the player picks from `options`, or types one when there
-  are none).
+  are none). A pick from `options` is stored under its `label` — `Instrument` and `Lute`
+  make "Instrument (lute)" — so write the label as the noun on its own, capitalised and
+  without an article; a typed answer is stored as typed.
 - `requiresProficiency` marks a printed "(if proficient)" option: it is offered only when
-  every weapon and armour in it is one the character is proficient with.
+  every weapon and armour in it is one the character is proficient with. A bullet whose
+  every option is gated and none offered is skipped, and contributes nothing.
 - `startingWealth` is `dice` times `multiplier` in gold: `5d4` x 10 is 5d4 x 10 gp.
+  `dice` is a bare `NdM`; a modifier (`5d4+10`) fails validation.
 
 ### Creatures
 

@@ -24,6 +24,7 @@ import {
   resolveStartingKit,
   rollStartingWealth,
   startingWealthLabel,
+  wealthRollLabel,
   type EquipmentSelection,
 } from '~/services/startingEquipment'
 import { bestStartingArmorClass, unarmoredCandidates } from '~/services/armorClass'
@@ -117,6 +118,15 @@ const filteredSubclasses = computed(() => filterBySearch(availableSubclasses.val
 watch(() => draft.classId, () => {
   draft.subclassId = ''
   subclassSearch.value = ''
+})
+
+// The subclass list opens below a long class grid, where a player on a phone would not
+// see it and would only find Next disabled; bring it into view as it appears.
+const subclassPicker = ref<HTMLElement | null>(null)
+watch(() => draft.classId, async () => {
+  if (!needsSubclass.value) return
+  await nextTick()
+  subclassPicker.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 })
 
 /**
@@ -249,6 +259,15 @@ function canProceed() {
 }
 
 /**
+ * Why Next is greyed out on the equipment step, where the unanswered slot can sit a long
+ * scroll above the button.
+ */
+const nextHint = computed(() => {
+  if (step.value !== 5 || canProceed()) return ''
+  return draft.startingGold ? 'Enter a whole number of gold pieces.' : 'Choose an option for every item above.'
+})
+
+/**
  * Everything the sheet files under Proficiencies & Languages.
  *
  * The class's tools and the background's tools and languages used to be dropped on the
@@ -330,8 +349,8 @@ watch([
 })
 
 /**
- * One line per item, by name in any case: a cleric's kit and an acolyte's background
- * both hand over a holy symbol, and the sheet should say two of them on one line.
+ * One line per item, by name in any case: a cleric's priest's pack and an acolyte's
+ * background both hand over vestments, and the sheet should say two of them on one line.
  */
 function mergeByName(items: Omit<EquipmentEntry, 'id'>[]): Omit<EquipmentEntry, 'id'>[] {
   const merged = new Map<string, Omit<EquipmentEntry, 'id'>>()
@@ -362,14 +381,16 @@ async function createCharacter() {
   // Gold buy takes the place of everything the class and the background would have
   // handed over, coin included — the rolled figure is the whole purse. Otherwise the kit
   // is carried, its weapons become attacks, and the best way of wearing it (or of not
-  // wearing it, on a tie) becomes the armour class the sheet derives.
+  // wearing it, on a tie) becomes the armour class the sheet derives. The armour class is
+  // worked out either way: a monk's Unarmored Defense is a feature, not an item, and a
+  // gold-buy monk still has it.
   const proficiencies = equipmentProficiencies.value
   const kit = draft.startingGold
     ? undefined
-    : resolveStartingKit(equipmentChoices.value, draft.equipmentSelection, rulepackStore)
+    : resolveStartingKit(equipmentChoices.value, draft.equipmentSelection, rulepackStore, proficiencies)
   const fromBackground = draft.startingGold ? undefined : backgroundKit(selectedBackground.value?.equipment ?? [])
-  const startingArmor = kit && bestStartingArmorClass(
-    kit.armor,
+  const startingArmor = bestStartingArmorClass(
+    kit?.armor ?? [],
     unarmoredCandidates(rulepackStore.getAllArmor(), draft.classId, selectedSubclass.value?.id),
     proficiencies,
     { modifiers: abilityModifiers.value },
@@ -409,7 +430,7 @@ async function createCharacter() {
     // figure worked out here as well would be counted twice.
     hp: { max: 0, current: 0, temp: 0 },
     armorClass: null,
-    ...(startingArmor ? { armorClassConfig: startingArmor } : {}),
+    armorClassConfig: startingArmor,
     speeds: speeds.value,
     senses: senses.value,
     initiative: null,
@@ -517,8 +538,8 @@ function signed(n: number | undefined) {
 
 <template>
   <!-- pb clears the Back/Next bar below, which is fixed above the nav: at pb-8 the tail
-       of the last card sat under it with no way to scroll to it. -->
-  <div class="min-h-screen pb-24">
+       of the last card sat under it with no way to scroll to it. The hint makes it taller. -->
+  <div class="min-h-screen" :class="nextHint ? 'pb-32' : 'pb-24'">
     <!-- Top bar -->
     <header class="sticky top-0 z-40 flex items-center gap-2 px-3 py-2 bg-surface-900/95 backdrop-blur border-b border-surface-700/60">
       <NuxtLink to="/" class="btn-ghost p-2">
@@ -683,7 +704,7 @@ function signed(n: number | undefined) {
             Saves: {{ selectedClass.savingThrowProficiencies.map(s => s.toUpperCase()).join(', ') }}
           </p>
         </div>
-        <div v-if="needsSubclass" class="space-y-2">
+        <div v-if="needsSubclass" ref="subclassPicker" class="space-y-2 scroll-mt-16">
           <p class="section-header">{{ subclassLabel }}</p>
           <SearchBox
             v-if="availableSubclasses.length > 6"
@@ -886,8 +907,7 @@ function signed(n: number | undefined) {
                 <button class="btn-primary shrink-0 px-4" @click="rollGold">Roll</button>
               </div>
               <p v-if="wealthRoll && String(wealthRoll.total) === draft.goldInput" class="text-xs text-slate-500">
-                Rolled {{ wealthRoll.rolls.join(' + ') }}<template v-if="startingWealth.multiplier !== 1">, × {{ startingWealth.multiplier }}</template>
-                = {{ wealthRoll.total }} gp
+                {{ wealthRollLabel(wealthRoll, startingWealth.multiplier) }}
               </p>
             </template>
           </div>
@@ -950,23 +970,26 @@ function signed(n: number | undefined) {
     </div>
 
     <!-- Navigation -->
-    <div class="fixed bottom-16 inset-x-0 px-4 flex gap-3 bg-surface-950/80 backdrop-blur py-3 border-t border-surface-700/60">
-      <button v-if="step > 0" class="btn-ghost flex-1" @click="step--">Back</button>
-      <button
-        v-if="step < STEPS.length - 1"
-        class="btn-primary flex-1"
-        :disabled="!canProceed()"
-        @click="step++"
-      >
-        Next
-      </button>
-      <button
-        v-else
-        class="btn-primary flex-1"
-        @click="createCharacter"
-      >
-        Create Character
-      </button>
+    <div class="fixed bottom-16 inset-x-0 px-4 bg-surface-950/80 backdrop-blur py-3 border-t border-surface-700/60">
+      <p v-if="nextHint" class="text-xs text-accent-400 mb-2">{{ nextHint }}</p>
+      <div class="flex gap-3">
+        <button v-if="step > 0" class="btn-ghost flex-1" @click="step--">Back</button>
+        <button
+          v-if="step < STEPS.length - 1"
+          class="btn-primary flex-1"
+          :disabled="!canProceed()"
+          @click="step++"
+        >
+          Next
+        </button>
+        <button
+          v-else
+          class="btn-primary flex-1"
+          @click="createCharacter"
+        >
+          Create Character
+        </button>
+      </div>
     </div>
   </div>
 </template>

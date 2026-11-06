@@ -8,6 +8,7 @@ import {
   resolveStartingKit,
   rollStartingWealth,
   startingWealthLabel,
+  wealthRollLabel,
   weaponsForChoice,
   type EquipmentLookup,
   type EquipmentSelection,
@@ -151,6 +152,70 @@ describe('isSelectionComplete', () => {
     expect(isSelectionComplete(free, [{ option: 0, picks: { 0: ' ' } }], [], lookup)).toBe(false)
     expect(isSelectionComplete(free, [{ option: 0, picks: { 0: 'Flute' } }], [], lookup)).toBe(true)
   })
+
+  it('counts a bullet with no option on offer as answered', () => {
+    const gated: StartingEquipmentChoice[] = [
+      { options: [{ label: 'x', items: [{ kind: 'item', name: 'Rope' }] }] },
+      {
+        options: [
+          { label: 'chain mail', items: [{ kind: 'armor', id: 'chain-mail' }], requiresProficiency: true },
+          { label: 'plate', items: [{ kind: 'armor', id: 'plate' }], requiresProficiency: true },
+        ],
+      },
+    ]
+    const selection: EquipmentSelection = [{ option: 0, picks: {} }, { option: -1, picks: {} }]
+    expect(isSelectionComplete(gated, selection, [], lookup)).toBe(true)
+    // Proficient after all, the bullet asks again.
+    expect(isSelectionComplete(gated, selection, ['heavy'], lookup)).toBe(false)
+    const kit = resolveStartingKit(gated, selection, lookup, [])
+    expect(kit.items.map(i => i.name)).toEqual(['Rope'])
+    expect(kit.armor).toEqual([])
+  })
+
+  it('skips a pre-answered one-option bullet the character may not take', () => {
+    const gated: StartingEquipmentChoice[] = [
+      { options: [{ label: 'chain mail', items: [{ kind: 'armor', id: 'chain-mail' }], requiresProficiency: true }] },
+    ]
+    const selection: EquipmentSelection = [{ option: 0, picks: {} }]
+    expect(isSelectionComplete(gated, selection, [], lookup)).toBe(true)
+    expect(resolveStartingKit(gated, selection, lookup, []).armor).toEqual([])
+    expect(resolveStartingKit(gated, selection, lookup, ['heavy']).armor.map(a => a.id)).toEqual(['chain-mail'])
+  })
+})
+
+describe('itemChoice picks', () => {
+  const choices: StartingEquipmentChoice[] = [
+    { options: [{ label: 'a holy symbol', items: [{ kind: 'itemChoice', label: 'Holy symbol', options: ['Amulet', 'Emblem'] }] }] },
+    { options: [{ label: 'a tool', items: [{ kind: 'itemChoice', label: 'Tool' }] }] },
+  ]
+
+  it('names a listed pick after what it is: "Holy symbol (amulet)"', () => {
+    const kit = resolveStartingKit(choices, [{ option: 0, picks: { 0: 'Amulet' } }, { option: 0, picks: { 0: 'Flute' } }], lookup)
+    expect(kit.items.map(i => i.name)).toEqual(['Holy symbol (amulet)', 'Flute'])
+  })
+
+  it('reads naturally for every listed pick in the SRD classes', () => {
+    const fragments = import.meta.glob<{ default: unknown }>('~/data/srd/*.json', { eager: true })
+    const names: string[] = []
+    for (const fragment of Object.values(fragments)) {
+      for (const cls of RulepackSchema.parse(fragment.default).classes) {
+        const bullets = cls.startingEquipment ?? []
+        bullets.forEach((choice) => {
+          choice.options.forEach((option) => {
+            option.items.forEach((item) => {
+              if (item.kind !== 'itemChoice' || !item.options?.length) return
+              const alone = { label: option.label, items: [item] }
+              const kit = resolveStartingKit([{ options: [alone] }], [{ option: 0, picks: { 0: item.options[0]! } }], lookup)
+              names.push(...kit.items.map(i => i.name))
+            })
+          })
+        })
+      }
+    }
+    expect(names).toEqual(expect.arrayContaining(['Arcane focus (crystal)', 'Holy symbol (amulet)', 'Druidic focus (sprig of mistletoe)']))
+    // "Holy symbol (amulet)", never "A holy symbol (amulet)".
+    expect(names.filter(n => !/^[A-Z][a-z]+ [a-z]+ \(/.test(n))).toEqual([])
+  })
 })
 
 describe('backgroundKit', () => {
@@ -208,6 +273,11 @@ describe('starting wealth', () => {
     expect(rollStartingWealth(monk.startingWealth!, () => 0).total).toBe(5)
     const high = rollStartingWealth(monk.startingWealth!, () => 0.999)
     expect(high.rolls).toEqual([4, 4, 4, 4, 4])
+  })
+
+  it('shows a roll as arithmetic: "(1 + 4 + 3 + 4 + 2) × 10 = 140 gp"', () => {
+    expect(wealthRollLabel({ rolls: [1, 4, 3, 4, 2], total: 140 }, 10)).toBe('(1 + 4 + 3 + 4 + 2) × 10 = 140 gp')
+    expect(wealthRollLabel({ rolls: [1, 4, 3, 4, 2], total: 14 }, 1)).toBe('1 + 4 + 3 + 4 + 2 = 14 gp')
   })
 })
 
