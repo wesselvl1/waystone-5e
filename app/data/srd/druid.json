@@ -1002,7 +1002,86 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a wooden shield",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "shield",
+                  "name": "Wooden shield"
+                }
+              ]
+            },
+            {
+              "label": "any simple weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a scimitar",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "scimitar"
+                }
+              ]
+            },
+            {
+              "label": "any simple melee weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple",
+                  "rangeType": "melee"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "leather armor, an explorer's pack, and a druidic focus",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "leather"
+                },
+                {
+                  "kind": "pack",
+                  "id": "explorers-pack"
+                },
+                {
+                  "kind": "itemChoice",
+                  "label": "Druidic focus",
+                  "options": [
+                    "Sprig of mistletoe",
+                    "Totem",
+                    "Wooden staff",
+                    "Yew wand"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "2d4",
+        "multiplier": 10
+      }
     }
   ]
 }

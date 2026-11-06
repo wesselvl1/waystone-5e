@@ -439,7 +439,71 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a shortsword",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "shortsword"
+                }
+              ]
+            },
+            {
+              "label": "any simple weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a dungeoneer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "dungeoneers-pack"
+                }
+              ]
+            },
+            {
+              "label": "an explorer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "explorers-pack"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "10 darts",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "dart",
+                  "quantity": 10
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "5d4",
+        "multiplier": 1
+      }
     }
   ]
 }

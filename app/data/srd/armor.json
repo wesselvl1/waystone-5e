@@ -37,7 +37,8 @@
       "category": "unarmored",
       "baseAC": 13,
       "classId": "sorcerer",
-      "description": "When you aren't wearing armor, your AC equals 13 + your Dexterity modifier."
+      "description": "When you aren't wearing armor, your AC equals 13 + your Dexterity modifier.",
+      "subclassId": "draconic-bloodline"
     },
     {
       "id": "natural-armor",

@@ -450,7 +450,119 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a rapier",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "rapier"
+                }
+              ]
+            },
+            {
+              "label": "a shortsword",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "shortsword"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a shortbow and quiver of 20 arrows",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "shortbow"
+                },
+                {
+                  "kind": "item",
+                  "name": "Quiver"
+                },
+                {
+                  "kind": "item",
+                  "name": "Arrows",
+                  "quantity": 20
+                }
+              ]
+            },
+            {
+              "label": "a shortsword",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "shortsword"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a burglar's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "burglars-pack"
+                }
+              ]
+            },
+            {
+              "label": "a dungeoneer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "dungeoneers-pack"
+                }
+              ]
+            },
+            {
+              "label": "an explorer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "explorers-pack"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "leather armor, two daggers, and thieves' tools",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "leather"
+                },
+                {
+                  "kind": "weapon",
+                  "id": "dagger",
+                  "quantity": 2
+                },
+                {
+                  "kind": "item",
+                  "name": "Thieves' tools"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "4d4",
+        "multiplier": 10
+      }
     }
   ]
 }

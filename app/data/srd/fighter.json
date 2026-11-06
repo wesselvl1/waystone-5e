@@ -434,7 +434,124 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "chain mail",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "chain-mail"
+                }
+              ]
+            },
+            {
+              "label": "leather armor, a longbow, and 20 arrows",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "leather"
+                },
+                {
+                  "kind": "weapon",
+                  "id": "longbow"
+                },
+                {
+                  "kind": "item",
+                  "name": "Arrows",
+                  "quantity": 20
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a martial weapon and a shield",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "martial"
+                },
+                {
+                  "kind": "armor",
+                  "id": "shield"
+                }
+              ]
+            },
+            {
+              "label": "two martial weapons",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "martial"
+                },
+                {
+                  "kind": "weaponChoice",
+                  "category": "martial"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a light crossbow and 20 bolts",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "light-crossbow"
+                },
+                {
+                  "kind": "item",
+                  "name": "Bolts",
+                  "quantity": 20
+                }
+              ]
+            },
+            {
+              "label": "two handaxes",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "handaxe",
+                  "quantity": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a dungeoneer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "dungeoneers-pack"
+                }
+              ]
+            },
+            {
+              "label": "an explorer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "explorers-pack"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "5d4",
+        "multiplier": 10
+      }
     }
   ]
 }
