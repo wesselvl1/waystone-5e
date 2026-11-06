@@ -6,6 +6,7 @@
  * same test.
  */
 import { useRulepacksStore } from '~/stores/rulepacks'
+import { cleanEquipmentName } from '~/services/equipment'
 import {
   availableOptions,
   weaponsForChoice,
@@ -15,7 +16,10 @@ import type { StartingEquipmentChoice, StartingItem, WeaponDefinition } from '~/
 
 const props = defineProps<{
   choices: StartingEquipmentChoice[]
-  /** The class's and subclass's, which decide what an "(if proficient)" option offers. */
+  /**
+   * Every 1st-level grant — class, subclass, race, subrace and background — which decide
+   * what an "(if proficient)" option offers.
+   */
   proficiencies: string[]
   backgroundName?: string
   backgroundEquipment: string[]
@@ -135,7 +139,7 @@ function setPick(index: number, itemIndex: number, value: string) {
     <div v-if="backgroundEquipment.length" class="card">
       <p class="section-header">From your background{{ backgroundName ? ` (${backgroundName})` : '' }}</p>
       <ul class="text-sm text-slate-300 space-y-0.5 list-disc list-inside">
-        <li v-for="line in backgroundEquipment" :key="line">{{ line }}</li>
+        <li v-for="(line, li) in backgroundEquipment" :key="li">{{ cleanEquipmentName(line) }}</li>
       </ul>
     </div>
   </div>

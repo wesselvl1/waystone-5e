@@ -8,6 +8,10 @@ import type {
   FeatPrerequisite,
   LevelUpEventDef,
   SpellAbilityRef,
+  Race,
+  Subrace,
+  Background,
+  SourceLevelEvents,
 } from '~/types/rulepack'
 import { addHitDieForClass, multiclassProficiencies, projectClassLevel } from '~/services/multiclass'
 import { expandedSpellIdsFor, maxSpellLevelForClass, spellMatchesChoice } from '~/services/spellcasting'
@@ -1149,6 +1153,30 @@ export function choosesSubclassAtFirstLevel(cls: ClassDefinition): boolean {
  */
 export function subclassProficienciesAt(subclass: SubclassDefinition, level: number): string[] {
   return (subclass.levels.find(l => l.level === level)?.levelUpEvents ?? [])
+    .flatMap(e => (e.type === 'GAIN_PROFICIENCY' && !e.whenOption ? [e.proficiency] : []))
+}
+
+/**
+ * GAIN_PROFICIENCY strings the race, the subrace and the background grant at 1st
+ * character level, ignoring `whenOption`-gated ones as above. A race group tagged with a
+ * trait the subrace replaces is skipped, the way the pipeline skips its events — a hill
+ * dwarf's warhammer counts, a replaced trait's grant does not. The creation wizard judges
+ * the starting kit against these alongside the class's own list.
+ */
+export function originProficienciesAtFirstLevel(
+  race: Race | undefined,
+  subrace: Subrace | undefined,
+  background: Background | undefined,
+): string[] {
+  const replaced = subrace?.replacesRaceTraits ?? []
+  const groups: SourceLevelEvents[] = [
+    ...(race?.levelUpEvents ?? []).filter(g => !g.trait || !replaced.includes(g.trait)),
+    ...(subrace?.levelUpEvents ?? []),
+    ...(background?.levelUpEvents ?? []),
+  ]
+  return groups
+    .filter(g => g.level === 1)
+    .flatMap(g => g.levelUpEvents)
     .flatMap(e => (e.type === 'GAIN_PROFICIENCY' && !e.whenOption ? [e.proficiency] : []))
 }
 

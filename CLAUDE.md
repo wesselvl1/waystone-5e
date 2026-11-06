@@ -325,9 +325,13 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   stores the best of the ways to dress as `armorClassConfig` (`bestStartingArmorClass`),
   a tie going to the unarmored feature — the armour is then left to be sold, where Unarmored
   Defense costs nothing to keep. Gold buy *replaces* the class's and the background's items,
-  coin included: the figure rolled or entered is the whole purse. The selection is reset
-  whenever the class or subclass changes, because `isSelectionComplete` accepts any known
-  weapon id and a pick from another class would otherwise pass it.
+  coin included: the figure rolled or entered is the whole purse. "(If proficient)"
+  options, the armour candidates and each attack's proficiency are judged against every
+  1st-level grant — class, chosen subclass, and the race's, subrace's and background's
+  unguarded `GAIN_PROFICIENCY` events (`originProficienciesAtFirstLevel`), so a hill
+  dwarf's warhammer counts. The selection is reset whenever the class, subclass, race,
+  subrace or background changes, because `isSelectionComplete` accepts any known weapon
+  id and a pick made under other proficiencies would otherwise pass it.
 - **A saving throw is derived the way an attack is, and what adds to it is found by
   wording.** `app/services/savingThrows.ts` builds the roll from the ability modifier, the
   proficiency bonus where the class grants it, whatever the character's features say, and

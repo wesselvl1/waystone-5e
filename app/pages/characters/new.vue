@@ -4,6 +4,7 @@ import { useRulepacksStore } from '~/stores/rulepacks'
 import {
   choosesSubclassAtFirstLevel,
   isSubclassPlaceholder,
+  originProficienciesAtFirstLevel,
   resolveFirstClassLevel,
   subclassProficienciesAt,
 } from '~/services/levelUpService'
@@ -27,7 +28,7 @@ import {
 } from '~/services/startingEquipment'
 import { bestStartingArmorClass, unarmoredCandidates } from '~/services/armorClass'
 import { dedupeProficiencies } from '~/services/proficiencies'
-import type { Character, AbilityKey, AbilityScores, SkillKey } from '~/types/character'
+import type { Character, AbilityKey, AbilityScores, EquipmentEntry, SkillKey } from '~/types/character'
 import type { AbilityScoreChoice } from '~/types/rulepack'
 
 const router = useRouter()
@@ -119,13 +120,15 @@ watch(() => draft.classId, () => {
 })
 
 /**
- * The class table's 1st-level features, without "Divine Domain" where the domain is
- * asked for right below: the pipeline drops that placeholder once a subclass supplies
- * features at the level, so listing it here would promise a feature the sheet won't have.
+ * The class table's 1st-level features, without "Divine Domain" once the domain picked
+ * right below has features of its own there: that is when the pipeline drops the
+ * placeholder, so listing it would promise a feature the sheet won't have.
  */
 const levelOneFeatures = computed(() => {
   const features = selectedClass.value?.levels[0]?.features ?? []
-  return needsSubclass.value ? features.filter(f => !isSubclassPlaceholder(f)) : features
+  const subclass = needsSubclass.value && draft.subclassId ? rulepackStore.getSubclass(draft.subclassId) : undefined
+  const replaced = (subclass?.levels.find(l => l.level === 1)?.features.length ?? 0) > 0
+  return replaced ? features.filter(f => !isSubclassPlaceholder(f)) : features
 })
 
 /**
@@ -285,13 +288,17 @@ const selectedSubclass = computed(() =>
 
 /**
  * What the kit is measured against: an "(if proficient)" option, the armour worn and the
- * attack rolls all read it. The subclass's own grants join the class's, since a Life
- * cleric's heavy armour is what puts chain mail on the list at all.
+ * attack rolls all read it. Everything granted at 1st level counts, not only the class's
+ * list — a Life cleric's heavy armour is what puts chain mail on the list at all, and a
+ * hill dwarf's warhammer is as much a proficiency as a fighter's. The race's, subrace's
+ * and background's arrive as level-1 events rather than on the class, so they are read
+ * off those events here.
  */
-const equipmentProficiencies = computed(() => [
+const equipmentProficiencies = computed(() => dedupeProficiencies([
   ...startingProficiencies(),
   ...(selectedSubclass.value ? subclassProficienciesAt(selectedSubclass.value, 1) : []),
-])
+  ...originProficienciesAtFirstLevel(selectedRace.value, selectedSubrace.value, selectedBackground.value),
+]))
 
 const abilityModifiers = computed(() => Object.fromEntries(ABILITY_KEYS.map(k =>
   [k, Math.floor((effectiveAbilities.value[k] - 10) / 2)])) as Record<AbilityKey, number>)
@@ -305,15 +312,40 @@ function rollGold() {
 }
 
 // A pick answers one class's bullets, and isSelectionComplete would accept a weapon id
-// left over from another, so a new class or subclass starts the step over. A bullet with
-// one option has nothing to ask and starts answered.
-watch([() => draft.classId, () => draft.subclassId], () => {
+// left over from another, so a new class or subclass starts the step over. So does a new
+// race, subrace or background, since each can change which "(if proficient)" options are
+// offered. A bullet with one option has nothing to ask and starts answered.
+watch([
+  () => draft.classId,
+  () => draft.subclassId,
+  () => draft.raceId,
+  () => draft.subraceId,
+  () => draft.backgroundId,
+], () => {
   draft.equipmentSelection = equipmentChoices.value.map(choice =>
     ({ option: choice.options.length === 1 ? 0 : -1, picks: {} }))
   draft.goldInput = ''
   wealthRoll.value = null
   if (!startingWealth.value) draft.startingGold = false
 })
+
+/**
+ * One line per item, by name in any case: a cleric's kit and an acolyte's background
+ * both hand over a holy symbol, and the sheet should say two of them on one line.
+ */
+function mergeByName(items: Omit<EquipmentEntry, 'id'>[]): Omit<EquipmentEntry, 'id'>[] {
+  const merged = new Map<string, Omit<EquipmentEntry, 'id'>>()
+  for (const item of items) {
+    const key = item.name.toLowerCase()
+    const existing = merged.get(key)
+    if (!existing) merged.set(key, { ...item })
+    else {
+      existing.quantity += item.quantity
+      if (existing.weight === undefined && item.weight !== undefined) existing.weight = item.weight
+    }
+  }
+  return [...merged.values()]
+}
 
 // ── Create character ──────────────────────────────────────────────────────────
 async function createCharacter() {
@@ -422,7 +454,7 @@ async function createCharacter() {
         description: selectedBackground.value.feature.description,
       }] : []),
     ],
-    equipment: [...(kit?.items ?? []), ...(fromBackground?.items ?? [])]
+    equipment: mergeByName([...(kit?.items ?? []), ...(fromBackground?.items ?? [])])
       .map(item => ({ id: crypto.randomUUID(), ...item })),
     currency: {
       cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
