@@ -277,7 +277,7 @@ export function unarmoredCandidates(
  *
  * Armour the character is not proficient with is skipped, a held shield (only if
  * proficient) joins every candidate that allows one, and a tie goes to an unarmored
- * candidate — the kit's armour is then left to be worn or sold, where an unarmored
+ * candidate â€” the kit's armour is then left to be worn or sold, where an unarmored
  * feature costs nothing to keep.
  */
 export function bestStartingArmorClass(
@@ -296,8 +296,8 @@ export function bestStartingArmorClass(
 
   const bodies = worn.filter(a => a.category !== 'shield' && isProficientWithArmor(a, proficiencies))
   const candidates: { config: ArmorClassConfig, unarmored: boolean }[] = [
-    ...unarmored.map(a => ({ config: withShield(configFromArmor(a)), unarmored: true })),
     ...bodies.map(a => ({ config: withShield(configFromArmor(a)), unarmored: false })),
+    ...unarmored.map(a => ({ config: withShield(configFromArmor(a)), unarmored: true })),
   ]
   if (candidates.length === 0) return withShield(defaultArmorClassConfig())
 
@@ -305,6 +305,8 @@ export function bestStartingArmorClass(
   let bestTotal = armorClassTotal(best.config, ctx)
   for (const candidate of candidates.slice(1)) {
     const total = armorClassTotal(candidate.config, ctx)
+    // Armour is listed first, so a tie must be won explicitly; among unarmored ties the
+    // earlier entry stays.
     if (total > bestTotal || (total === bestTotal && candidate.unarmored && !best.unarmored)) {
       best = candidate
       bestTotal = total

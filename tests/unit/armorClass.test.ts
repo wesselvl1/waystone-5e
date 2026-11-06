@@ -3,6 +3,7 @@ import {
   armorClassBreakdown,
   armorClassTotal,
   armorWarnings,
+  bestStartingArmorClass,
   cappedDex,
   characterArmorClass,
   compactAcBonuses,
@@ -11,7 +12,6 @@ import {
   isProficientWithArmor,
   previewArmorClass,
   shieldAllowed,
-  bestStartingArmorClass,
   unarmoredCandidates,
 } from '~/services/armorClass'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
