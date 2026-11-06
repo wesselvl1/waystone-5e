@@ -2,6 +2,7 @@ import type {
   AbilityKey,
   ArmorClassBonuses,
   ArmorClassConfig,
+  ArmorClassShield,
   Character,
 } from '~/types/character'
 import type { ArmorDefinition } from '~/types/rulepack'
@@ -256,4 +257,62 @@ export function compactAcBonuses(bonuses?: ArmorClassBonuses): ArmorClassBonuses
     if (value !== 0) out[kind] = value
   }
   return Object.keys(out).length > 0 ? out : undefined
+}
+
+/** Plain `unarmored` plus every unarmored entry whose classId matches and whose subclassId is absent or matches. */
+export function unarmoredCandidates(
+  all: ArmorDefinition[],
+  classId: string,
+  subclassId?: string,
+): ArmorDefinition[] {
+  return all.filter(a => a.category === 'unarmored' && (
+    a.id === 'unarmored'
+    || (a.classId === classId && (!a.subclassId || a.subclassId === subclassId))
+  ))
+}
+
+/**
+ * The armour class a new character starts with: every way of dressing from the kit and
+ * the class's unarmored features, scored, and the best kept.
+ *
+ * Armour the character is not proficient with is skipped, a held shield (only if
+ * proficient) joins every candidate that allows one, and a tie goes to an unarmored
+ * candidate — the kit's armour is then left to be worn or sold, where an unarmored
+ * feature costs nothing to keep. Among unarmored ties the class's own entry wins over
+ * plain `unarmored`: a monk with Wisdom 10 scores the same either way, and the sheet
+ * should still name the feature so a later Wisdom increase reaches it.
+ */
+export function bestStartingArmorClass(
+  worn: ArmorDefinition[],
+  unarmored: ArmorDefinition[],
+  proficiencies: string[],
+  ctx: ArmorClassContext,
+): ArmorClassConfig {
+  const shieldItem = worn.find(a => a.category === 'shield' && isProficientWithArmor(a, proficiencies))
+  const shield: ArmorClassShield | undefined = shieldItem
+    ? { equipped: true, armorId: shieldItem.id, name: shieldItem.name, bonus: shieldItem.baseAC }
+    : undefined
+
+  const withShield = (config: ArmorClassConfig): ArmorClassConfig =>
+    shield && shieldAllowed(config) ? { ...config, shield } : config
+
+  const bodies = worn.filter(a => a.category !== 'shield' && isProficientWithArmor(a, proficiencies))
+  // Tie-break rank: armour 0, plain unarmored 1, a class's (or subclass's) own entry 2.
+  const candidates: { config: ArmorClassConfig, rank: number }[] = [
+    ...bodies.map(a => ({ config: withShield(configFromArmor(a)), rank: 0 })),
+    ...unarmored.map(a => ({ config: withShield(configFromArmor(a)), rank: a.classId ? 2 : 1 })),
+  ]
+  if (candidates.length === 0) return withShield(defaultArmorClassConfig())
+
+  let best = candidates[0]!
+  let bestTotal = armorClassTotal(best.config, ctx)
+  for (const candidate of candidates.slice(1)) {
+    const total = armorClassTotal(candidate.config, ctx)
+    // A tie must be won by rank, not by order; between equal ranks the earlier entry stays.
+    if (total > bestTotal || (total === bestTotal && candidate.rank > best.rank)) {
+      best = candidate
+      bestTotal = total
+    }
+  }
+  return best.config
 }

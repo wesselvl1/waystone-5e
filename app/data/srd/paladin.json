@@ -535,7 +535,111 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a martial weapon and a shield",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "martial"
+                },
+                {
+                  "kind": "armor",
+                  "id": "shield"
+                }
+              ]
+            },
+            {
+              "label": "two martial weapons",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "martial"
+                },
+                {
+                  "kind": "weaponChoice",
+                  "category": "martial"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "five javelins",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "javelin",
+                  "quantity": 5
+                }
+              ]
+            },
+            {
+              "label": "any simple melee weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple",
+                  "rangeType": "melee"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a priest's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "priests-pack"
+                }
+              ]
+            },
+            {
+              "label": "an explorer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "explorers-pack"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "chain mail and a holy symbol",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "chain-mail"
+                },
+                {
+                  "kind": "itemChoice",
+                  "label": "Holy symbol",
+                  "options": [
+                    "Amulet",
+                    "Emblem",
+                    "Reliquary"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "5d4",
+        "multiplier": 10
+      }
     }
   ]
 }

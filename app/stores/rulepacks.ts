@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { db } from '~/db'
-import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, Background, SpellDefinition, FeatDefinition, ForkOrigin, OptionalClassFeature, CreatureDefinition, CreatureFilter, WeaponDefinition, ArmorDefinition } from '~/types/rulepack'
+import type { Rulepack, Race, ClassDefinition, SubclassDefinition, SubclassPatchEntry, SubracePatchEntry, Background, SpellDefinition, FeatDefinition, ForkOrigin, OptionalClassFeature, CreatureDefinition, CreatureFilter, WeaponDefinition, ArmorDefinition, EquipmentPack } from '~/types/rulepack'
 import type { RulepackFragment } from '~/schemas/rulepackSchema'
 import { mergeById, mergeOptionPools, distributeSubclasses, distributeSubraces } from '~/services/rulepackMerge'
 import type { EntryKind, ForkStatus } from '~/services/homebrew'
@@ -46,6 +46,7 @@ function applyFragment(existing: Rulepack, fragment: RulepackFragment): Rulepack
     creatures: mergeById(existing.creatures ?? [], fragment.creatures ?? []),
     weapons: mergeById(existing.weapons ?? [], fragment.weapons ?? []),
     armor: mergeById(existing.armor ?? [], fragment.armor ?? []),
+    equipmentPacks: mergeById(existing.equipmentPacks ?? [], fragment.equipmentPacks ?? []),
     optionalFeatures: mergeById(existing.optionalFeatures, fragment.optionalFeatures ?? []),
     subclasses: mergeById(existing.subclasses ?? [], pendingSubclasses),
     subraces: mergeById(existing.subraces ?? [], pendingSubraces),
@@ -78,6 +79,7 @@ function fragmentToRulepack(fragment: RulepackFragment): Rulepack {
     creatures: fragment.creatures ?? [],
     weapons: fragment.weapons ?? [],
     armor: fragment.armor ?? [],
+    equipmentPacks: fragment.equipmentPacks ?? [],
     optionalFeatures: fragment.optionalFeatures ?? [],
     subclasses: pendingSubclasses,
     subraces: pendingSubraces,
@@ -327,6 +329,18 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     }
   }
 
+  /** The named gear bundles a class's starting equipment can grant by id. */
+  function getAllEquipmentPacks(): Array<WithSource<EquipmentPack>> {
+    return withSource('equipmentPacks', p => p.equipmentPacks ?? []).sort(byName)
+  }
+
+  function getEquipmentPack(packId: string): EquipmentPack | undefined {
+    for (const pack of rulepacks.value) {
+      const found = (pack.equipmentPacks ?? []).find(e => e.id === packId)
+      if (found) return found
+    }
+  }
+
   function getAllBackgrounds(): Array<WithSource<Background>> {
     return withSource('backgrounds', p => p.backgrounds).sort(byName)
   }
@@ -387,6 +401,7 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
       creatures: getAllCreatures(),
       weapons: composed('weapons', p => p.weapons ?? []),
       armor: composed('armor', p => p.armor ?? []),
+      equipmentPacks: composed('equipmentPacks', p => p.equipmentPacks ?? []),
       optionalFeatures: composed('optionalFeatures', p => p.optionalFeatures),
       // Not distributed into anything: a pool patch is resolved where the pool is
       // offered, so it only has to reach the composed pack to widen an SRD class's list.
@@ -542,6 +557,8 @@ export const useRulepacksStore = defineStore('rulepacks', () => {
     getWeapon,
     getAllArmor,
     getArmor,
+    getAllEquipmentPacks,
+    getEquipmentPack,
     getAllBackgrounds,
     getBackground,
     getSubclassesForClass,

@@ -2512,7 +2512,113 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a light crossbow and 20 bolts",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "light-crossbow"
+                },
+                {
+                  "kind": "item",
+                  "name": "Bolts",
+                  "quantity": 20
+                }
+              ]
+            },
+            {
+              "label": "any simple weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a component pouch",
+              "items": [
+                {
+                  "kind": "item",
+                  "name": "Component pouch"
+                }
+              ]
+            },
+            {
+              "label": "an arcane focus",
+              "items": [
+                {
+                  "kind": "itemChoice",
+                  "label": "Arcane focus",
+                  "options": [
+                    "Crystal",
+                    "Orb",
+                    "Rod",
+                    "Staff",
+                    "Wand"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a scholar's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "scholars-pack"
+                }
+              ]
+            },
+            {
+              "label": "a dungeoneer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "dungeoneers-pack"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "leather armor, any simple weapon, and two daggers",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "leather"
+                },
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple"
+                },
+                {
+                  "kind": "weapon",
+                  "id": "dagger",
+                  "quantity": 2
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "4d4",
+        "multiplier": 10
+      }
     }
   ]
 }

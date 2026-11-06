@@ -1,0 +1,322 @@
+{
+  "id": "srd-5.1",
+  "name": "D&D 5e SRD 5.1",
+  "version": "5.1",
+  "description": "System Reference Document 5.1 equipment packs. Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).",
+  "author": "Wizards of the Coast",
+  "equipmentPacks": [
+    {
+      "id": "burglars-pack",
+      "name": "Burglar's Pack",
+      "cost": "16 gp",
+      "contents": [
+        {
+          "name": "Backpack",
+          "quantity": 1
+        },
+        {
+          "name": "Ball bearings (bag of 1,000)",
+          "quantity": 1
+        },
+        {
+          "name": "String (10 feet)",
+          "quantity": 1
+        },
+        {
+          "name": "Bell",
+          "quantity": 1
+        },
+        {
+          "name": "Candle",
+          "quantity": 5
+        },
+        {
+          "name": "Crowbar",
+          "quantity": 1
+        },
+        {
+          "name": "Hammer",
+          "quantity": 1
+        },
+        {
+          "name": "Piton",
+          "quantity": 10
+        },
+        {
+          "name": "Hooded lantern",
+          "quantity": 1
+        },
+        {
+          "name": "Flask of oil",
+          "quantity": 2
+        },
+        {
+          "name": "Rations (1 day)",
+          "quantity": 5
+        },
+        {
+          "name": "Tinderbox",
+          "quantity": 1
+        },
+        {
+          "name": "Waterskin",
+          "quantity": 1
+        },
+        {
+          "name": "Hempen rope (50 feet)",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "diplomats-pack",
+      "name": "Diplomat's Pack",
+      "cost": "39 gp",
+      "contents": [
+        {
+          "name": "Chest",
+          "quantity": 1
+        },
+        {
+          "name": "Map or scroll case",
+          "quantity": 2
+        },
+        {
+          "name": "Fine clothes",
+          "quantity": 1
+        },
+        {
+          "name": "Ink (1 ounce bottle)",
+          "quantity": 1
+        },
+        {
+          "name": "Ink pen",
+          "quantity": 1
+        },
+        {
+          "name": "Lamp",
+          "quantity": 1
+        },
+        {
+          "name": "Flask of oil",
+          "quantity": 2
+        },
+        {
+          "name": "Paper (sheet)",
+          "quantity": 5
+        },
+        {
+          "name": "Perfume (vial)",
+          "quantity": 1
+        },
+        {
+          "name": "Sealing wax",
+          "quantity": 1
+        },
+        {
+          "name": "Soap",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "dungeoneers-pack",
+      "name": "Dungeoneer's Pack",
+      "cost": "12 gp",
+      "contents": [
+        {
+          "name": "Backpack",
+          "quantity": 1
+        },
+        {
+          "name": "Crowbar",
+          "quantity": 1
+        },
+        {
+          "name": "Hammer",
+          "quantity": 1
+        },
+        {
+          "name": "Piton",
+          "quantity": 10
+        },
+        {
+          "name": "Torch",
+          "quantity": 10
+        },
+        {
+          "name": "Tinderbox",
+          "quantity": 1
+        },
+        {
+          "name": "Rations (1 day)",
+          "quantity": 10
+        },
+        {
+          "name": "Waterskin",
+          "quantity": 1
+        },
+        {
+          "name": "Hempen rope (50 feet)",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "entertainers-pack",
+      "name": "Entertainer's Pack",
+      "cost": "40 gp",
+      "contents": [
+        {
+          "name": "Backpack",
+          "quantity": 1
+        },
+        {
+          "name": "Bedroll",
+          "quantity": 1
+        },
+        {
+          "name": "Costume",
+          "quantity": 2
+        },
+        {
+          "name": "Candle",
+          "quantity": 5
+        },
+        {
+          "name": "Rations (1 day)",
+          "quantity": 5
+        },
+        {
+          "name": "Waterskin",
+          "quantity": 1
+        },
+        {
+          "name": "Disguise kit",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "explorers-pack",
+      "name": "Explorer's Pack",
+      "cost": "10 gp",
+      "contents": [
+        {
+          "name": "Backpack",
+          "quantity": 1
+        },
+        {
+          "name": "Bedroll",
+          "quantity": 1
+        },
+        {
+          "name": "Mess kit",
+          "quantity": 1
+        },
+        {
+          "name": "Tinderbox",
+          "quantity": 1
+        },
+        {
+          "name": "Torch",
+          "quantity": 10
+        },
+        {
+          "name": "Rations (1 day)",
+          "quantity": 10
+        },
+        {
+          "name": "Waterskin",
+          "quantity": 1
+        },
+        {
+          "name": "Hempen rope (50 feet)",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "priests-pack",
+      "name": "Priest's Pack",
+      "cost": "19 gp",
+      "contents": [
+        {
+          "name": "Backpack",
+          "quantity": 1
+        },
+        {
+          "name": "Blanket",
+          "quantity": 1
+        },
+        {
+          "name": "Candle",
+          "quantity": 10
+        },
+        {
+          "name": "Tinderbox",
+          "quantity": 1
+        },
+        {
+          "name": "Alms box",
+          "quantity": 1
+        },
+        {
+          "name": "Block of incense",
+          "quantity": 2
+        },
+        {
+          "name": "Censer",
+          "quantity": 1
+        },
+        {
+          "name": "Vestments",
+          "quantity": 1
+        },
+        {
+          "name": "Rations (1 day)",
+          "quantity": 2
+        },
+        {
+          "name": "Waterskin",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "scholars-pack",
+      "name": "Scholar's Pack",
+      "cost": "40 gp",
+      "contents": [
+        {
+          "name": "Backpack",
+          "quantity": 1
+        },
+        {
+          "name": "Book of lore",
+          "quantity": 1
+        },
+        {
+          "name": "Ink (1 ounce bottle)",
+          "quantity": 1
+        },
+        {
+          "name": "Ink pen",
+          "quantity": 1
+        },
+        {
+          "name": "Parchment (sheet)",
+          "quantity": 10
+        },
+        {
+          "name": "Little bag of sand",
+          "quantity": 1
+        },
+        {
+          "name": "Small knife",
+          "quantity": 1
+        }
+      ]
+    }
+  ]
+}

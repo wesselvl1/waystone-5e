@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
 import { fighterRulepack } from '../fixtures'
@@ -121,5 +123,55 @@ describe('RulepackSchema', () => {
     })
     expect(result.success).toBe(true)
     expect(result.success && result.data.races[0]!.subraces?.[0]!.languages).toBeUndefined()
+  })
+})
+
+describe('RulepackSchema starting equipment', () => {
+  const startingEquipment = [{
+    options: [{
+      label: 'a longsword, a shield and a pack',
+      requiresProficiency: true,
+      items: [
+        { kind: 'weapon', id: 'longsword', quantity: 1 },
+        { kind: 'armor', id: 'shield', name: 'Wooden shield' },
+        { kind: 'pack', id: 'dungeoneers-pack' },
+        { kind: 'item', name: 'Rope', quantity: 1, weight: 10 },
+        { kind: 'weaponChoice', category: 'martial', rangeType: 'melee' },
+        { kind: 'itemChoice', label: 'Instrument', options: ['Lute', 'Flute'] },
+      ],
+    }],
+  }]
+
+  it('accepts a class with startingEquipment and startingWealth', () => {
+    const cls = { ...fighterRulepack.classes[0], startingEquipment, startingWealth: { dice: '5d4', multiplier: 10 } }
+    const result = RulepackSchema.safeParse({ ...minimalRulepack, classes: [cls] })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.classes[0]!.startingEquipment).toEqual(startingEquipment)
+      expect(result.data.classes[0]!.startingWealth).toEqual({ dice: '5d4', multiplier: 10 })
+    }
+  })
+
+  it('rejects a startingWealth dice expression with a modifier', () => {
+    const cls = { ...fighterRulepack.classes[0], startingWealth: { dice: '5d4+10', multiplier: 10 } }
+    expect(RulepackSchema.safeParse({ ...minimalRulepack, classes: [cls] }).success).toBe(false)
+    const ok = { ...fighterRulepack.classes[0], startingWealth: { dice: '4D4', multiplier: 10 } }
+    expect(RulepackSchema.safeParse({ ...minimalRulepack, classes: [ok] }).success).toBe(true)
+  })
+
+  it('defaults equipmentPacks to []', () => {
+    const result = RulepackSchema.safeParse(minimalRulepack)
+    expect(result.success && result.data.equipmentPacks).toEqual([])
+  })
+})
+
+describe('docs/rulepacks.md starting equipment example', () => {
+  it('validates against RulepackSchema', () => {
+    const doc = readFileSync(resolve(__dirname, '../../docs/rulepacks.md'), 'utf8')
+    const section = doc.slice(doc.indexOf('### Starting equipment'))
+    const block = /```json\r?\n([\s\S]*?)```/.exec(section)![1]!
+    const result = RulepackSchema.safeParse(JSON.parse(block))
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.classes[0]!.startingEquipment).toHaveLength(2)
   })
 })

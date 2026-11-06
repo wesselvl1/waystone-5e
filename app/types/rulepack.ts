@@ -602,7 +602,38 @@ export interface ClassDefinition {
   levels: ClassLevel[]                 // index 0 = level 1
   featureDefinitions?: ClassFeatureDefinition[]
   subclasses?: SubclassDefinition[]
+  /** The class's "Starting Equipment" bullets, as printed; a single option is a fixed grant. */
+  startingEquipment?: StartingEquipmentChoice[]
+  /** The alternative to the bullets above: roll `dice`, multiply, take that much gold. */
+  startingWealth?: StartingWealth
 }
+
+export type StartingItem =
+  | { kind: 'weapon'; id: string; quantity?: number }          // quantity default 1
+  | { kind: 'armor'; id: string; name?: string }                // name overrides display ("Wooden shield")
+  | { kind: 'pack'; id: string }
+  | { kind: 'item'; name: string; quantity?: number; weight?: number }
+  | { kind: 'weaponChoice'; category?: WeaponCategory; rangeType?: 'melee' | 'ranged' }
+  | { kind: 'itemChoice'; label: string; options?: string[] }   // no options = free text
+
+export interface StartingEquipmentOption {
+  /** As printed: "a light crossbow and 20 bolts". */
+  label: string
+  items: StartingItem[]
+  /** "(if proficient)": offered only when every weapon/armour in `items` is proficient. */
+  requiresProficiency?: boolean
+}
+
+/** One printed bullet. A single option is a fixed grant. */
+export interface StartingEquipmentChoice { options: StartingEquipmentOption[] }
+
+/** `{ dice: '5d4', multiplier: 10 }` is 5d4 x 10 gp. */
+export interface StartingWealth { dice: string; multiplier: number }
+
+export interface EquipmentPackItem { name: string; quantity: number; weight?: number }
+
+/** A named bundle ("Dungeoneer's Pack") that `StartingItem` can grant by id. */
+export interface EquipmentPack { id: string; name: string; cost?: string; contents: EquipmentPackItem[] }
 
 /**
  * A creature statblock. Deliberately generic rather than beast-specific: Wild Shape,
@@ -880,6 +911,8 @@ export interface ArmorDefinition {
   shieldAllowed?: boolean
   /** The class whose feature grants this, so the picker can mark what suits the build. */
   classId?: string
+  /** Narrows `classId` to one subclass (a draconic sorcerer's Draconic Resilience). */
+  subclassId?: string
   /** Shown under the entry in the picker — what the feature actually says. */
   description?: string
   /** Minimum Strength; below it the wearer's speed drops by 10 feet. */
@@ -923,6 +956,7 @@ export interface Rulepack {
   creatures: CreatureDefinition[]
   weapons: WeaponDefinition[]
   armor: ArmorDefinition[]
+  equipmentPacks: EquipmentPack[]
   optionalFeatures: OptionalClassFeature[]
   /**
    * Patch entries whose target class/race lives in ANOTHER loaded pack, so they could not

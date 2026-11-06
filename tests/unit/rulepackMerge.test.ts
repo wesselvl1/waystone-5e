@@ -119,3 +119,14 @@ describe('distributeSubraces', () => {
     expect(distributeSubraces(races, [patch])).toEqual([patch])
   })
 })
+
+describe('mergeById for equipmentPacks', () => {
+  it('merges equipmentPacks by id, incoming wins', () => {
+    const pack = (id: string, name: string) => ({ id, name, contents: [] })
+    const merged = mergeById(
+      [pack('a', 'Old A'), pack('b', 'B')],
+      [pack('a', 'New A'), pack('c', 'C')],
+    )
+    expect(merged.map(p => p.name).sort()).toEqual(['B', 'C', 'New A'])
+  })
+})

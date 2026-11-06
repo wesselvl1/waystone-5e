@@ -659,7 +659,99 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a quarterstaff",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "quarterstaff"
+                }
+              ]
+            },
+            {
+              "label": "a dagger",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "dagger"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a component pouch",
+              "items": [
+                {
+                  "kind": "item",
+                  "name": "Component pouch"
+                }
+              ]
+            },
+            {
+              "label": "an arcane focus",
+              "items": [
+                {
+                  "kind": "itemChoice",
+                  "label": "Arcane focus",
+                  "options": [
+                    "Crystal",
+                    "Orb",
+                    "Rod",
+                    "Staff",
+                    "Wand"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a scholar's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "scholars-pack"
+                }
+              ]
+            },
+            {
+              "label": "an explorer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "explorers-pack"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a spellbook",
+              "items": [
+                {
+                  "kind": "item",
+                  "name": "Spellbook"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "4d4",
+        "multiplier": 10
+      }
     }
   ]
 }

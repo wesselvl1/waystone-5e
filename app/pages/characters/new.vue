@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
-import { resolveFirstClassLevel } from '~/services/levelUpService'
+import {
+  choosesSubclassAtFirstLevel,
+  isSubclassPlaceholder,
+  originProficienciesAtFirstLevel,
+  resolveFirstClassLevel,
+  subclassProficienciesAt,
+} from '~/services/levelUpService'
 import { raceAbilityBonuses, raceResistances, raceSenses, raceSpeeds } from '~/services/multiclass'
 import {
   choiceSummary,
@@ -10,9 +16,20 @@ import {
   type AbilityPicks,
 } from '~/services/abilityScoreChoice'
 import { filterBySearch } from '~/services/searchFilter'
-import { cleanEquipmentName } from '~/services/equipment'
+import {
+  attacksFromKit,
+  backgroundKit,
+  isSelectionComplete,
+  parseGoldAmount,
+  resolveStartingKit,
+  rollStartingWealth,
+  startingWealthLabel,
+  wealthRollLabel,
+  type EquipmentSelection,
+} from '~/services/startingEquipment'
+import { bestStartingArmorClass, unarmoredCandidates } from '~/services/armorClass'
 import { dedupeProficiencies } from '~/services/proficiencies'
-import type { Character, AbilityScores, SkillKey } from '~/types/character'
+import type { Character, AbilityKey, AbilityScores, EquipmentEntry, SkillKey } from '~/types/character'
 import type { AbilityScoreChoice } from '~/types/rulepack'
 
 const router = useRouter()
@@ -30,12 +47,15 @@ const draft = reactive({
   raceId: '',
   subraceId: '',
   classId: '',
+  subclassId: '',
   backgroundId: '',
   alignment: '',
   abilityMethod: 'standard' as 'standard' | 'pointbuy' | 'manual',
   abilities: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } as AbilityScores,
   skillChoices: [] as SkillKey[],
   startingGold: false,
+  equipmentSelection: [] as EquipmentSelection,
+  goldInput: '',
 })
 
 // ── Standard array ────────────────────────────────────────────────────────────
@@ -77,6 +97,49 @@ const selectedRace = computed(() => rulepackStore.getRace(draft.raceId))
 const selectedSubrace = computed(() => selectedRace.value?.subraces?.find(s => s.id === draft.subraceId))
 const selectedClass = computed(() => rulepackStore.getClass(draft.classId))
 const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id === draft.backgroundId))
+
+// ── Subclass ──────────────────────────────────────────────────────────────────
+// A cleric, a sorcerer or a warlock picks the subclass at 1st level, and the steps after
+// this one depend on it — a Life cleric's heavy armour decides the equipment — so it is
+// asked here rather than left to the level-up wizard. Whether a class does is read off
+// its own 1st level, so a homebrew class picking at 1st is asked the same way.
+const needsSubclass = computed(() => !!selectedClass.value && choosesSubclassAtFirstLevel(selectedClass.value))
+const subclassLabel = computed(() => {
+  const event = selectedClass.value?.levels.find(l => l.level === 1)?.levelUpEvents
+    ?.find(e => e.type === 'CHOOSE_SUBCLASS')
+  return (event && 'label' in event && event.label) || 'Subclass'
+})
+const availableSubclasses = computed(() => rulepackStore.getSubclassesForClass(draft.classId))
+const subclassSearch = ref('')
+const filteredSubclasses = computed(() => filterBySearch(availableSubclasses.value, subclassSearch.value,
+  sub => [sub.name, sub.description]))
+
+// A domain belongs to the class it was picked under.
+watch(() => draft.classId, () => {
+  draft.subclassId = ''
+  subclassSearch.value = ''
+})
+
+// The subclass list opens below a long class grid, where a player on a phone would not
+// see it and would only find Next disabled; bring it into view as it appears.
+const subclassPicker = ref<HTMLElement | null>(null)
+watch(() => draft.classId, async () => {
+  if (!needsSubclass.value) return
+  await nextTick()
+  subclassPicker.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+})
+
+/**
+ * The class table's 1st-level features, without "Divine Domain" once the domain picked
+ * right below has features of its own there: that is when the pipeline drops the
+ * placeholder, so listing it would promise a feature the sheet won't have.
+ */
+const levelOneFeatures = computed(() => {
+  const features = selectedClass.value?.levels[0]?.features ?? []
+  const subclass = needsSubclass.value && draft.subclassId ? rulepackStore.getSubclass(draft.subclassId) : undefined
+  const replaced = (subclass?.levels.find(l => l.level === 1)?.features.length ?? 0) > 0
+  return replaced ? features.filter(f => !isSubclassPlaceholder(f)) : features
+})
 
 /**
  * The race's traits minus any the chosen subrace supersedes: a SCAG tiefling bloodline
@@ -177,14 +240,32 @@ function canProceed() {
     if (subraceRequired.value && !draft.subraceId) return false
     return true
   }
-  if (step.value === 1) return !!draft.classId
+  // A class with no subclass loaded is not held up here; the level-up wizard can skip it.
+  if (step.value === 1) {
+    return !!draft.classId
+      && (!needsSubclass.value || !!draft.subclassId || availableSubclasses.value.length === 0)
+  }
   if (step.value === 2) return !!draft.backgroundId
   // Advancing with a distributable increase half spent would silently drop it.
   if (step.value === 3) {
     return racialChoices.value.every((c, i) => isChoiceSatisfied(c, racialPicks.value[i] ?? {}))
   }
+  if (step.value === 5) {
+    return draft.startingGold
+      ? parseGoldAmount(draft.goldInput) !== null
+      : isSelectionComplete(equipmentChoices.value, draft.equipmentSelection, equipmentProficiencies.value, rulepackStore)
+  }
   return true
 }
+
+/**
+ * Why Next is greyed out on the equipment step, where the unanswered slot can sit a long
+ * scroll above the button.
+ */
+const nextHint = computed(() => {
+  if (step.value !== 5 || canProceed()) return ''
+  return draft.startingGold ? 'Enter a whole number of gold pieces.' : 'Choose an option for every item above.'
+})
 
 /**
  * Everything the sheet files under Proficiencies & Languages.
@@ -218,6 +299,73 @@ function startingProficiencies(): string[] {
   return dedupeProficiencies(all)
 }
 
+// ── Starting equipment ────────────────────────────────────────────────────────
+const equipmentChoices = computed(() => selectedClass.value?.startingEquipment ?? [])
+const startingWealth = computed(() => selectedClass.value?.startingWealth)
+const selectedSubclass = computed(() =>
+  needsSubclass.value && draft.subclassId ? rulepackStore.getSubclass(draft.subclassId) : undefined)
+
+/**
+ * What the kit is measured against: an "(if proficient)" option, the armour worn and the
+ * attack rolls all read it. Everything granted at 1st level counts, not only the class's
+ * list — a Life cleric's heavy armour is what puts chain mail on the list at all, and a
+ * hill dwarf's warhammer is as much a proficiency as a fighter's. The race's, subrace's
+ * and background's arrive as level-1 events rather than on the class, so they are read
+ * off those events here.
+ */
+const equipmentProficiencies = computed(() => dedupeProficiencies([
+  ...startingProficiencies(),
+  ...(selectedSubclass.value ? subclassProficienciesAt(selectedSubclass.value, 1) : []),
+  ...originProficienciesAtFirstLevel(selectedRace.value, selectedSubrace.value, selectedBackground.value),
+]))
+
+const abilityModifiers = computed(() => Object.fromEntries(ABILITY_KEYS.map(k =>
+  [k, Math.floor((effectiveAbilities.value[k] - 10) / 2)])) as Record<AbilityKey, number>)
+
+/** The last roll, kept so the dice can be shown beside the total they made. */
+const wealthRoll = ref<{ rolls: number[]; total: number } | null>(null)
+function rollGold() {
+  if (!startingWealth.value) return
+  wealthRoll.value = rollStartingWealth(startingWealth.value)
+  draft.goldInput = String(wealthRoll.value.total)
+}
+
+// A pick answers one class's bullets, and isSelectionComplete would accept a weapon id
+// left over from another, so a new class or subclass starts the step over. So does a new
+// race, subrace or background, since each can change which "(if proficient)" options are
+// offered. A bullet with one option has nothing to ask and starts answered.
+watch([
+  () => draft.classId,
+  () => draft.subclassId,
+  () => draft.raceId,
+  () => draft.subraceId,
+  () => draft.backgroundId,
+], () => {
+  draft.equipmentSelection = equipmentChoices.value.map(choice =>
+    ({ option: choice.options.length === 1 ? 0 : -1, picks: {} }))
+  draft.goldInput = ''
+  wealthRoll.value = null
+  if (!startingWealth.value) draft.startingGold = false
+})
+
+/**
+ * One line per item, by name in any case: a cleric's priest's pack and an acolyte's
+ * background both hand over vestments, and the sheet should say two of them on one line.
+ */
+function mergeByName(items: Omit<EquipmentEntry, 'id'>[]): Omit<EquipmentEntry, 'id'>[] {
+  const merged = new Map<string, Omit<EquipmentEntry, 'id'>>()
+  for (const item of items) {
+    const key = item.name.toLowerCase()
+    const existing = merged.get(key)
+    if (!existing) merged.set(key, { ...item })
+    else {
+      existing.quantity += item.quantity
+      if (existing.weight === undefined && item.weight !== undefined) existing.weight = item.weight
+    }
+  }
+  return [...merged.values()]
+}
+
 // ── Create character ──────────────────────────────────────────────────────────
 async function createCharacter() {
   const cls = selectedClass.value
@@ -230,6 +378,24 @@ async function createCharacter() {
     }
   }
 
+  // Gold buy takes the place of everything the class and the background would have
+  // handed over, coin included — the rolled figure is the whole purse. Otherwise the kit
+  // is carried, its weapons become attacks, and the best way of wearing it (or of not
+  // wearing it, on a tie) becomes the armour class the sheet derives. The armour class is
+  // worked out either way: a monk's Unarmored Defense is a feature, not an item, and a
+  // gold-buy monk still has it.
+  const proficiencies = equipmentProficiencies.value
+  const kit = draft.startingGold
+    ? undefined
+    : resolveStartingKit(equipmentChoices.value, draft.equipmentSelection, rulepackStore, proficiencies)
+  const fromBackground = draft.startingGold ? undefined : backgroundKit(selectedBackground.value?.equipment ?? [])
+  const startingArmor = bestStartingArmorClass(
+    kit?.armor ?? [],
+    unarmoredCandidates(rulepackStore.getAllArmor(), draft.classId, selectedSubclass.value?.id),
+    proficiencies,
+    { modifiers: abilityModifiers.value },
+  )
+
   const character: Character = {
     id: crypto.randomUUID(),
     name: draft.name || 'Unnamed Adventurer',
@@ -240,7 +406,10 @@ async function createCharacter() {
     // The level being gained, not the one before it: the whole of level 1 is resolved
     // below, and a granted feat's retroactive hit points count the levels the character
     // has. The wizard path stores it back at 0, since the level is the wizard's to apply.
-    classes: [{ classId: draft.classId, level: 1 }],
+    // A subclass picked on the class step goes on now, so level 1 resolves its features
+    // and skips CHOOSE_SUBCLASS. Absent rather than '' when there is none: the pipeline
+    // asks for a subclass only while the id is undefined.
+    classes: [{ classId: draft.classId, level: 1, ...(needsSubclass.value && draft.subclassId ? { subclassId: draft.subclassId } : {}) }],
     experiencePoints: 0,
     inspiration: false,
 
@@ -261,6 +430,7 @@ async function createCharacter() {
     // figure worked out here as well would be counted twice.
     hp: { max: 0, current: 0, temp: 0 },
     armorClass: null,
+    armorClassConfig: startingArmor,
     speeds: speeds.value,
     senses: senses.value,
     initiative: null,
@@ -279,7 +449,9 @@ async function createCharacter() {
     classSpellcasting: {},
     spellSlots: {} as Character['spellSlots'],
     spells: [],
-    attacks: [],
+    attacks: kit
+      ? attacksFromKit(kit, proficiencies, abilityModifiers.value).map(a => ({ id: crypto.randomUUID(), ...a }))
+      : [],
 
     features: [
       ...raceTraits.value.map(t => ({
@@ -303,16 +475,13 @@ async function createCharacter() {
         description: selectedBackground.value.feature.description,
       }] : []),
     ],
-    equipment: draft.startingGold ? [] : (selectedBackground.value?.equipment ?? []).map(item => {
-      const match = item.match(/^(\d+)\s+(.+)$/)
-      return {
-        id: crypto.randomUUID(),
-        // A book may write its list as data references; the sheet wants the name alone.
-        name: cleanEquipmentName((match ? match[2] : item) ?? item),
-        quantity: match?.[1] ? Number.parseInt(match[1]) : 1,
-      }
-    }),
-    currency: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+    equipment: mergeByName([...(kit?.items ?? []), ...(fromBackground?.items ?? [])])
+      .map(item => ({ id: crypto.randomUUID(), ...item })),
+    currency: {
+      cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
+      ...fromBackground?.currency,
+      ...(draft.startingGold ? { gp: parseGoldAmount(draft.goldInput) ?? 0 } : {}),
+    },
 
     notes: '',
     createdAt: now,
@@ -337,8 +506,9 @@ async function createCharacter() {
     // A question has to be asked, not applied, so the whole level belongs to the level-up
     // wizard — HP roll, spells, subclass and every automatic event beside them. Nothing is
     // applied here, or the wizard would apply it a second time; the character is stored a
-    // level short until it runs.
-    await characterStore.save({ ...created, classes: [{ classId: draft.classId, level: 0 }] })
+    // level short until it runs. A subclass picked on the class step rides along on the
+    // class entry, so the wizard does not ask for it twice.
+    await characterStore.save({ ...created, classes: [{ ...created.classes[0]!, level: 0 }] })
     router.push(`/characters/${created.id}/levelup`)
     return
   }
@@ -368,8 +538,8 @@ function signed(n: number | undefined) {
 
 <template>
   <!-- pb clears the Back/Next bar below, which is fixed above the nav: at pb-8 the tail
-       of the last card sat under it with no way to scroll to it. -->
-  <div class="min-h-screen pb-24">
+       of the last card sat under it with no way to scroll to it. The hint makes it taller. -->
+  <div class="min-h-screen" :class="nextHint ? 'pb-32' : 'pb-24'">
     <!-- Top bar -->
     <header class="sticky top-0 z-40 flex items-center gap-2 px-3 py-2 bg-surface-900/95 backdrop-blur border-b border-surface-700/60">
       <NuxtLink to="/" class="btn-ghost p-2">
@@ -528,10 +698,40 @@ function signed(n: number | undefined) {
         <div v-if="selectedClass" class="card space-y-1">
           <p class="section-header">Level 1 Features</p>
           <p class="text-xs text-slate-400">
-            {{ selectedClass.levels[0]?.features.join(', ') || 'None' }}
+            {{ levelOneFeatures.join(', ') || 'None' }}
           </p>
           <p class="text-xs text-slate-500 mt-1">
             Saves: {{ selectedClass.savingThrowProficiencies.map(s => s.toUpperCase()).join(', ') }}
+          </p>
+        </div>
+        <div v-if="needsSubclass" ref="subclassPicker" class="space-y-2 scroll-mt-16">
+          <p class="section-header">{{ subclassLabel }}</p>
+          <SearchBox
+            v-if="availableSubclasses.length > 6"
+            v-model="subclassSearch"
+            placeholder="Search subclasses…"
+            :matches="filteredSubclasses.length"
+            :total="availableSubclasses.length"
+          />
+          <button
+            v-for="sub in filteredSubclasses"
+            :key="sub.id"
+            class="card w-full text-left transition-colors hover:border-primary-500/50"
+            :class="draft.subclassId === sub.id ? 'border-primary-500 bg-primary-900/20' : ''"
+            @click="draft.subclassId = sub.id"
+          >
+            <p class="font-semibold text-white text-sm">{{ sub.name }}</p>
+            <p class="text-xs text-slate-400 mt-1 leading-relaxed">{{ sub.description }}</p>
+            <div v-if="draft.subclassId === sub.id" class="mt-2 space-y-1.5">
+              <p class="text-xs font-medium text-accent-400 uppercase tracking-wide">Level 1 Features</p>
+              <div v-for="feat in sub.levels.find(l => l.level === 1)?.features ?? []" :key="feat.name" class="text-xs text-slate-300 bg-surface-800/60 rounded p-2">
+                <span class="font-semibold text-white">{{ feat.name }}.</span> {{ feat.description.slice(0, 180) }}{{ feat.description.length > 180 ? '…' : '' }}
+              </div>
+            </div>
+          </button>
+          <p v-if="filteredSubclasses.length === 0" class="text-slate-500 text-sm text-center py-4">
+            <template v-if="availableSubclasses.length === 0">No subclasses available in the loaded rulepacks.</template>
+            <template v-else>Nothing matches “{{ subclassSearch }}”.</template>
           </p>
         </div>
       </template>
@@ -684,23 +884,43 @@ function signed(n: number | undefined) {
       <!-- ── Step 5: Starting Equipment ── -->
       <template v-if="step === 5">
         <div class="space-y-3">
-          <div class="card">
-            <p class="section-header">Starting Equipment</p>
-            <p class="text-sm text-slate-400">Starting equipment packs will be added automatically from your class and background.</p>
-            <div v-if="selectedBackground?.equipment.length" class="mt-2">
-              <p class="text-xs text-slate-500 mb-1">Background equipment:</p>
-              <ul class="text-sm text-slate-300 space-y-0.5 list-disc list-inside">
-                <li v-for="item in selectedBackground.equipment" :key="item">{{ item }}</li>
-              </ul>
-            </div>
-          </div>
-          <div class="card space-y-3">
+          <!-- Gold buy only where the class prints a wealth roll to buy with. -->
+          <div v-if="startingWealth" class="card space-y-3">
             <div class="flex items-center gap-3">
               <input id="gold-toggle" v-model="draft.startingGold" type="checkbox" class="w-4 h-4 rounded accent-primary-500" />
               <label for="gold-toggle" class="text-sm text-slate-300">Start with gold instead</label>
             </div>
-            <p class="text-xs text-slate-500">You can manually edit your equipment on the character sheet at any time.</p>
+            <template v-if="draft.startingGold">
+              <p class="text-sm text-slate-400">
+                Roll <span class="text-white font-medium">{{ startingWealthLabel(startingWealth) }}</span> and buy
+                your equipment from it. Nothing from your class or background is added.
+              </p>
+              <div class="flex gap-2">
+                <input
+                  v-model="draft.goldInput"
+                  type="text"
+                  inputmode="numeric"
+                  class="input flex-1 min-w-0"
+                  placeholder="Gold pieces"
+                  aria-label="Starting gold in gold pieces"
+                />
+                <button class="btn-primary shrink-0 px-4" @click="rollGold">Roll</button>
+              </div>
+              <p v-if="wealthRoll && String(wealthRoll.total) === draft.goldInput" class="text-xs text-slate-500">
+                {{ wealthRollLabel(wealthRoll, startingWealth.multiplier) }}
+              </p>
+            </template>
           </div>
+
+          <CreationStartingEquipmentPicker
+            v-if="!draft.startingGold"
+            v-model="draft.equipmentSelection"
+            :choices="equipmentChoices"
+            :proficiencies="equipmentProficiencies"
+            :background-name="selectedBackground?.name"
+            :background-equipment="selectedBackground?.equipment ?? []"
+          />
+          <p class="text-xs text-slate-500">You can edit your equipment on the character sheet at any time.</p>
         </div>
       </template>
 
@@ -750,23 +970,26 @@ function signed(n: number | undefined) {
     </div>
 
     <!-- Navigation -->
-    <div class="fixed bottom-16 inset-x-0 px-4 flex gap-3 bg-surface-950/80 backdrop-blur py-3 border-t border-surface-700/60">
-      <button v-if="step > 0" class="btn-ghost flex-1" @click="step--">Back</button>
-      <button
-        v-if="step < STEPS.length - 1"
-        class="btn-primary flex-1"
-        :disabled="!canProceed()"
-        @click="step++"
-      >
-        Next
-      </button>
-      <button
-        v-else
-        class="btn-primary flex-1"
-        @click="createCharacter"
-      >
-        Create Character
-      </button>
+    <div class="fixed bottom-16 inset-x-0 px-4 bg-surface-950/80 backdrop-blur py-3 border-t border-surface-700/60">
+      <p v-if="nextHint" class="text-xs text-accent-400 mb-2">{{ nextHint }}</p>
+      <div class="flex gap-3">
+        <button v-if="step > 0" class="btn-ghost flex-1" @click="step--">Back</button>
+        <button
+          v-if="step < STEPS.length - 1"
+          class="btn-primary flex-1"
+          :disabled="!canProceed()"
+          @click="step++"
+        >
+          Next
+        </button>
+        <button
+          v-else
+          class="btn-primary flex-1"
+          @click="createCharacter"
+        >
+          Create Character
+        </button>
+      </div>
     </div>
   </div>
 </template>

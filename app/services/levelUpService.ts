@@ -1,11 +1,17 @@
 import type { Character, AbilityKey, Feature, SkillKey, SpellcastingOrigin, SpellSlotLevel } from '~/types/character'
 import type {
   Rulepack,
+  ClassDefinition,
+  SubclassDefinition,
   OptionalClassFeature,
   FeatDefinition,
   FeatPrerequisite,
   LevelUpEventDef,
   SpellAbilityRef,
+  Race,
+  Subrace,
+  Background,
+  SourceLevelEvents,
 } from '~/types/rulepack'
 import { addHitDieForClass, multiclassProficiencies, projectClassLevel } from '~/services/multiclass'
 import { expandedSpellIdsFor, maxSpellLevelForClass, spellMatchesChoice } from '~/services/spellcasting'
@@ -220,10 +226,12 @@ export function checkFeatPrerequisite(character: Character, feat: FeatDefinition
   return true
 }
 
-// Feature names in class level tables that are placeholders for subclass features
-const SUBCLASS_PLACEHOLDER_PATTERN = /\bpath\b|\barchetype\b|\bpatron\b|\bcircle\b|\bdomain\b|\bcollege\b|\bprimal path feature\b|\bsacred oath feature\b|\bwarlord presence\b| feature$/i
+// Feature names in class level tables that are placeholders for subclass features. The
+// last alternation is whole names only: "Sacred Oath" is the placeholder where "Oath
+// Spells" is a real feature, and "Arcane Tradition" must not reach "Arcane Recovery".
+const SUBCLASS_PLACEHOLDER_PATTERN = /\bpath\b|\barchetype\b|\bpatron\b|\bcircle\b|\bdomain\b|\bcollege\b|\bprimal path feature\b|\bsacred oath feature\b|\bwarlord presence\b| feature$|^(?:sorcerous origin|arcane tradition|monastic tradition|sacred oath|artificer specialist)$/i
 
-function isSubclassPlaceholder(featureName: string): boolean {
+export function isSubclassPlaceholder(featureName: string): boolean {
   return SUBCLASS_PLACEHOLDER_PATTERN.test(featureName)
 }
 
@@ -1128,6 +1136,50 @@ function expandSpellListEvent(
     ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
     ...(label ? { label } : {}),
   }
+}
+
+/**
+ * True when the class's own 1st level declares CHOOSE_SUBCLASS — read from data, never
+ * from class names, so a homebrew class that picks at 1st is asked the same as a cleric.
+ * The creation wizard asks for the subclass on its class step when this holds, because
+ * what comes after it (armour a domain grants) depends on the answer.
+ */
+export function choosesSubclassAtFirstLevel(cls: ClassDefinition): boolean {
+  return (cls.levels.find(l => l.level === 1)?.levelUpEvents ?? [])
+    .some(e => e.type === 'CHOOSE_SUBCLASS')
+}
+
+/**
+ * GAIN_PROFICIENCY strings the subclass grants at the given level, ignoring
+ * `whenOption`-gated ones: an arm of a choice is not granted until it is answered.
+ */
+export function subclassProficienciesAt(subclass: SubclassDefinition, level: number): string[] {
+  return (subclass.levels.find(l => l.level === level)?.levelUpEvents ?? [])
+    .flatMap(e => (e.type === 'GAIN_PROFICIENCY' && !e.whenOption ? [e.proficiency] : []))
+}
+
+/**
+ * GAIN_PROFICIENCY strings the race, the subrace and the background grant at 1st
+ * character level, ignoring `whenOption`-gated ones as above. A race group tagged with a
+ * trait the subrace replaces is skipped, the way the pipeline skips its events — a hill
+ * dwarf's warhammer counts, a replaced trait's grant does not. The creation wizard judges
+ * the starting kit against these alongside the class's own list.
+ */
+export function originProficienciesAtFirstLevel(
+  race: Race | undefined,
+  subrace: Subrace | undefined,
+  background: Background | undefined,
+): string[] {
+  const replaced = subrace?.replacesRaceTraits ?? []
+  const groups: SourceLevelEvents[] = [
+    ...(race?.levelUpEvents ?? []).filter(g => !g.trait || !replaced.includes(g.trait)),
+    ...(subrace?.levelUpEvents ?? []),
+    ...(background?.levelUpEvents ?? []),
+  ]
+  return groups
+    .filter(g => g.level === 1)
+    .flatMap(g => g.levelUpEvents)
+    .flatMap(e => (e.type === 'GAIN_PROFICIENCY' && !e.whenOption ? [e.proficiency] : []))
 }
 
 /**
@@ -2533,6 +2585,19 @@ export function applyResolvedChoices(
           if (subclassDef) {
             const subclassLevel = subclassDef.levels.find(l => l.level === currentLevel)
             const levelFeatures = subclassLevel?.features ?? []
+            // The class table's placeholder for this level ("Divine Domain") was added
+            // before the subclass was known. resolveLevelUpEvents leaves it out when the
+            // subclass is already set, so drop it here too, or a domain chosen in this
+            // wizard and one chosen at creation build two different characters.
+            if (levelFeatures.length > 0) {
+              const placeholderIds = new Set(
+                (rulepack.classes.find(c => c.id === choice.classId)?.levels
+                  .find(l => l.level === currentLevel)?.features ?? [])
+                  .filter(isSubclassPlaceholder)
+                  .map(name => classFeatureId(choice.classId, name, currentLevel)),
+              )
+              updated.features = updated.features.filter(f => !placeholderIds.has(f.id))
+            }
             for (const feat of levelFeatures) {
               const featId = subclassFeatureId(choice.subclassId, feat.name, currentLevel)
               if (!updated.features.some(f => f.id === featId)) {

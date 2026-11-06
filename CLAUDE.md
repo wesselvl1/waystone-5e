@@ -164,7 +164,7 @@ Non-obvious rules encoded in that service:
 - **Regular spell slots are derived, not stored.** `baseSpellSlots()` in `app/services/spellcasting.ts` reads them off the character's classes: full casters count fully, half casters halve rounded down, pact magic not at all. With a *single* spellcasting class that class's own table applies — a paladin 5 has four 1st- and two 2nd-level slots, where a caster level of 2 would give three 1st only. `character.spellSlots` persists only `used` plus an optional manual `bonus`, so no level-up event writes slots. **Warlock `pactMagic` slots are absolute** and live in `character.warlockSlots`, separate from `character.spellSlots`.
 - Slots come from the combined caster level, but **what a class may learn is capped by that class's own level** (`maxSpellLevelForClass`): a cleric 1 / wizard 1 has a 2nd-level slot yet may only prepare 1st-level spells from either list.
 - **Multiclassing** lives in `app/services/multiclass.ts`. Entering a class as an additional class grants the SRD's reduced proficiency set from `ClassDefinition.multiclassing` and never saving throws; prerequisites warn rather than block.
-- Class level tables contain placeholder feature names for subclass features ("Primal Path Feature", "Martial Archetype"). `isSubclassPlaceholder` regex-filters them out when the character's subclass supplies real features at that level.
+- Class level tables contain placeholder feature names for subclass features ("Primal Path Feature", "Martial Archetype"). `isSubclassPlaceholder` regex-filters them out when the character's subclass supplies real features at that level. The pick-level names that share a word with a real feature ("Sacred Oath" / "Oath Spells", "Arcane Tradition" / "Arcane Recovery") are matched as whole names only.
 - Changing CON (via ASI or feat) retroactively adjusts `hp.max`/`hp.current` by the modifier delta × total level. Feats with `hpBonusPerLevel` (Tough) apply retroactively *and* set `character.hpBonusPerLevel` for future level-ups.
 - **A `CHOOSE_OPTION` pool gates its own entries.** `ChooseOptionDef` carries `minLevel`, `requiresOption` (another choice's answer — the Pact Boon behind Thirsting Blade) and `requiresSpell` (eldritch blast behind Agonizing Blast); `optionAvailable()` is the single check, and the service applies it against the *stored* character. A gate the same level-up run answers is not stored yet, so the wizard re-answers against a projected character — see `projectedCharacter` in `levelup.vue`.
 - **A pack can widen a pool it does not own.** A book's Eldritch Invocations have nowhere
@@ -243,8 +243,14 @@ Non-obvious rules encoded in that service:
   `classes[0].level = 1`** — `ADD_HP` and `UPDATE_HIT_DIE` are automatic events like any
   other and supply both, a figure worked out beside the pipeline is counted twice, and the
   level being gained has to be on the character already or a granted feat's retroactive hit
-  points (Tough's +2 per level) miss the 1st level. That contract is guarded by comments in
-  a page file and nothing else: no test reaches into `new.vue`.
+  points (Tough's +2 per level) miss the 1st level. `classes[0].subclassId` may already be
+  set, by the class step of a class that picks at 1st level, and is absent — never `''` —
+  when nothing was picked, since the pipeline asks for a subclass only while the id is
+  undefined. `RESOLVED_SUBCLASS` drops that level's class-table placeholder ("Divine
+  Domain") when the subclass has features there, as `resolveLevelUpEvents` does, so a
+  subclass set before level 1 and one picked in the level-up wizard build the same
+  character. That contract is guarded by comments in a page file and nothing else: no
+  test reaches into `new.vue`.
 
 ### Derived stats
 
@@ -312,6 +318,20 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   not a barbarian's); the calculator drops the shield and says why rather than silently
   dropping it. Nothing switched on mid-fight belongs here — Shield, Blade Song and
   barkskin last a minute, and this is the number on the sheet.
+- **Starting equipment is class data turned into a kit.** A class declares its printed
+  bullets (`startingEquipment`) and its wealth roll (`startingWealth`);
+  `app/services/startingEquipment.ts` resolves the creation wizard's picks into items,
+  weapons and armour, and `new.vue` carries the items, makes an attack of every weapon and
+  stores the best of the ways to dress as `armorClassConfig` (`bestStartingArmorClass`),
+  a tie going to the unarmored feature — the armour is then left to be sold, where Unarmored
+  Defense costs nothing to keep. Gold buy *replaces* the class's and the background's items,
+  coin included: the figure rolled or entered is the whole purse. "(If proficient)"
+  options, the armour candidates and each attack's proficiency are judged against every
+  1st-level grant — class, chosen subclass, and the race's, subrace's and background's
+  unguarded `GAIN_PROFICIENCY` events (`originProficienciesAtFirstLevel`), so a hill
+  dwarf's warhammer counts. The selection is reset whenever the class, subclass, race,
+  subrace or background changes, because `isSelectionComplete` accepts any known weapon
+  id and a pick made under other proficiencies would otherwise pass it.
 - **A saving throw is derived the way an attack is, and what adds to it is found by
   wording.** `app/services/savingThrows.ts` builds the roll from the ability modifier, the
   proficiency bonus where the class grants it, whatever the character's features say, and

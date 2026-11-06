@@ -3,6 +3,7 @@ import {
   armorClassBreakdown,
   armorClassTotal,
   armorWarnings,
+  bestStartingArmorClass,
   cappedDex,
   characterArmorClass,
   compactAcBonuses,
@@ -11,6 +12,7 @@ import {
   isProficientWithArmor,
   previewArmorClass,
   shieldAllowed,
+  unarmoredCandidates,
 } from '~/services/armorClass'
 import { RulepackSchema } from '~/schemas/rulepackSchema'
 import { CharacterSchema } from '~/schemas/characterSchema'
@@ -257,5 +259,93 @@ describe('the storage round trip', () => {
     const parsed = CharacterSchema.parse(JSON.parse(JSON.stringify(legacy)))
     expect(parsed.armorClassConfig).toBeUndefined()
     expect(characterArmorClass(parsed, ctx)).toBe(16)
+  })
+})
+
+describe('bestStartingArmorClass', () => {
+  const mods = (dex: number, con = 0, wis = 0) => ({ modifiers: { str: 0, dex, con, int: 0, wis, cha: 0 } })
+  const unarmoredAll = srdArmor.filter(a => a.category === 'unarmored')
+
+  it('fighter Dex 14 in chain mail beats leather', () => {
+    const cfg = bestStartingArmorClass(
+      [armor('leather'), armor('chain-mail')],
+      unarmoredCandidates(unarmoredAll, 'fighter'),
+      ['all armor', 'shields'],
+      mods(2),
+    )
+    expect(cfg.armorId).toBe('chain-mail')
+    expect(armorClassTotal(cfg, mods(2))).toBe(16)
+  })
+
+  it('barbarian Dex 14 Con 16 with a shield takes Unarmored Defense + shield', () => {
+    const c = mods(2, 3)
+    const cfg = bestStartingArmorClass(
+      [armor('hide'), armor('shield')],
+      unarmoredCandidates(unarmoredAll, 'barbarian'),
+      ['light armor', 'medium armor', 'shields'],
+      c,
+    )
+    expect(cfg.armorId).toBe('unarmored-defense-barbarian')
+    expect(cfg.shield).toEqual({ equipped: true, armorId: 'shield', name: 'Shield', bonus: 2 })
+    expect(armorClassTotal(cfg, c)).toBe(17)
+  })
+
+  it('a tie goes to Unarmored Defense', () => {
+    const c = mods(2, 2)
+    const cfg = bestStartingArmorClass(
+      [armor('hide')],
+      unarmoredCandidates(unarmoredAll, 'barbarian'),
+      ['medium armor'],
+      c,
+    )
+    expect(cfg.armorId).toBe('unarmored-defense-barbarian')
+  })
+
+  it("a tie with plain unarmored goes to the monk's Unarmored Defense", () => {
+    const c = mods(2, 0, 0)
+    const cfg = bestStartingArmorClass([], unarmoredCandidates(unarmoredAll, 'monk'), [], c)
+    expect(cfg.armorId).toBe('unarmored-defense-monk')
+    expect(armorClassTotal(cfg, c)).toBe(12)
+  })
+
+  it("a tie with plain unarmored goes to the barbarian's Unarmored Defense", () => {
+    const c = mods(2, 0)
+    const cfg = bestStartingArmorClass([], unarmoredCandidates(unarmoredAll, 'barbarian'), [], c)
+    expect(cfg.armorId).toBe('unarmored-defense-barbarian')
+  })
+
+  it("a monk's Unarmored Defense drops the shield", () => {
+    const c = mods(0, 0, 4)
+    const cfg = bestStartingArmorClass(
+      [armor('shield')],
+      unarmoredCandidates(unarmoredAll, 'monk'),
+      ['shields'],
+      c,
+    )
+    expect(cfg.armorId).toBe('unarmored-defense-monk')
+    expect(cfg.shield).toBeUndefined()
+    expect(armorClassTotal(cfg, c)).toBe(14)
+  })
+
+  it('draconic resilience is a candidate for the Draconic Bloodline only', () => {
+    expect(unarmoredCandidates(unarmoredAll, 'sorcerer', 'wild-magic').map(a => a.id)).toEqual(['unarmored'])
+    expect(unarmoredCandidates(unarmoredAll, 'sorcerer', 'draconic-bloodline').map(a => a.id))
+      .toContain('draconic-resilience')
+  })
+
+  it('skips chain mail without heavy proficiency', () => {
+    const cfg = bestStartingArmorClass(
+      [armor('chain-mail')],
+      unarmoredCandidates(unarmoredAll, 'wizard'),
+      ['light armor'],
+      mods(2),
+    )
+    expect(cfg.armorId).toBe('unarmored')
+  })
+
+  it('falls back to plain unarmored with a held shield', () => {
+    const cfg = bestStartingArmorClass([armor('shield')], [], ['shields'], mods(1))
+    expect(cfg.armorId).toBe('unarmored')
+    expect(cfg.shield?.bonus).toBe(2)
   })
 })

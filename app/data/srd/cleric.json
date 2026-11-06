@@ -624,7 +624,139 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a mace",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "mace"
+                }
+              ]
+            },
+            {
+              "label": "a warhammer (if proficient)",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "warhammer"
+                }
+              ],
+              "requiresProficiency": true
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "scale mail",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "scale-mail"
+                }
+              ]
+            },
+            {
+              "label": "leather armor",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "leather"
+                }
+              ]
+            },
+            {
+              "label": "chain mail (if proficient)",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "chain-mail"
+                }
+              ],
+              "requiresProficiency": true
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a light crossbow and 20 bolts",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "light-crossbow"
+                },
+                {
+                  "kind": "item",
+                  "name": "Bolts",
+                  "quantity": 20
+                }
+              ]
+            },
+            {
+              "label": "any simple weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a priest's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "priests-pack"
+                }
+              ]
+            },
+            {
+              "label": "an explorer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "explorers-pack"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a shield and a holy symbol",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "shield"
+                },
+                {
+                  "kind": "itemChoice",
+                  "label": "Holy symbol",
+                  "options": [
+                    "Amulet",
+                    "Emblem",
+                    "Reliquary"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "5d4",
+        "multiplier": 10
+      }
     }
   ]
 }

@@ -977,7 +977,116 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a rapier",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "rapier"
+                }
+              ]
+            },
+            {
+              "label": "a longsword",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "longsword"
+                }
+              ]
+            },
+            {
+              "label": "any simple weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a diplomat's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "diplomats-pack"
+                }
+              ]
+            },
+            {
+              "label": "an entertainer's pack",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "entertainers-pack"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "a lute",
+              "items": [
+                {
+                  "kind": "item",
+                  "name": "Lute"
+                }
+              ]
+            },
+            {
+              "label": "any other musical instrument",
+              "items": [
+                {
+                  "kind": "itemChoice",
+                  "label": "Musical instrument",
+                  "options": [
+                    "Bagpipes",
+                    "Drum",
+                    "Dulcimer",
+                    "Flute",
+                    "Horn",
+                    "Lyre",
+                    "Pan flute",
+                    "Shawm",
+                    "Viol"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "leather armor and a dagger",
+              "items": [
+                {
+                  "kind": "armor",
+                  "id": "leather"
+                },
+                {
+                  "kind": "weapon",
+                  "id": "dagger"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "5d4",
+        "multiplier": 10
+      }
     }
   ]
 }

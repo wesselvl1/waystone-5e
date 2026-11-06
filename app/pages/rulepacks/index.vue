@@ -127,6 +127,7 @@ function packContents(pack: Rulepack) {
     { label: 'creatures', count: pack.creatures?.length ?? 0 },
     { label: 'weapons', count: pack.weapons?.length ?? 0 },
     { label: 'armour', count: pack.armor?.length ?? 0 },
+    { label: 'equipment packs', count: pack.equipmentPacks?.length ?? 0 },
     { label: 'optional features', count: pack.optionalFeatures.length },
     {
       // Counted as options rather than as pools: "1 option pool" is a shape of the file,

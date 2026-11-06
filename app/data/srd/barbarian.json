@@ -356,7 +356,77 @@
             }
           ]
         }
-      ]
+      ],
+      "startingEquipment": [
+        {
+          "options": [
+            {
+              "label": "a greataxe",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "greataxe"
+                }
+              ]
+            },
+            {
+              "label": "any martial melee weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "martial",
+                  "rangeType": "melee"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "two handaxes",
+              "items": [
+                {
+                  "kind": "weapon",
+                  "id": "handaxe",
+                  "quantity": 2
+                }
+              ]
+            },
+            {
+              "label": "any simple weapon",
+              "items": [
+                {
+                  "kind": "weaponChoice",
+                  "category": "simple"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "options": [
+            {
+              "label": "an explorer's pack and four javelins",
+              "items": [
+                {
+                  "kind": "pack",
+                  "id": "explorers-pack"
+                },
+                {
+                  "kind": "weapon",
+                  "id": "javelin",
+                  "quantity": 4
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "startingWealth": {
+        "dice": "2d4",
+        "multiplier": 10
+      }
     }
   ]
 }
