@@ -123,3 +123,35 @@ describe('RulepackSchema', () => {
     expect(result.success && result.data.races[0]!.subraces?.[0]!.languages).toBeUndefined()
   })
 })
+
+describe('RulepackSchema starting equipment', () => {
+  const startingEquipment = [{
+    options: [{
+      label: 'a longsword, a shield and a pack',
+      requiresProficiency: true,
+      items: [
+        { kind: 'weapon', id: 'longsword', quantity: 1 },
+        { kind: 'armor', id: 'shield', name: 'Wooden shield' },
+        { kind: 'pack', id: 'dungeoneers-pack' },
+        { kind: 'item', name: 'Rope', quantity: 1, weight: 10 },
+        { kind: 'weaponChoice', category: 'martial', rangeType: 'melee' },
+        { kind: 'itemChoice', label: 'Instrument', options: ['Lute', 'Flute'] },
+      ],
+    }],
+  }]
+
+  it('accepts a class with startingEquipment and startingWealth', () => {
+    const cls = { ...fighterRulepack.classes[0], startingEquipment, startingWealth: { dice: '5d4', multiplier: 10 } }
+    const result = RulepackSchema.safeParse({ ...minimalRulepack, classes: [cls] })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.classes[0]!.startingEquipment).toEqual(startingEquipment)
+      expect(result.data.classes[0]!.startingWealth).toEqual({ dice: '5d4', multiplier: 10 })
+    }
+  })
+
+  it('defaults equipmentPacks to []', () => {
+    const result = RulepackSchema.safeParse(minimalRulepack)
+    expect(result.success && result.data.equipmentPacks).toEqual([])
+  })
+})

@@ -117,6 +117,7 @@ Every array is optional. Include only what the file adds.
 | `optionPools` | Extra options for a choice another pack owns — invocations, metamagic, fighting styles |
 | `weapons` | Rows of the weapon table |
 | `armor` | Rows of the armour table, including "unarmoured" features such as Unarmored Defense |
+| `equipmentPacks` | Named gear bundles ("Dungeoneer's Pack") a class's starting equipment can grant by id |
 | `creatures` | Statblocks, used by Wild Shape |
 
 ### One file or many
@@ -519,9 +520,62 @@ spell id the character must know).
   Dexterity, `2` for medium, `0` for none.
 - Put features that replace armour (Unarmored Defense, natural armour) in the `unarmored`
   category. `"shieldAllowed": false` rules a shield out, and `classId` marks the entry as
-  suiting that class.
+  suiting that class. Add `subclassId` to narrow that to one subclass (Draconic Resilience
+  suits a draconic sorcerer, not every sorcerer); it means nothing without `classId`.
 - `properties` are lowercase. `finesse` and `thrown` decide which ability an attack uses by
   default.
+
+### Starting equipment
+
+A class declares its printed "Starting Equipment" bullets as `startingEquipment`, one
+entry per bullet, and the alternative gold roll as `startingWealth`. A bullet with one
+option is a fixed grant; with several, the player picks. Packs live in `equipmentPacks`.
+
+```json
+{
+  "equipmentPacks": [
+    { "id": "tol-lamplighters-pack", "name": "Lamplighter's Pack", "cost": "12 gp",
+      "contents": [
+        { "name": "Lantern, hooded", "quantity": 1, "weight": 2 },
+        { "name": "Flask of oil", "quantity": 5, "weight": 1 }
+      ] }
+  ],
+  "classes": [
+    {
+      "id": "tol-lampwright",
+      "startingEquipment": [
+        { "options": [
+          { "label": "a longsword and a shield", "requiresProficiency": true,
+            "items": [
+              { "kind": "weapon", "id": "longsword" },
+              { "kind": "armor", "id": "shield", "name": "Wooden shield" }
+            ] },
+          { "label": "any martial weapon",
+            "items": [{ "kind": "weaponChoice", "category": "martial" }] }
+        ] },
+        { "options": [
+          { "label": "a Lamplighter's Pack and a lute",
+            "items": [
+              { "kind": "pack", "id": "tol-lamplighters-pack" },
+              { "kind": "itemChoice", "label": "Instrument", "options": ["Lute", "Flute"] }
+            ] }
+        ] }
+      ],
+      "startingWealth": { "dice": "5d4", "multiplier": 10 }
+    }
+  ]
+}
+```
+
+- A `StartingItem` is one of `weapon` (an `id` in `weapons`, optional `quantity`), `armor`
+  (an `id` in `armor`; `name` overrides how it is listed), `pack` (an `id` in
+  `equipmentPacks`), `item` (a free-text `name`, with optional `quantity` and `weight`),
+  `weaponChoice` (the player picks a weapon, optionally limited by `category` or
+  `rangeType`) and `itemChoice` (the player picks from `options`, or types one when there
+  are none).
+- `requiresProficiency` marks a printed "(if proficient)" option: it is offered only when
+  every weapon and armour in it is one the character is proficient with.
+- `startingWealth` is `dice` times `multiplier` in gold: `5d4` x 10 is 5d4 x 10 gp.
 
 ### Creatures
 

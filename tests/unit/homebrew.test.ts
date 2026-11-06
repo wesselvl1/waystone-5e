@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { EntrySchemas } from '~/schemas/rulepackSchema'
 import type { Rulepack, SpellDefinition } from '~/types/rulepack'
 import {
   ENTRY_KINDS,
@@ -353,5 +354,13 @@ describe('listEntries', () => {
     const pack = book('srd-5.1', { spells: [spell()] })
     expect(listEntries(pack, 'spells')).toHaveLength(1)
     expect(listEntries(pack, 'creatures')).toEqual([])
+  })
+})
+
+describe('equipment packs', () => {
+  it('lists equipmentPacks as an editable kind', () => {
+    expect(ENTRY_KINDS.some(k => k.key === 'equipmentPacks')).toBe(true)
+    const pack = { id: 'hb-kit', name: 'Kit', contents: [{ name: 'Rope', quantity: 1 }] }
+    expect(EntrySchemas.equipmentPacks.safeParse(pack).success).toBe(true)
   })
 })

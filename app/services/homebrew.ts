@@ -261,6 +261,17 @@ export const ENTRY_KINDS: EntryKindMeta[] = [
     blank: () => ({ id: '', name: '', category: 'light', baseAC: 11 }),
   },
   {
+    key: 'equipmentPacks',
+    label: 'Equipment packs',
+    singular: 'equipment pack',
+    // `contents` is a list of { name, quantity, weight } and is edited in the JSON tab.
+    fields: [
+      NAME,
+      { key: 'cost', label: 'Cost', kind: 'text', optional: true },
+    ],
+    blank: () => ({ id: '', name: '', contents: [] }),
+  },
+  {
     key: 'optionalFeatures',
     label: 'Optional features',
     singular: 'optional feature',
@@ -550,6 +561,7 @@ export function blankHomebrewPack(): Rulepack {
     creatures: [],
     weapons: [],
     armor: [],
+    equipmentPacks: [],
     optionalFeatures: [],
     subclasses: [],
     subraces: [],

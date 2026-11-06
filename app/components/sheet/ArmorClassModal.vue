@@ -106,7 +106,12 @@ function rowArmorClass(armor: ArmorDefinition): number {
 }
 
 /** The classes this character actually has, so a row can be marked as fitting the build. */
-const classIds = computed(() => new Set(props.character.classes.map(c => c.classId)))
+/** A subclass-tagged row (Draconic Resilience) suits the build only with that subclass. */
+function suitsClass(armor: ArmorDefinition): boolean {
+  if (!armor.classId) return false
+  return props.character.classes.some(c =>
+    c.classId === armor.classId && (!armor.subclassId || c.subclassId === armor.subclassId))
+}
 
 function chooseArmor(armor: ArmorDefinition) {
   draft.value = configFromArmor(armor, draft.value)
@@ -260,7 +265,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                   <span class="text-sm font-mono text-primary-300 tabular-nums">AC {{ rowArmorClass(armor) }}</span>
                 </div>
                 <p class="text-[10px] text-slate-500 mt-0.5 truncate">
-                  <span v-if="armor.classId && classIds.has(armor.classId)" class="text-success-400">Your class · </span>
+                  <span v-if="suitsClass(armor)" class="text-success-400">Your class · </span>
                   <span v-if="!isProficientWithArmor(armor, proficiencies)" class="text-amber-400/80">Not proficient · </span>
                   <span v-if="armor.shieldAllowed === false" class="text-amber-400/80">No shield · </span>
                   <span v-if="armor.stealthDisadvantage">Stealth disadv. · </span>

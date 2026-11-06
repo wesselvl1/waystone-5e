@@ -446,6 +446,39 @@ const ClassFeatureDefinitionSchema = z.object({
   replaces: z.string().optional(),
 })
 
+const StartingItemSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('weapon'), id: z.string(), quantity: z.number().int().min(1).optional() }),
+  z.object({ kind: z.literal('armor'), id: z.string(), name: z.string().optional() }),
+  z.object({ kind: z.literal('pack'), id: z.string() }),
+  z.object({
+    kind: z.literal('item'),
+    name: z.string(),
+    quantity: z.number().int().min(1).optional(),
+    weight: z.number().min(0).optional(),
+  }),
+  z.object({
+    kind: z.literal('weaponChoice'),
+    category: z.enum(['simple', 'martial']).optional(),
+    rangeType: z.enum(['melee', 'ranged']).optional(),
+  }),
+  z.object({ kind: z.literal('itemChoice'), label: z.string(), options: z.array(z.string()).optional() }),
+])
+
+const StartingEquipmentOptionSchema = z.object({
+  label: z.string(),
+  items: z.array(StartingItemSchema),
+  requiresProficiency: z.boolean().optional(),
+})
+
+const StartingEquipmentChoiceSchema = z.object({
+  options: z.array(StartingEquipmentOptionSchema).min(1),
+})
+
+const StartingWealthSchema = z.object({
+  dice: z.string(),
+  multiplier: z.number().min(0),
+})
+
 const ClassDefinitionSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -475,6 +508,8 @@ const ClassDefinitionSchema = z.object({
   levels: z.array(ClassLevelSchema),
   featureDefinitions: z.array(ClassFeatureDefinitionSchema).optional(),
   subclasses: z.array(SubclassDefinitionSchema).optional(),
+  startingEquipment: z.array(StartingEquipmentChoiceSchema).optional(),
+  startingWealth: StartingWealthSchema.optional(),
 })
 
 const BackgroundSchema = z.object({
@@ -563,11 +598,23 @@ const ArmorDefinitionSchema = z.object({
   // Absent means a shield is allowed; only the monk's Unarmored Defense says otherwise.
   shieldAllowed: z.boolean().optional(),
   classId: z.string().optional(),
+  subclassId: z.string().optional(),
   description: z.string().optional(),
   strengthRequirement: z.number().int().min(0).optional(),
   stealthDisadvantage: z.boolean().optional(),
   cost: z.string().optional(),
   weight: z.number().min(0).optional(),
+})
+
+const EquipmentPackSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  cost: z.string().optional(),
+  contents: z.array(z.object({
+    name: z.string(),
+    quantity: z.number().int().min(1),
+    weight: z.number().min(0).optional(),
+  })),
 })
 
 export const OptionalClassFeatureSchema = z.object({
@@ -626,6 +673,8 @@ export const RulepackSchema = z.object({
   weapons: z.array(WeaponDefinitionSchema).optional().default([]),
   /** The equipment table's armour and shields: what the AC calculator lists. */
   armor: z.array(ArmorDefinitionSchema).optional().default([]),
+  /** Named gear bundles a class's starting equipment can grant by id. */
+  equipmentPacks: z.array(EquipmentPackSchema).optional().default([]),
   /** Top-level subclass patches: each entry carries a classId specifying which class to attach to. */
   subclasses: z.array(SubclassPatchEntrySchema).optional().default([]),
   /** Top-level subrace patches: each entry carries a raceId specifying which race to attach to. */
@@ -659,6 +708,7 @@ export const EntrySchemas = {
   creatures: CreatureDefinitionSchema,
   weapons: WeaponDefinitionSchema,
   armor: ArmorDefinitionSchema,
+  equipmentPacks: EquipmentPackSchema,
   subclasses: SubclassPatchEntrySchema,
   subraces: SubracePatchEntrySchema,
   optionalFeatures: OptionalClassFeatureSchema,
