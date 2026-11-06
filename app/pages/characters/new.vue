@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
-import { resolveFirstClassLevel } from '~/services/levelUpService'
+import { choosesSubclassAtFirstLevel, resolveFirstClassLevel } from '~/services/levelUpService'
 import { raceAbilityBonuses, raceResistances, raceSenses, raceSpeeds } from '~/services/multiclass'
 import {
   choiceSummary,
@@ -30,6 +30,7 @@ const draft = reactive({
   raceId: '',
   subraceId: '',
   classId: '',
+  subclassId: '',
   backgroundId: '',
   alignment: '',
   abilityMethod: 'standard' as 'standard' | 'pointbuy' | 'manual',
@@ -77,6 +78,28 @@ const selectedRace = computed(() => rulepackStore.getRace(draft.raceId))
 const selectedSubrace = computed(() => selectedRace.value?.subraces?.find(s => s.id === draft.subraceId))
 const selectedClass = computed(() => rulepackStore.getClass(draft.classId))
 const selectedBackground = computed(() => allBackgrounds.value.find(b => b.id === draft.backgroundId))
+
+// ── Subclass ──────────────────────────────────────────────────────────────────
+// A cleric, a sorcerer or a warlock picks the subclass at 1st level, and the steps after
+// this one depend on it — a Life cleric's heavy armour decides the equipment — so it is
+// asked here rather than left to the level-up wizard. Whether a class does is read off
+// its own 1st level, so a homebrew class picking at 1st is asked the same way.
+const needsSubclass = computed(() => !!selectedClass.value && choosesSubclassAtFirstLevel(selectedClass.value))
+const subclassLabel = computed(() => {
+  const event = selectedClass.value?.levels.find(l => l.level === 1)?.levelUpEvents
+    ?.find(e => e.type === 'CHOOSE_SUBCLASS')
+  return (event && 'label' in event && event.label) || 'Subclass'
+})
+const availableSubclasses = computed(() => rulepackStore.getSubclassesForClass(draft.classId))
+const subclassSearch = ref('')
+const filteredSubclasses = computed(() => filterBySearch(availableSubclasses.value, subclassSearch.value,
+  sub => [sub.name, sub.description]))
+
+// A domain belongs to the class it was picked under.
+watch(() => draft.classId, () => {
+  draft.subclassId = ''
+  subclassSearch.value = ''
+})
 
 /**
  * The race's traits minus any the chosen subrace supersedes: a SCAG tiefling bloodline
@@ -177,7 +200,11 @@ function canProceed() {
     if (subraceRequired.value && !draft.subraceId) return false
     return true
   }
-  if (step.value === 1) return !!draft.classId
+  // A class with no subclass loaded is not held up here; the level-up wizard can skip it.
+  if (step.value === 1) {
+    return !!draft.classId
+      && (!needsSubclass.value || !!draft.subclassId || availableSubclasses.value.length === 0)
+  }
   if (step.value === 2) return !!draft.backgroundId
   // Advancing with a distributable increase half spent would silently drop it.
   if (step.value === 3) {
@@ -240,7 +267,10 @@ async function createCharacter() {
     // The level being gained, not the one before it: the whole of level 1 is resolved
     // below, and a granted feat's retroactive hit points count the levels the character
     // has. The wizard path stores it back at 0, since the level is the wizard's to apply.
-    classes: [{ classId: draft.classId, level: 1 }],
+    // A subclass picked on the class step goes on now, so level 1 resolves its features
+    // and skips CHOOSE_SUBCLASS. Absent rather than '' when there is none: the pipeline
+    // asks for a subclass only while the id is undefined.
+    classes: [{ classId: draft.classId, level: 1, ...(needsSubclass.value && draft.subclassId ? { subclassId: draft.subclassId } : {}) }],
     experiencePoints: 0,
     inspiration: false,
 
@@ -337,8 +367,9 @@ async function createCharacter() {
     // A question has to be asked, not applied, so the whole level belongs to the level-up
     // wizard — HP roll, spells, subclass and every automatic event beside them. Nothing is
     // applied here, or the wizard would apply it a second time; the character is stored a
-    // level short until it runs.
-    await characterStore.save({ ...created, classes: [{ classId: draft.classId, level: 0 }] })
+    // level short until it runs. A subclass picked on the class step rides along on the
+    // class entry, so the wizard does not ask for it twice.
+    await characterStore.save({ ...created, classes: [{ ...created.classes[0]!, level: 0 }] })
     router.push(`/characters/${created.id}/levelup`)
     return
   }
@@ -532,6 +563,36 @@ function signed(n: number | undefined) {
           </p>
           <p class="text-xs text-slate-500 mt-1">
             Saves: {{ selectedClass.savingThrowProficiencies.map(s => s.toUpperCase()).join(', ') }}
+          </p>
+        </div>
+        <div v-if="needsSubclass" class="space-y-2">
+          <p class="section-header">{{ subclassLabel }}</p>
+          <SearchBox
+            v-if="availableSubclasses.length > 6"
+            v-model="subclassSearch"
+            placeholder="Search subclasses…"
+            :matches="filteredSubclasses.length"
+            :total="availableSubclasses.length"
+          />
+          <button
+            v-for="sub in filteredSubclasses"
+            :key="sub.id"
+            class="card w-full text-left transition-colors hover:border-primary-500/50"
+            :class="draft.subclassId === sub.id ? 'border-primary-500 bg-primary-900/20' : ''"
+            @click="draft.subclassId = sub.id"
+          >
+            <p class="font-semibold text-white text-sm">{{ sub.name }}</p>
+            <p class="text-xs text-slate-400 mt-1 leading-relaxed">{{ sub.description }}</p>
+            <div v-if="draft.subclassId === sub.id" class="mt-2 space-y-1.5">
+              <p class="text-xs font-medium text-accent-400 uppercase tracking-wide">Level 1 Features</p>
+              <div v-for="feat in sub.levels.find(l => l.level === 1)?.features ?? []" :key="feat.name" class="text-xs text-slate-300 bg-surface-800/60 rounded p-2">
+                <span class="font-semibold text-white">{{ feat.name }}.</span> {{ feat.description.slice(0, 180) }}{{ feat.description.length > 180 ? '…' : '' }}
+              </div>
+            </div>
+          </button>
+          <p v-if="filteredSubclasses.length === 0" class="text-slate-500 text-sm text-center py-4">
+            <template v-if="availableSubclasses.length === 0">No subclasses available in the loaded rulepacks.</template>
+            <template v-else>Nothing matches “{{ subclassSearch }}”.</template>
           </p>
         </div>
       </template>

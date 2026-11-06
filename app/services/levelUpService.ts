@@ -1,6 +1,8 @@
 import type { Character, AbilityKey, Feature, SkillKey, SpellcastingOrigin, SpellSlotLevel } from '~/types/character'
 import type {
   Rulepack,
+  ClassDefinition,
+  SubclassDefinition,
   OptionalClassFeature,
   FeatDefinition,
   FeatPrerequisite,
@@ -1128,6 +1130,26 @@ function expandSpellListEvent(
     ...(eventDef.whenOption ? { whenOption: eventDef.whenOption } : {}),
     ...(label ? { label } : {}),
   }
+}
+
+/**
+ * True when the class's own 1st level declares CHOOSE_SUBCLASS — read from data, never
+ * from class names, so a homebrew class that picks at 1st is asked the same as a cleric.
+ * The creation wizard asks for the subclass on its class step when this holds, because
+ * what comes after it (armour a domain grants) depends on the answer.
+ */
+export function choosesSubclassAtFirstLevel(cls: ClassDefinition): boolean {
+  return (cls.levels.find(l => l.level === 1)?.levelUpEvents ?? [])
+    .some(e => e.type === 'CHOOSE_SUBCLASS')
+}
+
+/**
+ * GAIN_PROFICIENCY strings the subclass grants at the given level, ignoring
+ * `whenOption`-gated ones: an arm of a choice is not granted until it is answered.
+ */
+export function subclassProficienciesAt(subclass: SubclassDefinition, level: number): string[] {
+  return (subclass.levels.find(l => l.level === level)?.levelUpEvents ?? [])
+    .flatMap(e => (e.type === 'GAIN_PROFICIENCY' && !e.whenOption ? [e.proficiency] : []))
 }
 
 /**
@@ -2533,6 +2555,19 @@ export function applyResolvedChoices(
           if (subclassDef) {
             const subclassLevel = subclassDef.levels.find(l => l.level === currentLevel)
             const levelFeatures = subclassLevel?.features ?? []
+            // The class table's placeholder for this level ("Divine Domain") was added
+            // before the subclass was known. resolveLevelUpEvents leaves it out when the
+            // subclass is already set, so drop it here too, or a domain chosen in this
+            // wizard and one chosen at creation build two different characters.
+            if (levelFeatures.length > 0) {
+              const placeholderIds = new Set(
+                (rulepack.classes.find(c => c.id === choice.classId)?.levels
+                  .find(l => l.level === currentLevel)?.features ?? [])
+                  .filter(isSubclassPlaceholder)
+                  .map(name => classFeatureId(choice.classId, name, currentLevel)),
+              )
+              updated.features = updated.features.filter(f => !placeholderIds.has(f.id))
+            }
             for (const feat of levelFeatures) {
               const featId = subclassFeatureId(choice.subclassId, feat.name, currentLevel)
               if (!updated.features.some(f => f.id === featId)) {
