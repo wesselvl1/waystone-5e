@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { useCharactersStore } from '~/stores/characters'
 import { useRulepacksStore } from '~/stores/rulepacks'
-import { choosesSubclassAtFirstLevel, resolveFirstClassLevel } from '~/services/levelUpService'
+import {
+  choosesSubclassAtFirstLevel,
+  isSubclassPlaceholder,
+  resolveFirstClassLevel,
+  subclassProficienciesAt,
+} from '~/services/levelUpService'
 import { raceAbilityBonuses, raceResistances, raceSenses, raceSpeeds } from '~/services/multiclass'
 import {
   choiceSummary,
@@ -10,9 +15,19 @@ import {
   type AbilityPicks,
 } from '~/services/abilityScoreChoice'
 import { filterBySearch } from '~/services/searchFilter'
-import { cleanEquipmentName } from '~/services/equipment'
+import {
+  attacksFromKit,
+  backgroundKit,
+  isSelectionComplete,
+  parseGoldAmount,
+  resolveStartingKit,
+  rollStartingWealth,
+  startingWealthLabel,
+  type EquipmentSelection,
+} from '~/services/startingEquipment'
+import { bestStartingArmorClass, unarmoredCandidates } from '~/services/armorClass'
 import { dedupeProficiencies } from '~/services/proficiencies'
-import type { Character, AbilityScores, SkillKey } from '~/types/character'
+import type { Character, AbilityKey, AbilityScores, SkillKey } from '~/types/character'
 import type { AbilityScoreChoice } from '~/types/rulepack'
 
 const router = useRouter()
@@ -37,6 +52,8 @@ const draft = reactive({
   abilities: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } as AbilityScores,
   skillChoices: [] as SkillKey[],
   startingGold: false,
+  equipmentSelection: [] as EquipmentSelection,
+  goldInput: '',
 })
 
 // ── Standard array ────────────────────────────────────────────────────────────
@@ -99,6 +116,16 @@ const filteredSubclasses = computed(() => filterBySearch(availableSubclasses.val
 watch(() => draft.classId, () => {
   draft.subclassId = ''
   subclassSearch.value = ''
+})
+
+/**
+ * The class table's 1st-level features, without "Divine Domain" where the domain is
+ * asked for right below: the pipeline drops that placeholder once a subclass supplies
+ * features at the level, so listing it here would promise a feature the sheet won't have.
+ */
+const levelOneFeatures = computed(() => {
+  const features = selectedClass.value?.levels[0]?.features ?? []
+  return needsSubclass.value ? features.filter(f => !isSubclassPlaceholder(f)) : features
 })
 
 /**
@@ -210,6 +237,11 @@ function canProceed() {
   if (step.value === 3) {
     return racialChoices.value.every((c, i) => isChoiceSatisfied(c, racialPicks.value[i] ?? {}))
   }
+  if (step.value === 5) {
+    return draft.startingGold
+      ? parseGoldAmount(draft.goldInput) !== null
+      : isSelectionComplete(equipmentChoices.value, draft.equipmentSelection, equipmentProficiencies.value, rulepackStore)
+  }
   return true
 }
 
@@ -245,6 +277,44 @@ function startingProficiencies(): string[] {
   return dedupeProficiencies(all)
 }
 
+// ── Starting equipment ────────────────────────────────────────────────────────
+const equipmentChoices = computed(() => selectedClass.value?.startingEquipment ?? [])
+const startingWealth = computed(() => selectedClass.value?.startingWealth)
+const selectedSubclass = computed(() =>
+  needsSubclass.value && draft.subclassId ? rulepackStore.getSubclass(draft.subclassId) : undefined)
+
+/**
+ * What the kit is measured against: an "(if proficient)" option, the armour worn and the
+ * attack rolls all read it. The subclass's own grants join the class's, since a Life
+ * cleric's heavy armour is what puts chain mail on the list at all.
+ */
+const equipmentProficiencies = computed(() => [
+  ...startingProficiencies(),
+  ...(selectedSubclass.value ? subclassProficienciesAt(selectedSubclass.value, 1) : []),
+])
+
+const abilityModifiers = computed(() => Object.fromEntries(ABILITY_KEYS.map(k =>
+  [k, Math.floor((effectiveAbilities.value[k] - 10) / 2)])) as Record<AbilityKey, number>)
+
+/** The last roll, kept so the dice can be shown beside the total they made. */
+const wealthRoll = ref<{ rolls: number[]; total: number } | null>(null)
+function rollGold() {
+  if (!startingWealth.value) return
+  wealthRoll.value = rollStartingWealth(startingWealth.value)
+  draft.goldInput = String(wealthRoll.value.total)
+}
+
+// A pick answers one class's bullets, and isSelectionComplete would accept a weapon id
+// left over from another, so a new class or subclass starts the step over. A bullet with
+// one option has nothing to ask and starts answered.
+watch([() => draft.classId, () => draft.subclassId], () => {
+  draft.equipmentSelection = equipmentChoices.value.map(choice =>
+    ({ option: choice.options.length === 1 ? 0 : -1, picks: {} }))
+  draft.goldInput = ''
+  wealthRoll.value = null
+  if (!startingWealth.value) draft.startingGold = false
+})
+
 // ── Create character ──────────────────────────────────────────────────────────
 async function createCharacter() {
   const cls = selectedClass.value
@@ -256,6 +326,22 @@ async function createCharacter() {
       skillProfs[skill] = 1
     }
   }
+
+  // Gold buy takes the place of everything the class and the background would have
+  // handed over, coin included — the rolled figure is the whole purse. Otherwise the kit
+  // is carried, its weapons become attacks, and the best way of wearing it (or of not
+  // wearing it, on a tie) becomes the armour class the sheet derives.
+  const proficiencies = equipmentProficiencies.value
+  const kit = draft.startingGold
+    ? undefined
+    : resolveStartingKit(equipmentChoices.value, draft.equipmentSelection, rulepackStore)
+  const fromBackground = draft.startingGold ? undefined : backgroundKit(selectedBackground.value?.equipment ?? [])
+  const startingArmor = kit && bestStartingArmorClass(
+    kit.armor,
+    unarmoredCandidates(rulepackStore.getAllArmor(), draft.classId, selectedSubclass.value?.id),
+    proficiencies,
+    { modifiers: abilityModifiers.value },
+  )
 
   const character: Character = {
     id: crypto.randomUUID(),
@@ -291,6 +377,7 @@ async function createCharacter() {
     // figure worked out here as well would be counted twice.
     hp: { max: 0, current: 0, temp: 0 },
     armorClass: null,
+    ...(startingArmor ? { armorClassConfig: startingArmor } : {}),
     speeds: speeds.value,
     senses: senses.value,
     initiative: null,
@@ -309,7 +396,9 @@ async function createCharacter() {
     classSpellcasting: {},
     spellSlots: {} as Character['spellSlots'],
     spells: [],
-    attacks: [],
+    attacks: kit
+      ? attacksFromKit(kit, proficiencies, abilityModifiers.value).map(a => ({ id: crypto.randomUUID(), ...a }))
+      : [],
 
     features: [
       ...raceTraits.value.map(t => ({
@@ -333,16 +422,13 @@ async function createCharacter() {
         description: selectedBackground.value.feature.description,
       }] : []),
     ],
-    equipment: draft.startingGold ? [] : (selectedBackground.value?.equipment ?? []).map(item => {
-      const match = item.match(/^(\d+)\s+(.+)$/)
-      return {
-        id: crypto.randomUUID(),
-        // A book may write its list as data references; the sheet wants the name alone.
-        name: cleanEquipmentName((match ? match[2] : item) ?? item),
-        quantity: match?.[1] ? Number.parseInt(match[1]) : 1,
-      }
-    }),
-    currency: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+    equipment: [...(kit?.items ?? []), ...(fromBackground?.items ?? [])]
+      .map(item => ({ id: crypto.randomUUID(), ...item })),
+    currency: {
+      cp: 0, sp: 0, ep: 0, gp: 0, pp: 0,
+      ...fromBackground?.currency,
+      ...(draft.startingGold ? { gp: parseGoldAmount(draft.goldInput) ?? 0 } : {}),
+    },
 
     notes: '',
     createdAt: now,
@@ -559,7 +645,7 @@ function signed(n: number | undefined) {
         <div v-if="selectedClass" class="card space-y-1">
           <p class="section-header">Level 1 Features</p>
           <p class="text-xs text-slate-400">
-            {{ selectedClass.levels[0]?.features.join(', ') || 'None' }}
+            {{ levelOneFeatures.join(', ') || 'None' }}
           </p>
           <p class="text-xs text-slate-500 mt-1">
             Saves: {{ selectedClass.savingThrowProficiencies.map(s => s.toUpperCase()).join(', ') }}
@@ -745,23 +831,44 @@ function signed(n: number | undefined) {
       <!-- ── Step 5: Starting Equipment ── -->
       <template v-if="step === 5">
         <div class="space-y-3">
-          <div class="card">
-            <p class="section-header">Starting Equipment</p>
-            <p class="text-sm text-slate-400">Starting equipment packs will be added automatically from your class and background.</p>
-            <div v-if="selectedBackground?.equipment.length" class="mt-2">
-              <p class="text-xs text-slate-500 mb-1">Background equipment:</p>
-              <ul class="text-sm text-slate-300 space-y-0.5 list-disc list-inside">
-                <li v-for="item in selectedBackground.equipment" :key="item">{{ item }}</li>
-              </ul>
-            </div>
-          </div>
-          <div class="card space-y-3">
+          <!-- Gold buy only where the class prints a wealth roll to buy with. -->
+          <div v-if="startingWealth" class="card space-y-3">
             <div class="flex items-center gap-3">
               <input id="gold-toggle" v-model="draft.startingGold" type="checkbox" class="w-4 h-4 rounded accent-primary-500" />
               <label for="gold-toggle" class="text-sm text-slate-300">Start with gold instead</label>
             </div>
-            <p class="text-xs text-slate-500">You can manually edit your equipment on the character sheet at any time.</p>
+            <template v-if="draft.startingGold">
+              <p class="text-sm text-slate-400">
+                Roll <span class="text-white font-medium">{{ startingWealthLabel(startingWealth) }}</span> and buy
+                your equipment from it. Nothing from your class or background is added.
+              </p>
+              <div class="flex gap-2">
+                <input
+                  v-model="draft.goldInput"
+                  type="text"
+                  inputmode="numeric"
+                  class="input flex-1 min-w-0"
+                  placeholder="Gold pieces"
+                  aria-label="Starting gold in gold pieces"
+                />
+                <button class="btn-primary shrink-0 px-4" @click="rollGold">Roll</button>
+              </div>
+              <p v-if="wealthRoll && String(wealthRoll.total) === draft.goldInput" class="text-xs text-slate-500">
+                Rolled {{ wealthRoll.rolls.join(' + ') }}<template v-if="startingWealth.multiplier !== 1">, × {{ startingWealth.multiplier }}</template>
+                = {{ wealthRoll.total }} gp
+              </p>
+            </template>
           </div>
+
+          <CreationStartingEquipmentPicker
+            v-if="!draft.startingGold"
+            v-model="draft.equipmentSelection"
+            :choices="equipmentChoices"
+            :proficiencies="equipmentProficiencies"
+            :background-name="selectedBackground?.name"
+            :background-equipment="selectedBackground?.equipment ?? []"
+          />
+          <p class="text-xs text-slate-500">You can edit your equipment on the character sheet at any time.</p>
         </div>
       </template>
 

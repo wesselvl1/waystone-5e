@@ -225,7 +225,7 @@ export function checkFeatPrerequisite(character: Character, feat: FeatDefinition
 // Feature names in class level tables that are placeholders for subclass features
 const SUBCLASS_PLACEHOLDER_PATTERN = /\bpath\b|\barchetype\b|\bpatron\b|\bcircle\b|\bdomain\b|\bcollege\b|\bprimal path feature\b|\bsacred oath feature\b|\bwarlord presence\b| feature$/i
 
-function isSubclassPlaceholder(featureName: string): boolean {
+export function isSubclassPlaceholder(featureName: string): boolean {
   return SUBCLASS_PLACEHOLDER_PATTERN.test(featureName)
 }
 

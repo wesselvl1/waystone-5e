@@ -243,8 +243,14 @@ Non-obvious rules encoded in that service:
   `classes[0].level = 1`** — `ADD_HP` and `UPDATE_HIT_DIE` are automatic events like any
   other and supply both, a figure worked out beside the pipeline is counted twice, and the
   level being gained has to be on the character already or a granted feat's retroactive hit
-  points (Tough's +2 per level) miss the 1st level. That contract is guarded by comments in
-  a page file and nothing else: no test reaches into `new.vue`.
+  points (Tough's +2 per level) miss the 1st level. `classes[0].subclassId` may already be
+  set, by the class step of a class that picks at 1st level, and is absent — never `''` —
+  when nothing was picked, since the pipeline asks for a subclass only while the id is
+  undefined. `RESOLVED_SUBCLASS` drops that level's class-table placeholder ("Divine
+  Domain") when the subclass has features there, as `resolveLevelUpEvents` does, so a
+  subclass set before level 1 and one picked in the level-up wizard build the same
+  character. That contract is guarded by comments in a page file and nothing else: no
+  test reaches into `new.vue`.
 
 ### Derived stats
 
@@ -312,6 +318,16 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   not a barbarian's); the calculator drops the shield and says why rather than silently
   dropping it. Nothing switched on mid-fight belongs here — Shield, Blade Song and
   barkskin last a minute, and this is the number on the sheet.
+- **Starting equipment is class data turned into a kit.** A class declares its printed
+  bullets (`startingEquipment`) and its wealth roll (`startingWealth`);
+  `app/services/startingEquipment.ts` resolves the creation wizard's picks into items,
+  weapons and armour, and `new.vue` carries the items, makes an attack of every weapon and
+  stores the best of the ways to dress as `armorClassConfig` (`bestStartingArmorClass`),
+  a tie going to the unarmored feature — the armour is then left to be sold, where Unarmored
+  Defense costs nothing to keep. Gold buy *replaces* the class's and the background's items,
+  coin included: the figure rolled or entered is the whole purse. The selection is reset
+  whenever the class or subclass changes, because `isSelectionComplete` accepts any known
+  weapon id and a pick from another class would otherwise pass it.
 - **A saving throw is derived the way an attack is, and what adds to it is found by
   wording.** `app/services/savingThrows.ts` builds the roll from the ability modifier, the
   proficiency bonus where the class grants it, whatever the character's features say, and
