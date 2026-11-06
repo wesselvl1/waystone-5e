@@ -286,6 +286,8 @@ export const CharacterSchema = z.object({
 
   features: z.array(FeatureSchema),
   equipment: z.array(EquipmentEntrySchema),
+  trackedItemIds: z.array(z.string()).optional(),
+  untrackedItemIds: z.array(z.string()).optional(),
   currency: z.object({
     cp: z.number().int().min(0),
     sp: z.number().int().min(0),

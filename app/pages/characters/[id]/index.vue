@@ -376,6 +376,7 @@ function doLevelUp() {
               <SheetSkills :character="character" @update="onUpdate" />
               <SheetCombatStats :character="character" @update="onUpdate" />
               <SheetAttacksList :character="character" @update="onUpdate" />
+              <SheetItemTracker :character="character" @update="onUpdate" />
             </template>
             <SheetSpellsPanel v-else-if="activeTab === 'spells'" :character="character" @update="onUpdate" />
             <template v-else-if="activeTab === 'features'">

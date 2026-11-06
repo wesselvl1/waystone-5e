@@ -500,6 +500,13 @@ export interface Character {
   // Features & equipment
   features: Feature[]
   equipment: EquipmentEntry[]
+  /**
+   * The item tracker's rows, in display order, as inventory ids. The count is the line's
+   * own quantity — see `app/services/itemTracker.ts`. Absent means nothing placed yet.
+   */
+  trackedItemIds?: string[]
+  /** Ammunition the player took off the tracker, which would otherwise be added on its own. */
+  untrackedItemIds?: string[]
   currency: Currency
   /**
    * What to multiply Strength x 15 by, when the player would rather say than have it
