@@ -401,6 +401,14 @@ All external JSON (character import, rulepack import from file or URL) goes thro
   prompt it is, and the panel prints an entry whose wording is still a prompt as a dashed
   chip.
 
+- **The item tracker under Attacks counts the inventory line itself.** − and + change
+  `EquipmentEntry.quantity`; nothing stores a second number, so the tracker and the Items
+  tab cannot drift. The character keeps only presentation, by inventory id:
+  `trackedItemIds` (row order) and `untrackedItemIds` (ammunition the player took off).
+  Ammunition is tracked without asking, read off the name by `isAmmunition()` in
+  `app/services/itemTracker.ts`, which is how characters made before this get their
+  arrows too. Adding, removing and reordering live behind the card's Edit button; the drag
+  handle stops its touches reaching the page so the tab swipe cannot fire mid-drag.
 - **An item name loses the source it was filed under.** Book content names an item the way
   5etools does (`fine clothes|phb`), and the pipe is a corpus disambiguator that was never
   meant to be read. `cleanEquipmentName()` strips it at creation *and* in
